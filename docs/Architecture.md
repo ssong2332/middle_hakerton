@@ -233,14 +233,119 @@ export interface MediationResult {
   holidayConflicts: HolidayConflict[];   // AC-057
   personalizationApplied: boolean;       // AC-059③ / AC-066③ — 개인화 미적용 표시의 근거
   source: 'live' | 'cache' | 'fallback'; // 🔴 AC-041 — 폴백 중임을 화면에 표시하는 근거
+  ticketOption: TicketOption;            // 🔴 12번째 필드 (2026-08-04 추가, DECISIONS #35) — AC-058 게이트
 }
 ```
 
 **필드 배치 판정은 이미 Planning Decision #49 / T1이 확정했다** — architect는 이를 바꾸지 않고 형식만 고정한다. `misreadRisks[]` 를 `warnings[]` 에 합치지 않는 이유 4가지는 T1 본문에 있다.
 
+🔴 **`ticketOption` 은 기존 11개 필드의 배치를 바꾸지 않는다** — 순서·이름·타입 모두 그대로이며 **12번째로 덧붙는다.** 위치 자체는 이미 `docs/API.md` `POST /api/ticket` 의 "게이트" 행(*"게이트 판정은 `POST /api/mediate` 응답에 포함되며 이 라우트가 자체 게이트를 만들지 않는다"*)이 확정했다 — 빠져 있던 것은 **위치가 아니라 형식**이다. 아래 F1-a가 그 형식을 고정한다.
+
 C6/C7의 결정 권한 필드는 **이름이 다른 두 필드로 공존**한다(AC-064, Planning Decision #84) — `TicketResult.decisionAuthority`(단일값)와 `SummaryResult.decisions[].authorityStatus`(행별). enum과 판정 로직은 `packages/core/src/rules/decision-authority.ts` **한 곳**을 공유한다(Planning Decision #8: C7이 별도 파이프라인을 만들지 않는다).
 
-### F4 — 층 2 어댑터 계약 (T57이 확정할 형태)
+### F1-a — C6 티켓 게이트 판정 필드 (DECISIONS #35 · ADR-0005)
+
+UX-004(UF-003, 게이트 판정처) → UX-007(UF-004, 게이트 통과 시에만 도달) / AC-058
+
+```ts
+// packages/core/src/contract.ts  — 🔒 Freeze Point 1
+export type TicketOptionBasis = 'signal_present' | 'signal_absent' | 'undetermined';
+
+export interface TicketOption {
+  /**
+   * 🔴 화면이 읽는 유일한 값. `true` 일 때만 "Convert to Task Ticket" 링크를 렌더한다(AC-058①).
+   * `false` 면 링크를 레이아웃에서 완전히 제거한다 — 비활성·회색 링크 금지(AC-058②, UX-004 TicketLinkAbsent).
+   */
+  offered: boolean;
+  /**
+   * 🔴 **내부 상태·테스트 출력 전용. 화면에 렌더하지 않는다.**
+   * `offered === true` ⟺ `basis === 'signal_present'` (불변식).
+   * `'undetermined'` = 판정 근거를 얻지 못함(C2 호출 실패·폴백 응답 등) → `offered:false` 로 **fail-closed**.
+   */
+  basis: TicketOptionBasis;
+}
+```
+
+| 판정 | `offered` | `basis` | 화면 | 근거 |
+|---|---|---|---|---|
+| 감정 신호 있음 | `true` | `signal_present` | 링크 렌더 | AC-058② "감정형 케이스에서 정상 제시" |
+| 감정 신호 없음 | `false` | `signal_absent` | 링크 없음(비활성 아님) | AC-058① 대조군 |
+| 판정 불가 | `false` | `undetermined` | 링크 없음 | Conventions 9 "없는 값을 지어내지 않는다" + Error Handling ④ 부분 실패 |
+
+**AC-058 검증 케이스는 이미 존재한다 — 새로 만들지 않는다.** `docs/TestCases.md` 표 B의 **T-E 그룹**(planner 소유)이 그대로 이 필드의 기대값이다: **T-E03**("확인 부탁드립니다" — 검증 항목 *"티켓 변환 옵션 제시 안 함"*) → `{ offered: false, basis: 'signal_absent' }`(AC-058① 대조군) / **T-E01·T-E02·T-E04**(감정형) → `{ offered: true, basis: 'signal_present' }`(AC-058②). 🔴 대조군이 `signal_absent` 가 아니라 `undetermined` 로 통과하면 **AC 통과가 아니라 파이프라인 고장**이다.
+
+**이 형식을 택한 이유 4가지**
+
+1. **AC-058은 boolean 하나로 검증된다.** 요구는 "대조군 1건 미제시 + 감정형 1건 제시"이며 등급·점수·확신도를 요구하지 않는다. 판정 결과보다 많은 것을 응답에 담으면 **AC가 요구하지 않은 감정 데이터를 만들어 내보내는 것**이 된다.
+2. **`basis` 를 따로 둔 이유는 AC-063②의 선례와 같다.** 공휴일은 "충돌 없음"과 "데이터 없음"을 화면에서는 똑같이 아무것도 안 보이게 하되 **내부 상태·테스트 출력에서는 구분**한다. 게이트도 동일하다 — `signal_absent`(정상 판정)와 `undetermined`(판정 실패)가 타입에서 구분되지 않으면 QA가 AC-058의 대조군 통과와 파이프라인 고장을 구별할 수 없다.
+3. **`null` 이 아니라 항상 존재하는 객체다.** AC-062가 티켓 4섹션에 적용한 원칙("생략·빈칸이 아니라 명시")과 같다. `nullable boolean` 은 `if (x)` 에서 `null` 과 `false` 가 같아 보여 **부분 실패가 정상 판정으로 위장**된다.
+4. **fail-closed.** 근거를 얻지 못했을 때 링크를 띄우면 AC-058이 금지한 "항상 제시"에 가까워지고, Conventions 9(근거 없으면 만들지 않는다)에도 걸린다.
+
+🔴 **감정 점수·감정 라벨을 응답에 넣지 않는다 — 명시적 판단이며 누락이 아니다.** 근거는 `docs/PRD.md` Risks의 EU AI Act Article 5(1)(f) 행이다: MVP에 남은 사정권은 AC-018·AC-058 둘뿐이고, 그 방어선은 *"발신자 본인이 방금 입력한 자기 텍스트를 대상으로 하고 결과도 본인에게만 표시된다"* 이다. `emotionScore: number` 나 `emotionLabel: string` 을 계약에 넣으면 **① 응답 payload 자체가 "사람의 감정 상태에 대한 등급 판정"이라는 산출물**이 되어 그 서술과 어긋나고, **② `emotion*` 이라는 이름이 계약에 생기면 AC-070②("감정 분류 함수·프롬프트·저장 필드 부재를 코드 검색으로 확인")의 grep 판정에 잡음이 섞여** 검증 자체가 흐려진다. 필드명을 제품 결정(*티켓 옵션을 제시했는가*)으로 지은 것은 이 두 가지를 동시에 피하기 위한 것이다. 자연어 감정 서술을 담는 자유 문자열도 두지 않는다 — `basis` 는 **enum 3값이 전부**다.
+
+**저장·로그 금지**: `ticketOption` 은 어떤 테이블에도 저장되지 않는다(`POST /api/mediate` 는 저장하지 않으며, `sent_messages` 에 감정 컬럼이 없다 — AC-070②). 구조화 로그에도 필드를 추가하지 않는다(DECISIONS #27의 로그 필드 목록 불변). AC-058의 증거는 **T11 회귀 검증셋의 실행 출력**이며 운영 로그가 아니다.
+
+**소비처**: `[FE]` UX-004 한 곳뿐이다. 확장 패널(UX-016)은 이 필드를 읽지 않는다 — UX-016이 담당하는 Flow 목록에 UF-004(티켓)가 없다. `POST /api/ticket` 은 여전히 **자체 게이트를 만들지 않는다**(`docs/API.md`) — 판정기가 둘이 되면 같은 입력이 두 가지로 갈린다. 따라서 AC-058의 보장은 **UI 레벨의 보장**이며, 라우트를 직접 호출하는 경로까지 막지는 않는다(Security의 Abuse cases 13·14 행이 그 잔여 표면을 이미 다룬다 — 결과는 입력자 본인에게만 표시된다).
+
+### F1-b — 파이프라인 시그니처: DB 조회물이 들어오는 자리 (DECISIONS #36 · ADR-0004)
+
+UX-004(UF-003) · UX-016(UF-011/012/014/015) / AC-015·AC-016·AC-047(용어사전) · AC-013·AC-014(학습 항목) · AC-028(코어 비의존)
+
+```ts
+// packages/core/src/pipeline.ts  — 🔒 Freeze Point 1
+export function run(input: MediationInput, deps: MediationDeps): Promise<MediationResult>;
+
+export interface MediationDeps {
+  /** 실행 수단. core는 인터페이스만 알고 구현(`apps/web/lib/llm/openai.ts`)을 모른다. */
+  llm: LLMClient;
+  /** 🔴 **호출 전에 이미 조회를 마친** DB 산출물. core는 여기서 읽기만 하고 조회하지 않는다. */
+  data: MediationData;
+}
+
+export interface MediationData {
+  /** C5 용어사전 — `dictionary_terms` 전 행(사용자 스코프, DECISIONS #22). 비어 있으면 `[]`. */
+  dictionary: DictionaryEntry[];
+  /** C3 학습 항목 — `profile_learned_items` 전 행. 비어 있으면 `[]`(정상 상태, AC-059). */
+  learnedItems: LearnedItem[];
+}
+
+/** `docs/Database.md` `dictionary_terms` 중 **변환이 읽는 컬럼만**. `id`·`note` 는 화면용이라 넣지 않는다. */
+export interface DictionaryEntry {
+  entryType: 'term' | 'person';
+  sourceText: string;                    // term: 원문 용어 / person: 실명
+  targetText: string | null;             // term: 유지할 표기. null이면 원문 유지
+  koHonorific: string | null;            // person 전용
+  enHonorific: string | null;            // 🔴 person 전용. null이면 추측 생성 금지(AC-047②③)
+}
+
+/** `docs/Database.md` `profile_learned_items` 중 변환이 읽는 컬럼만. */
+export interface LearnedItem {
+  patternKey: string;                    // diff_records.pattern_key 와 같은 어휘
+  value: string;
+  // observed_count 는 넣지 않는다 — CHECK ≥ 3 이라 행의 존재 자체가 3회 도달을 뜻한다(AC-013)
+}
+```
+
+**어디에 넣을지의 판정표 (표에 없는 케이스가 나오면 임의 판단하지 말고 이 표에 행을 추가한다)**
+
+| 이 값이 | then | 이유 |
+|---|---|---|
+| 이 요청 **당사자 1인의 속성 객체**(발신자 프로필, 그 쌍의 규약, 수신자 국가·타임존) | `MediationInput` 안 — T1이 확정한 4필드 구조 그대로 | 이미 `SenderContext.profile` / `RecipientContext.protocol` 에 자리가 있다. **바꾸지 않는다** |
+| 변환이 **참조하는 목록형 조회물**(용어사전 N행, 학습 항목 N행) | `deps.data` | 당사자 서술이 아니라 참조 자료이고 건수가 가변이다 |
+| **실행 수단**(LLM 호출, 향후 시계 등) | `deps` 최상위 | `LLMClient` 가 이미 이 자리다 |
+| core가 **직접 조회** | ❌ **금지** | 위 "의존 방향 규칙" — `packages/core` 는 `@supabase/*` 를 import 할 수 없다. ESLint `no-restricted-imports` 가 빌드를 실패시킨다 |
+
+🔴 **`MediationInput` 은 T1이 확정한 4필드에서 늘어나지 않는다.** 앞으로 발견되는 DB 조회물은 전부 `deps.data` 로 간다 — 이 규칙이 없으면 T10·T28에서 사람마다 다른 자리에 넣는다.
+
+**조회 함수가 아니라 조회 *결과*를 넘기는 이유 3가지**
+
+1. **`Layers & Module Boundaries` 의 core 박스가 이미 이것을 규정한다** — *"I/O는 전부 인자와 반환값으로만"*. `loadDictionary(): Promise<…>` 를 주입하면 core 안에서 저장소 실패가 발생하고, **어느 층이 예외를 잡는가**(Error Handling 표: `withApi()` 한 곳)가 흐려진다.
+2. **부분 실패 정책이 한 곳에 남는다.** 사전 조회 실패가 중재 전체를 실패시키지 않아야 하는데(Error Handling ④), 조회를 Route Handler가 하면 그 판단이 **`withApi()` 안 한 곳**에 있고, core가 하면 스텝마다 흩어진다.
+3. **T11(회귀 검증셋 26건)이 목 없이 돈다.** 순수 함수라 픽스처를 그대로 넣으면 되고, "하나의 실행 출력" 요구가 저장소 목 설정 없이 성립한다.
+
+**수용한 대가**: `urgency === 'CRITICAL'` 이면 C3를 건너뛰므로(Data Flow ③) 그때는 `learnedItems` 조회 1건이 **버려진다.** 같은 요청에서 이미 4~5건을 읽고 있고 동시 사용자 10명(NFR Scale) 규모라 무시할 수 있는 값이며, 그 대가로 얻는 것이 위 3가지다.
+
+🔴 **프롬프트 주입 방어의 소유자**: `dictionary` 값은 사용자 자신의 데이터지만 **지시문이 아니라 데이터로 취급**한다 — 구분자로 감싼 데이터 블록으로 넣는 책임은 `packages/core/src/prompts/`(C2 프롬프트 빌더)에 있고 Route Handler에 있지 않다(Security의 Abuse cases 12행).
 
 ```ts
 // apps/extension/src/layer1/registry.ts  — 🔒 Freeze Point 2
@@ -266,18 +371,22 @@ export interface Layer2Adapter {
    ▼
 withApi(): 세션 확인 → zod 입력 검증 → rate limit 확인 (AC-041)
    ▼
-core/pipeline.run()                                    ← 순서 고정 (AC-032)
+🔴 조회는 여기서 끝난다 — dictionary_terms · profile_learned_items 를 읽어 deps.data 를 만든다 (F1-b)
+   ▼
+core/pipeline.run(input, deps)                         ← 순서 고정 (AC-032)
    ① C1 분류 ─────────────────────────────────────► urgency + reason
    ②  CRITICAL 이면 예약·지연 경로를 건너뛰고 톤 정제만 (AC-005)
    ③ C3 프로필 조회  ← profiles / profile_learned_items
         └ 프로필이 비었으면(skipped) **건너뛴다. 추측 기본값을 넣지 않는다** (AC-059②③)
    ④ 쌍방 규약 조회  ← pair_protocols   (충돌 시 규약 우선 — Planning Decision #26)
-   ⑤ C5 용어사전 주입 ← dictionary_terms (프롬프트에 주입, 별도 LLM 호출 아님)
+   ⑤ C5 용어사전 주입 ← deps.data.dictionary (프롬프트에 주입, 별도 LLM 호출 아님 · F1-b)
+        └ core가 조회하지 않는다 — 위에서 이미 조회된 것을 인자로 받는다 (AC-028)
    ⑥ C2 톤 변환 ─── 🔴 한 번의 LLM 호출로 transformed / preserved / warnings /
                         misreadRisks / holidayConflicts 를 **함께** 산출
                         (추가 호출 금지 — NFR 체감 5초 + Decision #29)
    ⑦ C4 역번역 ────────────────────────────────────► backTranslation
    ⑧ 감정 신호가 있으면 C6 티켓 링크를 "제시만" (AC-058 — 항상 제시/항상 미제시 금지)
+        └ 판정은 ticketOption { offered, basis } 로 나간다 (F1-a). 점수·라벨을 만들지 않는다
    ▼
 응답 → [UX-004] 비교 뷰 렌더 (승인 전)
    ▼
@@ -368,6 +477,20 @@ Outcome of architect's Security Design Checklist (see .claude/agents/architect.m
 | Dependency risk | **신규 의존성 전부 `docs/DECISIONS.md` 에 행이 있다**: `next`·`react`(#1), `@supabase/supabase-js`·`@supabase/ssr`(#4), `openai`(#7), `zod`(#12), `vitest`(#13), `eslint`+`prettier`(#14), `vite`(#15). **유지보수 위험 판정**: 8개 모두 주요 프로젝트이며 미유지보수·알려진 위험 패키지 **0건**. ⚠️ 다만 **취약점 스캔을 이번 세션에 실행하지 않았다(추정)** — 확인 수단: T2 스캐폴드 직후 `npm audit --omit=dev` 1회 실행, 결과를 T2 보고에 첨부. **정책**: 위 8개 외의 신규 의존성은 `docs/CodingRules.md` Prohibitions에 따라 DECISIONS.md 행 없이 추가할 수 없다 |
 | Abuse cases | 아래 별도 표 |
 
+### C6 게이트 판정과 EU AI Act 방어선 (2026-08-04 추가 · DECISIONS #35 · ADR-0005)
+
+위 "Sensitive data" 행에 대한 보충이다 — **AC-058 게이트 판정이 응답 payload에 무엇을 남기는가**를 설계 시점에 못 박는다.
+
+| 항목 | 결정 |
+|---|---|
+| 응답에 담는 것 | `ticketOption: { offered: boolean, basis: 'signal_present'\|'signal_absent'\|'undetermined' }` **이것이 전부다**(F1-a) |
+| 응답에 담지 **않는** 것 | 🔴 **감정 점수(수치)·감정 라벨(분노/불만 등)·감정에 대한 자연어 서술.** 계약에 `emotion*` 이라는 이름의 필드를 만들지 않는다 |
+| 저장 | **없음.** `POST /api/mediate` 는 저장하지 않고, `sent_messages` 에 감정 컬럼이 존재하지 않는다(AC-070②) |
+| 로그 | **없음.** DECISIONS #27의 로그 필드 목록에 추가하지 않는다 |
+| 노출 대상 | **발신자 본인만.** 관리자·수신자·제3자에게 전달되는 경로가 존재하지 않는다(AC-018의 [우려 수준]과 같은 방어선) |
+| 근거 | `docs/PRD.md` Risks의 EU AI Act Article 5(1)(f) 행 — MVP에 남은 사정권은 AC-018·AC-058 둘뿐이며, 방어 서술은 *"발신자 본인이 방금 입력한 자기 텍스트를 대상으로 하고 결과도 본인에게만 표시된다"* 이다. **점수·라벨을 payload에 두면 그 서술과 어긋난다** — 그 순간 산출물이 "본인 입력에 대한 옵션 제시"가 아니라 "사람의 감정 상태에 대한 등급 판정"이 된다 |
+| ⚠️ 등급 | 위 행이 **리스크를 0으로 만들지 않는다.** PRD가 이미 *"AC-018·AC-058이 여전히 감정 관련 처리를 하므로 리스크가 0이 되지 않는다"* 고 명시했고 **법률 자문은 없다(추정)**. 이 설계가 하는 일은 노출을 **AC-058이 요구하는 최소치로 묶어 두는 것**이지 안전을 단정하는 것이 아니다 |
+
 ### Abuse cases (MVP 기능별 1문장)
 
 | MVP # | 기능 | 악용·오용 시나리오 | 이 설계의 대응 |
@@ -441,7 +564,8 @@ implementer가 지켜야 할 아키텍처 규칙. 위반은 reviewer의 Major �
 8. **자동 발송·자동 클릭 코드 경로를 만들지 않는다.** "없음"이 검증 대상이므로(AC-010/AC-040), 나중에 쓸 생각으로도 만들지 않는다.
 9. **없는 값을 지어내지 않는다.** `미정`/`불명`/`미등록`/빈 배열이 정상 반환값이다(AC-020/043②/047②/050①/065⑤). 기본값으로 채우는 코드가 곧 AC 위반이다.
 10. **프롬프트는 `packages/core/src/prompts/` 에 두고 `PROMPT_VERSION` 을 함께 올린다.** 캐시 키에 들어가므로, 올리지 않으면 프롬프트를 고쳐도 옛 응답이 반환된다.
-11. **네이밍/디렉터리/스타일 세부 규칙은 `docs/CodingRules.md`(User 소유)** — architect는 편집하지 않는다. 현재 Naming/Directory/Style 표가 비어 있어 DoD Gate "Lint passes"가 실행 불가 상태이며, 초안은 보고서에서 권고했다.
+11. **DB 조회물은 core 밖에서 조회해 `deps.data` 로 넘긴다.** core 안에 조회 함수·조회 인터페이스를 만들지 않는다(조회 *결과*만 받는다 — F1-b). 새 조회물이 생기면 F1-b의 판정표에 행을 추가한 뒤 반영하고, 임의로 `MediationInput` 에 필드를 늘리지 않는다. 위반 판정: `packages/core` 안에 `Promise` 를 반환하는 저장소성 인자가 새로 생긴 diff(예외: `LLMClient`).
+12. **네이밍/디렉터리/스타일 세부 규칙은 `docs/CodingRules.md`(User 소유)** — architect는 편집하지 않는다. 현재 Naming/Directory/Style 표가 비어 있어 DoD Gate "Lint passes"가 실행 불가 상태이며, 초안은 보고서에서 권고했다.
 
 ---
 
@@ -484,6 +608,8 @@ Every row gets a decision or an explicit "N/A — reason"; never blank.
 | 로컬·프로덕션이 **Supabase 프로젝트 1개**를 공유 | 개발 중 실수가 프로덕션 데이터에 닿는다. 완화 = 계정 단위 분리 + RLS. **그럼에도**: Free 티어 **활성 프로젝트 2개 제한**(measured, supabase.com/pricing)과 17일 안의 2환경 스키마 동기화 비용. **2개를 환경 분리에 다 쓰면 여유분이 0이 되어 사고 시 복구용 프로젝트를 만들 수 없다** — 이 점이 1개 공유를 택한 결정적 이유다 | — |
 | Vercel Hobby | 🔴 **비상업·개인 사용 전용 제약이 실재한다 — `추정`이 아니라 `measured`다**(*"the Hobby plan restricts users to non-commercial, personal use only"*, vercel.com/docs/plans/hobby, 2026-08-04 오케스트레이터 직접 열람). **MVP 기간(~2026-08-21)에는 차단 요인이 아니다** — 해커톤 제출·시연은 비상업이다. **걸리는 시점은 상용화다**: Planning Decision #27(실사용자 확장)과 Open Question #6 결정(좌석당 $8~12 구독, Monetization user-approved)이 실행되는 순간 이 제약에 정면으로 걸리며 **Pro($20/user/월)로 전환해야 한다.** 즉 이 무료 선택은 **MVP 한정 유효**이며 수익 모델과 함께 재검토 대상이다. <br>부수 제약(measured): 런타임 로그 보존 1시간 → `llm_call_log` 로 완화(DECISIONS #26). 조직 소유 리포 연결 불가 → **우리 리포는 개인 계정 소유라 해당 없음**(Deployment 절). <br>**그럼에도 채택한 이유**: Planning Decision #28의 무료·기본 서브도메인 조건을 만족하면서 **즉시 롤백**(Promote to Production)이 되는 가장 짧은 경로 | — |
 | Supabase Free 프로젝트가 **1주 미사용 시 일시정지**(measured) | 발표 직전 정지되면 시연이 죽는다. **완화**: 8/4~8/21 사이 매일 개발·리허설 트래픽이 있어 현실적 위험은 낮다. **T36 배포 동결 점검에 "Supabase 프로젝트 상태 active 확인" 1줄을 넣는다** | — |
+| **C6 게이트 판정을 `{ offered, basis }` 2필드로만 (감정 점수·라벨 미채택)** | 게이트가 왜 안 떴는지 **사용자에게 설명하지 않는다**(`basis` 미렌더). 임계값을 조정하려면 재배포가 필요하다(FE에서 점수를 다시 판정하지 않으므로). **그럼에도**: AC-058이 요구하는 것은 옵션 제시 여부뿐이고, 점수·라벨을 응답에 두는 순간 산출물의 성격이 "옵션 제시"에서 **"사람의 감정 상태에 대한 등급 판정"** 으로 바뀌어 PRD Risks의 EU AI Act 방어 서술과 어긋난다. ⚠️ **리스크가 0이 되는 것은 아니다 — 법률 자문 없음(추정)** | [0005](adr/0005-c6-ticket-gate-field.md) |
+| **DB 조회물을 조회 *함수*가 아니라 조회 *결과*로 core에 주입** | `CRITICAL` 로 C3를 건너뛸 때 `learnedItems` 조회 1건이 **버려진다.** Route Handler가 그만큼 두꺼워진다. **그럼에도**: core가 순수 함수로 남아야 T11(회귀 26건)이 저장소 목 없이 "하나의 실행 출력"을 내고, 저장소 실패가 core 안에서 터지지 않아야 *"예외는 `withApi()` 한 곳"* 이라는 Error Handling이 유지된다. 버려지는 조회 1건은 동시 10명(NFR Scale)에서 무의미하다 | [0004](adr/0004-core-pipeline-input-vs-deps.md) |
 | **채택하지 않은 더 정교한 대안 — 왜 지금은 아닌가** | **Hexagonal/Clean Architecture 3계층 + DI 컨테이너**: 코어 순수성은 이미 패키지 경계로 얻었고, 추가 계층은 파일 수만 3배로 만든다 — 17일·4명에서는 경계가 아니라 **경계를 지날 때마다 드는 타이핑**이 병목이다. / **이벤트 소싱/아웃박스**: mock-send 제품에 전달 보장이 필요 없다. / **BFF 분리**: 클라이언트가 웹·확장 2개이고 **둘이 같은 계약을 쓰는 것이 AC-028의 요구사항**이라 BFF는 요구를 정면으로 거스른다. / **Feature flag 시스템**: 컷이 "파일 삭제"라서 런타임 플래그가 필요 없다. 플래그를 넣으면 컷된 코드가 리포에 남아 컴파일 대상이 된다 | — |
 
 ---
