@@ -7,17 +7,17 @@
 
 ## 개발 진행 상태 (반드시 먼저 읽어주세요)
 
-🔴 **현재 이 저장소에는 실행 가능한 소스코드가 없습니다.** 기획(PRD)과 UX 설계 문서만 완료되어 있고, 구현은 아직 착수 전입니다.
+🟡 **모노리포 스캐폴드와 코어 I/O 계약은 존재하지만, 제품 기능(로그인·C1~C7 등)은 대부분 아직 구현 전(`todo`)입니다.** `apps/web`(Next.js) · `apps/extension`(Chrome 확장) · `packages/core`(엔진)에 실제 소스가 있으나, 화면은 대부분 빈 스캐폴드이며 백엔드 API·인증·LLM 연동은 아직 붙지 않았습니다.
 
 | 항목 | 상태 |
 |---|---|
 | PRD (docs/PRD.md) | 완료 (v3.2) |
 | UX 설계 (docs/UX.md) | 완료 (v6.0) |
-| Architecture (docs/Architecture.md) | 미착수 (architect 에이전트 미실행 — 템플릿 상태) |
-| 구현 태스크 (docs/Tasks.md) | 총 72건, **전부 `todo`**(2026-08-04 기준 실측) |
+| Architecture (docs/Architecture.md) | 완료 — 기술 기반 6항목 사용자 승인 완료(2026-08-04), 상세는 문서 참조 |
+| 구현 태스크 (docs/Tasks.md) | 총 72건 — **`done` 2건**(T1 코어 I/O 계약 동결, T2 Next.js/Vite 모노리포 스캐폴드) · **`todo` 70건**(2026-08-04 기준 실측, `docs/Tasks.md` Status 열) |
 | 목표 제출일 | 2026-08-21 |
 
-따라서 아래 "핵심 기능"은 **PRD·UX에 명세된 예정 기능**이며, 현재 동작하지 않습니다. 이 문서의 어떤 문장도 "이미 동작한다"는 뜻으로 읽혀서는 안 됩니다.
+따라서 아래 "핵심 기능"은 **PRD·UX에 명세된 예정 기능**이며, T1·T2를 제외하면 현재 동작하지 않습니다. 이 문서의 어떤 문장도 "핵심 기능(C1~C7 등)이 이미 동작한다"는 뜻으로 읽혀서는 안 됩니다.
 
 ## 해커톤 맥락
 
@@ -76,23 +76,59 @@
 
 이 프로젝트는 로컬 비밀값 관리를 위해 `.env` 파일을 사용합니다. `.env`는 git에 커밋되지 않으며, `.env.example`만 저장소에 포함됩니다.
 
-현재 `.env.example`에 정의된 항목(플레이스홀더만 표기, 실제 값 없음):
+`.env.example`에 정의된 항목(플레이스홀더 이름만 표기, 실제 값 없음 — 근거: `.env.example`):
 
 | 변수 | 용도 |
 |---|---|
-| `YOUR_API_KEY` | 외부 서비스 연동용 API 키 |
-| `YOUR_SECRET` | 애플리케이션 시크릿(세션 서명, 암호화 등) |
-| `DATABASE_URL` | 데이터베이스 연결 문자열 |
+| `OPENAI_API_KEY` | OpenAI API 키. 서버 전용 — `NEXT_PUBLIC_` 접두사를 붙이지 않는다(붙이면 클라이언트 번들에 노출됨) |
+| `OPENAI_MODEL` | 사용할 OpenAI 모델명. 코드에 하드코딩하지 않고 이 값으로 등급 조정 |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL. 클라이언트에서 쓰이므로 `NEXT_PUBLIC_` 접두사 필요 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key. 클라이언트 노출 전제(RLS가 인가를 강제) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key. 서버 전용, RLS 우회 — `apps/web/lib/supabase/server.ts`의 `createServiceClient()` 한 곳에서만 사용 |
+| `MAX_LLM_CALLS_PER_USER_PER_DAY` | 사용자당 일일 LLM 호출 상한 |
+| `MAX_LLM_CALLS_GLOBAL_PER_DAY` | 전역 일일 LLM 호출 상한 |
 
-> 위 항목은 구현 착수 전 기본값입니다. PRD에 언급된 `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` 등은 백엔드 구현 태스크(T3) 완료 시 `.env.example`과 이 표에 반영될 예정이며, 아직 확정되지 않았습니다.
+Supabase URL/키, OpenAI 키 등 실제 값은 이 저장소에 없습니다 — 팀 내부에서 직접 전달받아 로컬 `.env`에 채워 넣으세요.
 
-실행 방법(설치·빌드·실행 커맨드)은 아직 존재하지 않습니다 — 소스코드가 없으므로 이 문서에서 임의로 지어내지 않습니다.
+## 설치 및 실행
 
-## 기술 스택 (예정/후보 — 미확정)
+Node.js 22(이상 권장 — CI가 22를 사용, `.github/workflows/ci.yml`) 및 npm workspaces 기반 모노리포입니다.
 
-`docs/Architecture.md`가 아직 비어 있어(architect 에이전트 미실행) 기술 스택은 확정되지 않았습니다. 아래는 `docs/PRD.md`에서 언급된 후보이며, 확정된 결정이 아닙니다.
+```bash
+# 의존성 설치 (루트에서 한 번, 모든 workspace 포함)
+npm install
 
-- 웹앱: Next.js(TypeScript) — 후보
-- 데이터/인증: Supabase — 후보
-- AI 모델 호출: OpenAI API(백엔드 경유, 키 비노출) — 후보
-- 브라우저 확장: Chrome 확장(개발자 모드 로드) — 후보
+# .env 준비
+cp .env.example .env   # 값은 위 표를 참고해 직접 채워 넣기
+
+# 웹앱 개발 서버 (apps/web, Next.js)
+npm run dev --workspace apps/web
+
+# 브라우저 확장 빌드 (apps/extension, Vite → dist)
+npm run build:ext
+
+# 코어/전체 검증
+npm run lint
+npm run typecheck
+npm test
+npm run build          # apps/web 프로덕션 빌드
+```
+
+⚠️ 위 명령은 `package.json`의 scripts와 일치하도록 확인했습니다(devDependency 실행이나 기능 완결을 보장하지 않습니다). 현재 대부분의 화면·API는 스캐폴드 단계이므로 `npm run dev`로 서버는 뜨지만 로그인·C1~C7 등 실제 기능은 아직 동작하지 않습니다(위 "개발 진행 상태" 참고).
+
+## 기술 스택
+
+`docs/Architecture.md`에서 기술 기반 6항목이 2026-08-04 사용자 승인으로 확정되었습니다. 상세 근거·대안 비교는 `docs/Architecture.md` Tech Stack 및 `docs/adr/`를 참고하세요.
+
+- 언어: TypeScript(strict)
+- 웹앱: Next.js 16(App Router) — 프론트 + Route Handler 백엔드 통합
+- 모노리포: npm workspaces (`apps/web`, `apps/extension`, `packages/core`)
+- 코어 엔진: `packages/core` — 프레임워크·DB·HTTP 클라이언트 의존성 0
+- DB 엔진/호스팅: PostgreSQL 15+ / Supabase 관리형 Postgres(Free)
+- 인증: Supabase Auth(이메일+비밀번호) + RLS
+- AI 모델 호출: OpenAI API(백엔드 Route Handler 경유, 키 비노출)
+- 브라우저 확장: Chrome Manifest V3, Vite(라이브러리 모드)
+- 테스트: Vitest + `@testing-library/react`
+- 린트/포맷: ESLint(flat config) + Prettier
+- CI: GitHub Actions(lint → typecheck → test → build)
+- 배포: Vercel Hobby (`*.vercel.app` 기본 서브도메인)
