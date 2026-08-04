@@ -56,7 +56,13 @@ export interface LLMResponse {
  * | 캐시 적중 | `{ source: 'cache' }` **반환**. LLM 호출 0건 | AC-041 |
  * | 실호출 성공 | `{ source: 'live' }` **반환** | AC-041 |
  * | 호출 실패·상한 초과·크레딧 소진이지만 **폴백 응답이 있다** | 🔴 **던지지 않고** `{ source: 'fallback' }` 을 **반환**한다 | `docs/API.md` *"LLM 계열은 오류 응답보다 폴백 200이 우선이다"* — `packages/core/src/data/fallback-responses.ts` 에서 찾으면 `200` + `source:"fallback"` |
- * | **폴백조차 없다** | 🔴 `LLMUnavailableError` 를 **던진다** | `docs/API.md` Errors 행 *"503 `LLM_UNAVAILABLE`(폴백도 없을 때)"* |
+ * | **폴백조차 없고, 원인이 실제 호출 실패다**(네트워크·5xx·응답이 `LLM_MALFORMED`로 검증 실패) | 🔴 `LLMUnavailableError` 를 **던진다**(`retryable: true` — 재시도하면 성공할 수도 있다) | `docs/API.md` Errors 행 *"503 `LLM_UNAVAILABLE`(폴백도 없을 때)"*, `retryable` 값은 `docs/API.md:42` |
+ * | **폴백조차 없고, 원인이 요청 상한 초과다**(OpenAI를 아예 호출하지 않았다) | 🔴 `QuotaExceededError` 를 **던진다**(`retryable: false` — 오늘 안에 재시도해도 동일하게 실패한다) | `docs/API.md` `QUOTA_EXCEEDED` 행, `retryable` 값은 `docs/API.md:44`, `packages/core/src/errors.ts` `QuotaExceededError` JSDoc |
+ *
+ * ⚠️ **2026-08-04 정정**: 위 두 행은 원래 하나(`LLMUnavailableError`만)였고, 그 상태에서
+ * `errors.ts`의 `QuotaExceededError` JSDoc이 "폴백조차 없을 때의 잔여 경로"라고 같은 상황을
+ * 자기 것으로 주장해 두 T1 파일이 모순됐다(reviewer REJECTED). 위와 같이 원인별로 분리해
+ * 모순을 없앴다 — 구현은 `apps/web/lib/llm/openai.ts`.
  *
  * 🔴 **core는 이 예외를 잡지 않는다.** `packages/core` 와 `apps/web/lib` 는 **던지기만** 하고
  * 잡는 곳은 `apps/web/lib/http.ts` 의 `withApi()` **한 곳뿐**이다
