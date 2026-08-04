@@ -68,6 +68,21 @@ export class QuotaExceededError extends CoreError {
   readonly retryable = false as const;
 }
 
+/**
+ * `docs/API.md` `LLM_MALFORMED`(502) — LLM 응답이 **step별 스키마 검증**에 실패했을 때.
+ * `apps/web/lib/llm/openai.ts`의 step-agnostic 검증(문자열 존재 + JSON 파싱 가능 여부)은
+ * 이미 통과했지만, 필드 의미(예: C4가 기대하는 `{ backTranslation: string }` 형태)는 각
+ * 스텝이 검증한다(`packages/core/src/llm/client.ts` `LLMClient` JSDoc "step별 응답 스키마…
+ * 그 태스크들이 정한다"). 🔴 이 클래스는 T2가 만든 4개(`ValidationError` 등)에 없던 것을
+ * 처음 던지는 태스크(T5, C4)가 추가한다 — 파일 상단 주석의 "그 에러를 처음 던지는 태스크가
+ * 정한다"가 이 추가의 근거다. `retryable: true` — 같은 입력에도 모델이 다른(정상) 응답을
+ * 낼 수 있어 재시도가 의미 있다(`docs/API.md:43`).
+ */
+export class LLMMalformedResponseError extends CoreError {
+  readonly code = 'LLM_MALFORMED' as const;
+  readonly retryable = true as const;
+}
+
 /** `docs/API.md` `NOT_FOUND`(404) — 대상 없음(타인 소유 포함, RLS 결과). */
 export class NotFoundError extends CoreError {
   readonly code = 'NOT_FOUND' as const;
