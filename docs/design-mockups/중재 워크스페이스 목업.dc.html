@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  body { margin:0; background:#f3f2f2; color:#201e1d; font-family:"Archivo",system-ui,sans-serif; font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased; }
+  *, *::before, *::after { box-sizing:border-box; }
+  a { color:#ae1800; text-underline-offset:3px; }
+  a:hover { color:#dd2b0f; }
+  :focus { outline:none; }
+  :focus-visible { outline:2px solid #ec3013; outline-offset:2px; }
+  ::selection { background:rgba(236,48,19,0.3); }
+  input, textarea, button, select { font-family:inherit; border-radius:0; }
+  @keyframes om-sweep { 0% { transform:translateX(-100%); } 100% { transform:translateX(300%); } }
+  @keyframes om-spin { to { transform:rotate(360deg); } }
+</style>
+</helmet>
+
+<div style="padding:48px 56px 96px; max-width:1560px">
+
+  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:32px; borderBottom:2px solid rgba(32,30,29,0.4); paddingBottom:14px; marginBottom:8px">
+    <div>
+      <div style="font:600 10px 'IBM Plex Mono',monospace; letterSpacing:0.14em; color:rgba(32,30,29,0.55)">UI MOCKUP · 시각 참조용 · 명세는 별도 문서가 기준</div>
+      <h1 style="font:800 40px 'Archivo',sans-serif; letterSpacing:-0.02em; margin:6px 0 0">중재 워크스페이스 &amp; 확장 프로그램 패널</h1>
+    </div>
+    <div style="font:600 10px 'IBM Plex Mono',monospace; letterSpacing:0.1em; textAlign:right; color:rgba(32,30,29,0.55); lineHeight:1.9">
+      <div>UX-004 · 2패널 중재 워크스페이스</div>
+      <div>UX-016 · 선택 텍스트 중재 패널</div>
+      <div>UX-017 · 확장 프로그램 개인정보 고지</div>
+    </div>
+  </div>
+
+  <!-- ══ UX-004 ══════════════════════════════════════════════════ -->
+  <div style="marginTop:56px" data-screen-label="UX-004 Desktop">
+    <div style="display:flex; alignItems:baseline; gap:12px; marginBottom:14px">
+      <div style="font:800 13px 'Archivo',sans-serif; letterSpacing:0.09em; textTransform:uppercase">UX-004 — 2패널 중재 워크스페이스</div>
+      <div style="font:400 11px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.55)">Desktop 1180 · 상태 토글로 전환</div>
+    </div>
+
+    <div style="border:1px solid rgba(32,30,29,0.25); background:#f8f4f4; padding:12px 14px; marginBottom:18px; display:grid; gap:10px">
+      <div style="display:flex; alignItems:center; gap:10px; flexWrap:wrap">
+        <span style="font:600 9px 'IBM Plex Mono',monospace; letterSpacing:0.12em; width:78px; color:rgba(32,30,29,0.6)">상태</span>
+        <sc-for list="{{ ux4States }}" as="o" hint-placeholder-count="6">
+          <button type="button" style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex; alignItems:center; gap:10px; flexWrap:wrap">
+        <span style="font:600 9px 'IBM Plex Mono',monospace; letterSpacing:0.12em; width:78px; color:rgba(32,30,29,0.6)">긴급도</span>
+        <sc-for list="{{ urgencyOpts }}" as="o" hint-placeholder-count="3">
+          <button type="button" style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</button>
+        </sc-for>
+        <span style="width:14px"></span>
+        <span style="font:600 9px 'IBM Plex Mono',monospace; letterSpacing:0.12em; color:rgba(32,30,29,0.6)">오해 위험</span>
+        <sc-for list="{{ riskOpts }}" as="o" hint-placeholder-count="3">
+          <button type="button" style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex; alignItems:center; gap:10px; flexWrap:wrap">
+        <span style="font:600 9px 'IBM Plex Mono',monospace; letterSpacing:0.12em; width:78px; color:rgba(32,30,29,0.6)">조건</span>
+        <sc-for list="{{ ux4Toggles }}" as="o" hint-placeholder-count="6">
+          <button type="button" style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- frame -->
+    <div style="width:1180px; background:#f3f2f2; border:2px solid #201e1d; boxShadow:0 3px 10px rgba(45,43,43,0.16)">
+      <div style="display:flex; alignItems:center; justifyContent:space-between; padding:10px 16px; borderBottom:2px solid #201e1d">
+        <div style="display:flex; alignItems:center; gap:14px">
+          <span style="font:800 13px 'Archivo',sans-serif; letterSpacing:0.14em">MEDIATE</span>
+          <span style="width:1px; height:14px; background:rgba(32,30,29,0.3)"></span>
+          <span style="font:600 11px 'Archivo',sans-serif; color:rgba(32,30,29,0.6)">메시지 중재</span>
+        </div>
+        <div style="display:flex; gap:16px; font:600 11px 'Archivo',sans-serif; color:rgba(32,30,29,0.6)">
+          <span>발송 내역</span><span>용어 사전</span><span>프로필</span>
+        </div>
+      </div>
+
+      <div style="display:grid; gridTemplateColumns:1fr 1fr">
+        <!-- LEFT: sender -->
+        <div style="padding:18px 18px 20px">
+          <div style="font:800 10px 'Archivo',sans-serif; letterSpacing:0.14em; marginBottom:14px">발신자</div>
+
+          <div style="display:grid; gap:5px; marginBottom:14px">
+            <div style="display:flex; alignItems:baseline; justifyContent:space-between; gap:12px">
+              <label for="ux4-rcpt" style="font:600 11px 'Archivo',sans-serif">수신자</label>
+              <a href="#ux018" style="font:600 11px 'Archivo',sans-serif; color:#ae1800">상대방 정보 보강</a>
+            </div>
+            <input id="ux4-rcpt" type="email" value="minjun.kim@acme.io" style="width:100%; padding:7px 9px; font:400 13px 'Archivo',sans-serif; color:#201e1d; background:#f8f4f4; border:1px solid #201e1d" style-focus="outline:2px solid #ec3013; outline-offset:1px">
+          </div>
+
+          <div style="display:grid; gap:5px; marginBottom:6px">
+            <label for="ux4-msg" style="font:600 11px 'Archivo',sans-serif">메시지</label>
+            <sc-if value="{{ isEmpty }}">
+              <textarea id="ux4-msg" rows="6" placeholder="보낼 메시지를 입력하세요" style="width:100%; padding:9px; font:400 13px 'Archivo',sans-serif; lineHeight:1.6; color:#201e1d; background:#f8f4f4; border:1px solid #201e1d; outline:2px solid #ec3013; outlineOffset:2px; resize:vertical"></textarea>
+            </sc-if>
+            <sc-if value="{{ hasText }}" hint-placeholder-val="{{ true }}">
+              <textarea id="ux4-msg" rows="6" style="width:100%; padding:9px; font:400 13px 'Archivo',sans-serif; lineHeight:1.6; color:#201e1d; background:#f8f4f4; border:1px solid #201e1d; resize:vertical" style-focus="outline:2px solid #ec3013; outline-offset:2px">이번 주까지 API 문서 주세요. 계속 늦어서 일정이 다 밀립니다 😤</textarea>
+            </sc-if>
+          </div>
+          <sc-if value="{{ showCharCount }}">
+            <div style="display:flex; alignItems:center; gap:6px; marginBottom:12px; font:400 11px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.6)">
+              <span style="display:inline-flex; alignItems:center; justifyContent:center; width:13px; height:13px; border:1px solid rgba(32,30,29,0.5); font:600 9px 'Archivo',sans-serif">i</span>
+              <span>4,812 / 5,000자 — 안내용 표시이며 입력은 제한되지 않습니다</span>
+            </div>
+          </sc-if>
+          <div style="height:12px"></div>
+
+          <sc-if value="{{ showPersoOff }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; gap:8px; alignItems:flex-start; padding:8px 10px; background:#eae9e9; border:1px solid rgba(32,30,29,0.3); marginBottom:10px">
+              <span style="display:inline-flex; alignItems:center; justifyContent:center; width:14px; height:14px; border:1px solid #201e1d; font:600 9px 'Archivo',sans-serif; flexShrink:0; marginTop:1px">i</span>
+              <div style="font:400 11px 'Archivo',sans-serif; lineHeight:1.5">
+                <span style="font-weight:600">개인화 미적용</span> — 커뮤니케이션 스타일 프로필이 비어 있어 기본 규칙으로 변환됩니다.
+                <a href="#ux003" style="color:#ae1800">프로필 작성</a>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="border:1px solid #201e1d; padding:11px 12px; marginBottom:12px; background:#f8f4f4">
+            <div style="display:flex; alignItems:center; gap:8px; marginBottom:6px">
+              <span style="font:800 10px 'Archivo',sans-serif; letterSpacing:0.12em">긴급도</span>
+              <span style="{{ urgencyChip }}">{{ urgencyLabel }}</span>
+            </div>
+            <div style="font:400 11px 'Archivo',sans-serif; lineHeight:1.5; color:rgba(32,30,29,0.75); marginBottom:9px">{{ urgencyReason }}</div>
+            <div style="font:600 9px 'IBM Plex Mono',monospace; letterSpacing:0.1em; color:rgba(32,30,29,0.6); marginBottom:5px">수동 변경</div>
+            <div role="radiogroup" aria-label="긴급도 변경" style="display:flex; gap:0">
+              <sc-for list="{{ urgencyOverride }}" as="o" hint-placeholder-count="3">
+                <button type="button" style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <button type="button" style="display:inline-flex; alignItems:center; gap:8px; width:100%; padding:10px 12px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 13px 'Archivo',sans-serif; cursor:pointer; textAlign:left" style-hover="background:#dd2b0f; border:1px solid #dd2b0f">
+            <sc-if value="{{ isLoading }}">
+              <span style="display:inline-block; width:11px; height:11px; border:2px solid rgba(248,244,244,0.4); borderTopColor:#f8f4f4; animation:om-spin 0.8s linear infinite"></span>
+            </sc-if>
+            <span>Run Mediation</span>
+          </button>
+
+          <div style="marginTop:16px; paddingTop:12px; borderTop:2px solid rgba(32,30,29,0.4); display:flex; flexDirection:column; alignItems:flex-start; gap:8px">
+            <sc-if value="{{ showTicketLink }}" hint-placeholder-val="{{ true }}">
+              <a href="#ux007" style="font:600 11px 'Archivo',sans-serif; color:#ae1800">Convert to Task Ticket →</a>
+            </sc-if>
+            <sc-if value="{{ showSecondaryActions }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex; gap:8px; flexWrap:wrap">
+                <button type="button" style="padding:7px 10px; background:transparent; color:#201e1d; border:1px solid #201e1d; font:800 11px 'Archivo',sans-serif; cursor:pointer" style-hover="background:#ffe0d9">마감 기한 협상</button>
+                <button type="button" style="padding:7px 10px; background:transparent; color:#201e1d; border:1px solid #201e1d; font:800 11px 'Archivo',sans-serif; cursor:pointer" style-hover="background:#ffe0d9">수신자 아침 시간에 예약</button>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <!-- RIGHT: recipient -->
+        <div style="padding:18px; borderLeft:2px solid #201e1d; background:#eae9e9">
+          <div style="display:flex; alignItems:center; justifyContent:space-between; marginBottom:14px">
+            <div style="font:800 10px 'Archivo',sans-serif; letterSpacing:0.14em">수신자에게 보이는 메시지</div>
+            <sc-if value="{{ showFallback }}">
+              <span style="display:inline-flex; alignItems:center; gap:5px; padding:2px 6px; border:1px solid #201e1d; background:#f8f4f4; font:600 9px 'IBM Plex Mono',monospace; letterSpacing:0.06em">
+                <span style="width:6px; height:6px; background:#201e1d; display:inline-block"></span>폴백 응답 사용 중
+              </span>
+            </sc-if>
+          </div>
+
+          <sc-if value="{{ isEmpty }}">
+            <div style="border:1px dashed rgba(32,30,29,0.45); padding:40px 20px; textAlign:center; background:#f3f2f2">
+              <div style="font:800 13px 'Archivo',sans-serif; marginBottom:6px">아직 결과가 없습니다</div>
+              <div style="font:400 12px 'Archivo',sans-serif; color:rgba(32,30,29,0.6); lineHeight:1.6">메시지를 입력하고 Run Mediation을 누르면<br>변환 결과가 여기에 표시됩니다.</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isLoading }}">
+            <div style="border:1px solid #201e1d; background:#f8f4f4; padding:16px">
+              <div style="display:grid; gap:10px">
+                <div style="display:flex; alignItems:center; gap:9px; font:800 12px 'Archivo',sans-serif">
+                  <span style="display:inline-flex; alignItems:center; justifyContent:center; width:16px; height:16px; border:1px solid #201e1d; background:#201e1d; color:#f8f4f4; font:800 9px 'Archivo',sans-serif">✓</span>
+                  <span>분류 중</span>
+                  <span style="font:400 10px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.6)">완료</span>
+                </div>
+                <div style="display:flex; alignItems:center; gap:9px; font:800 12px 'Archivo',sans-serif">
+                  <span style="display:inline-flex; alignItems:center; justifyContent:center; width:16px; height:16px; border:1px solid #201e1d; font:800 9px 'Archivo',sans-serif">2</span>
+                  <span>변환 중</span>
+                  <span style="font:400 10px 'IBM Plex Mono',monospace; color:#ae1800">진행 중</span>
+                </div>
+                <div style="height:4px; background:#d7d3d3; overflow:hidden; margin:2px 0">
+                  <div style="width:34%; height:100%; background:#ec3013; animation:om-sweep 1.4s ease-in-out infinite"></div>
+                </div>
+                <div style="display:flex; alignItems:center; gap:9px; font:800 12px 'Archivo',sans-serif; color:rgba(32,30,29,0.45)">
+                  <span style="display:inline-flex; alignItems:center; justifyContent:center; width:16px; height:16px; border:1px solid rgba(32,30,29,0.45); font:800 9px 'Archivo',sans-serif">3</span>
+                  <span>역번역 중</span>
+                  <span style="font:400 10px 'IBM Plex Mono',monospace">대기</span>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isError }}">
+            <div style="border:2px solid #ec3013; background:#fff2ef; padding:12px; marginBottom:14px">
+              <div style="display:flex; gap:8px; alignItems:flex-start">
+                <span style="display:inline-flex; alignItems:center; justifyContent:center; width:16px; height:16px; border:1px solid #ae1800; color:#ae1800; font:800 10px 'Archivo',sans-serif; flexShrink:0">!</span>
+                <div style="flex:1">
+                  <div style="font:800 12px 'Archivo',sans-serif; color:#7c1405">처리에 실패했습니다</div>
+                  <div style="font:400 11px 'Archivo',sans-serif; color:#7c1405; marginTop:3px">작성한 메시지는 그대로 남아 있습니다.</div>
+                  <button type="button" style="marginTop:9px; padding:6px 10px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 11px 'Archivo',sans-serif; cursor:pointer" style-hover="background:#dd2b0f">다시 시도</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isDelivered }}">
+            <div style="border:1px solid #201e1d; background:#f8f4f4; padding:14px">
+              <div style="display:flex; alignItems:center; gap:8px">
+                <span style="display:inline-flex; alignItems:center; justifyContent:center; width:16px; height:16px; border:1px solid #201e1d; background:#201e1d; color:#f8f4f4; font:800 9px 'Archivo',sans-serif">✓</span>
+                <span style="font:800 14px 'Archivo',sans-serif">전달됨</span>
+              </div>
+              <div style="marginTop:12px; paddingTop:10px; borderTop:1px solid rgba(32,30,29,0.25); display:grid; gap:6px; font:400 11px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.75)">
+                <div>2026-08-04 14:22 KST — 중재 실행</div>
+                <div>2026-08-04 14:24 KST — 승인 후 발송</div>
+                <div>수신자 minjun.kim@acme.io</div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isResult }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid; gap:12px">
+              <div style="border:1px solid #201e1d; background:#f8f4f4; padding:12px">
+                <div style="font:400 13px 'Archivo',sans-serif; lineHeight:1.75">
+                  안녕하세요. <strong style="font-weight:800">API 문서</strong><span style="font:600 9px 'IBM Plex Mono',monospace; verticalAlign:2px; color:#ae1800">(보존됨)</span>를
+                  <strong style="font-weight:800">8월 7일(금)</strong><span style="font:600 9px 'IBM Plex Mono',monospace; verticalAlign:2px; color:#ae1800">(보존됨)</span>까지 공유해 주실 수 있을까요?
+                  현재 일정에 영향이 있어 <strong style="font-weight:800">회신 부탁드립니다</strong><span style="font:600 9px 'IBM Plex Mono',monospace; verticalAlign:2px; color:#ae1800">(보존됨)</span>.
+                </div>
+              </div>
+
+              <div style="display:flex; gap:7px; alignItems:flex-start; font:400 11px 'Archivo',sans-serif; lineHeight:1.55; color:rgba(32,30,29,0.75)">
+                <span style="font:800 9px 'IBM Plex Mono',monospace; letterSpacing:0.08em; flexShrink:0; paddingTop:1px; color:#201e1d">변환 이유</span>
+                <span>비난으로 읽힐 표현을 제거하고, 마감일·요청 행동은 원문 그대로 유지했습니다.</span>
+              </div>
+
+              <div style="border:1px solid rgba(32,30,29,0.3); padding:11px 12px; background:#f3f2f2">
+                <div style="font:800 9px 'IBM Plex Mono',monospace; letterSpacing:0.1em; marginBottom:6px">역번역</div>
+                <div style="font:400 12px 'Archivo',sans-serif; lineHeight:1.6; marginBottom:8px">Hello. Could you share the API document by Friday, August 7? It affects the current schedule, so please confirm.</div>
+                <div style="display:flex; gap:6px; alignItems:flex-start; paddingTop:7px; borderTop:1px solid rgba(32,30,29,0.2)">
+                  <span style="display:inline-flex; alignItems:center; justifyContent:center; width:13px; height:13px; border:1px solid rgba(32,30,29,0.5); font:600 9px 'Archivo',sans-serif; flexShrink:0; marginTop:1px">i</span>
+                  <span style="font:400 10px 'Archivo',sans-serif; lineHeight:1.5; color:rgba(32,30,29,0.7)">완전한 검증이 아니라 큰 오역을 걸러내는 1차 안전장치입니다.</span>
+                </div>
+              </div>
+
+              <sc-if value="{{ showAnyWarning }}" hint-placeholder-val="{{ true }}">
+                <div style="display:grid; gap:7px">
+                  <sc-if value="{{ warnEmoji }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex; gap:8px; alignItems:flex-start; border:1px solid #201e1d; borderLeft:3px solid #ec3013; background:#f8f4f4; padding:8px 10px">
+                      <span style="display:inline-flex; alignItems:center; justifyContent:center; width:14px; height:14px; border:1px solid #201e1d; font:800 9px 'Archivo',sans-serif; flexShrink:0; marginTop:1px">!</span>
+                      <div style="font:400 11px 'Archivo',sans-serif; lineHeight:1.5">
+                        <span style="font-weight:600">이모지 주의</span> — 이 이모지는 해석이 갈릴 수 있습니다 — 상대와 합의된 규칙이 없습니다.
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ warnHonorificMix }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex; gap:8px; alignItems:flex-start; border:1px solid #201e1d; borderLeft:3px solid #ec3013; background:#f8f4f4; padding:8px 10px">
+                      <span style="display:inline-flex; alignItems:center; justifyContent:center; width:14px; height:14px; border:1px solid #201e1d; font:800 9px 'Archivo',sans-serif; flexShrink:0; marginTop:1px">!</span>
+                      <div style="font:400 11px 'Archivo',sans-serif; lineHeight:1.5">
+                        <span style="font-weight:600">경어체 혼용</span> — 한 메시지 안에 합쇼체와 해요체가 섞여 있습니다.
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ warnHonorificUnknown }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex; gap:8px; alignItems:flex-start; border:1px solid #201e1d; borderLeft:3px solid #ec3013; background:#f8f4f4; padding:8px 10px">
+                      <span style="display:inline-flex; alignItems:center; justifyContent:center; width:14px; height:14px; border:1px solid #201e1d; font:800 9px 'Archivo',sans-serif; flexShrink:0; marginTop:1px">!</span>
+                      <div style="font:400 11px 'Archivo',sans-serif; lineHeight:1.5">
+                        <span style="font-weight:600">호칭 미등록</span> — "박지훈"의 호칭이 등록되어 있지 않습니다.
+                        <a href="#ux010" style="color:#ae1800">용어 사전에 추가</a>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ warnHoliday }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex; gap:8px; alignItems:flex-start; border:1px solid #201e1d; borderLeft:3px solid #ec3013; background:#f8f4f4; padding:8px 10px">
+                      <span style="display:inline-flex; alignItems:center; justifyContent:center; width:14px; height:14px; border:1px solid #201e1d; font:800 9px 'Archivo',sans-serif; flexShrink:0; marginTop:1px">!</span>
+                      <div style="font:400 11px 'Archivo',sans-serif; lineHeight:1.5; display:flex; flexWrap:wrap; alignItems:center; gap:8px">
+                        <span>이 마감일은 상대 국가 연휴 2일차입니다.</span>
+                        <button type="button" style="padding:3px 7px; background:transparent; border:1px solid #201e1d; font:800 10px 'Archivo',sans-serif; cursor:pointer" style-hover="background:#ffe0d9">기한 재협상</button>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ riskFull }}" hint-placeholder-val="{{ true }}">
+                <div style="border:1px solid #201e1d; background:#f8f4f4">
+                  <div style="padding:8px 11px; borderBottom:1px solid rgba(32,30,29,0.25); display:flex; alignItems:center; gap:8px">
+                    <span style="display:inline-flex; alignItems:center; justifyContent:center; width:14px; height:14px; border:1px solid #201e1d; font:800 9px 'Archivo',sans-serif">!</span>
+                    <span style="font:800 11px 'Archivo',sans-serif; letterSpacing:0.06em">오해 위험 2건</span>
+                    <span style="font:400 10px 'Archivo',sans-serif; color:rgba(32,30,29,0.6)">— 참고용, 발송을 막지 않습니다</span>
+                  </div>
+                  <details open style="borderBottom:1px solid rgba(32,30,29,0.2)">
+                    <summary style="padding:8px 11px; cursor:pointer; font:600 11px 'Archivo',sans-serif" style-focus-visible="outline:2px solid #ec3013; outline-offset:-2px">"계속 늦어서"</summary>
+                    <div style="padding:0 11px 10px 11px; display:grid; gap:5px">
+                      <div style="display:flex; gap:8px; font:400 11px 'Archivo',sans-serif; lineHeight:1.5"><span style="font:800 9px 'IBM Plex Mono',monospace; width:62px; flexShrink:0; paddingTop:2px">원문 인용</span><span>"계속 늦어서 일정이 다 밀립니다"</span></div>
+                      <div style="display:flex; gap:8px; font:400 11px 'Archivo',sans-serif; lineHeight:1.5"><span style="font:800 9px 'IBM Plex Mono',monospace; width:62px; flexShrink:0; paddingTop:2px">예상 오해</span><span>상대의 업무 능력을 문제 삼는 비난으로 읽힐 수 있음</span></div>
+                      <div style="display:flex; gap:8px; font:400 11px 'Archivo',sans-serif; lineHeight:1.5"><span style="font:800 9px 'IBM Plex Mono',monospace; width:62px; flexShrink:0; paddingTop:2px">근거</span><span>반복 빈도 표현과 부정적 결과가 한 문장에 연결됨</span></div>
+                    </div>
+                  </details>
+                  <details>
+                    <summary style="padding:8px 11px; cursor:pointer; font:600 11px 'Archivo',sans-serif" style-focus-visible="outline:2px solid #ec3013; outline-offset:-2px">"😤"</summary>
+                    <div style="padding:0 11px 10px 11px; display:grid; gap:5px">
+                      <div style="display:flex; gap:8px; font:400 11px 'Archivo',sans-serif; lineHeight:1.5"><span style="font:800 9px 'IBM Plex Mono',monospace; width:62px; flexShrink:0; paddingTop:2px">원문 인용</span><span>"밀립니다 😤"</span></div>
+                      <div style="display:flex; gap:8px; font:400 11px 'Archivo',sans-serif; lineHeight:1.5"><span style="font:800 9px 'IBM Plex Mono',monospace; width:62px; flexShrink:0; paddingTop:2px">예상 오해</span><span>분노 표출로 읽힐 수 있음</span></div>
+                      <div style="display:flex; gap:8px; font:400 11px 'Archivo',sans-serif; lineHeight:1.5"><span style="font:800 9px 'IBM Plex Mono',monospace; width:62px; flexShrink:0; paddingTop:2px">근거</span><span>이 이모지에 대해 합의된 예외 규칙이 없음</span></div>
+                    </div>
+                  </details>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ riskReduced }}">
+                <div style="display:flex; alignItems:center; gap:9px">
+                  <details style="border:1px solid #201e1d; background:#f8f4f4">
+                    <summary style="padding:5px 9px; cursor:pointer; display:flex; alignItems:center; gap:6px; font:800 10px 'Archivo',sans-serif" style-focus-visible="outline:2px solid #ec3013; outline-offset:-2px">
+                      <span style="display:inline-flex; alignItems:center; justifyContent:center; width:12px; height:12px; border:1px solid #201e1d; font:800 8px 'Archivo',sans-serif">!</span>
+                      오해 위험 2건
+                    </summary>
+                    <div style="padding:8px 10px; borderTop:1px solid rgba(32,30,29,0.25); width:420px; display:grid; gap:8px; font:400 10px 'Archivo',sans-serif; lineHeight:1.5">
+                      <div><span style="font-weight:600">"계속 늦어서"</span> · 예상 오해: 비난으로 읽힐 수 있음 · 근거: 빈도 표현 + 부정 결과 연결</div>
+                      <div><span style="font-weight:600">"😤"</span> · 예상 오해: 분노 표출로 읽힐 수 있음 · 근거: 합의된 이모지 규칙 없음</div>
+                    </div>
+                  </details>
+                  <span style="font:400 10px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.55)">축약형 — 포커스/클릭으로 펼침</span>
+                </div>
+              </sc-if>
+
+              <button type="button" style="display:flex; alignItems:center; width:100%; padding:10px 12px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 13px 'Archivo',sans-serif; cursor:pointer; textAlign:left" style-hover="background:#dd2b0f; border:1px solid #dd2b0f">Approve &amp; Send</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ disabledApprove }}">
+            <div style="marginTop:14px">
+              <button type="button" disabled style="display:flex; alignItems:center; width:100%; padding:10px 12px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 13px 'Archivo',sans-serif; opacity:0.45; cursor:not-allowed; textAlign:left">Approve &amp; Send</button>
+              <div style="marginTop:5px; font:400 10px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.6)">중재 결과가 있어야 활성화됩니다</div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ UX-004 stacked ══════════════════════════════════════════ -->
+  <div style="marginTop:64px; paddingTop:40px; borderTop:2px solid rgba(32,30,29,0.4)" data-screen-label="UX-004 Stacked">
+    <div style="display:flex; alignItems:baseline; gap:12px; marginBottom:14px">
+      <div style="font:800 13px 'Archivo',sans-serif; letterSpacing:0.09em; textTransform:uppercase">UX-004 — 세로 스택 (Tablet / Mobile)</div>
+      <div style="font:400 11px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.55)">420 · 읽기 순서 동일 · 발신자 → 수신자</div>
+    </div>
+
+    <div style="width:420px; background:#f3f2f2; border:2px solid #201e1d; boxShadow:0 3px 10px rgba(45,43,43,0.16)">
+      <div style="display:flex; alignItems:center; justifyContent:space-between; padding:9px 13px; borderBottom:2px solid #201e1d">
+        <span style="font:800 12px 'Archivo',sans-serif; letterSpacing:0.14em">MEDIATE</span>
+        <span style="font:800 11px 'Archivo',sans-serif; letterSpacing:0.08em">≡</span>
+      </div>
+      <div style="padding:14px">
+        <div style="font:800 10px 'Archivo',sans-serif; letterSpacing:0.14em; marginBottom:10px">발신자</div>
+        <div style="display:grid; gap:4px; marginBottom:10px">
+          <label for="m-rcpt" style="font:600 11px 'Archivo',sans-serif">수신자</label>
+          <input id="m-rcpt" type="email" value="minjun.kim@acme.io" style="width:100%; padding:7px 9px; font:400 13px 'Archivo',sans-serif; background:#f8f4f4; border:1px solid #201e1d; color:#201e1d">
+        </div>
+        <div style="display:grid; gap:4px; marginBottom:10px">
+          <label for="m-msg" style="font:600 11px 'Archivo',sans-serif">메시지</label>
+          <textarea id="m-msg" rows="4" style="width:100%; padding:8px; font:400 13px 'Archivo',sans-serif; lineHeight:1.6; background:#f8f4f4; border:1px solid #201e1d; color:#201e1d; resize:vertical">이번 주까지 API 문서 주세요. 계속 늦어서 일정이 다 밀립니다 😤</textarea>
+        </div>
+        <div style="border:1px solid #201e1d; background:#f8f4f4; padding:10px; marginBottom:10px">
+          <div style="display:flex; alignItems:center; gap:8px; marginBottom:5px">
+            <span style="font:800 10px 'Archivo',sans-serif; letterSpacing:0.12em">긴급도</span>
+            <span style="display:inline-block; padding:2px 7px; background:#201e1d; color:#f8f4f4; font:800 10px 'Archivo',sans-serif; letterSpacing:0.08em">NORMAL</span>
+          </div>
+          <div style="font:400 11px 'Archivo',sans-serif; color:rgba(32,30,29,0.75); lineHeight:1.5">마감일이 명시되어 있으나 당일 처리 요구는 아닙니다.</div>
+        </div>
+        <button type="button" style="display:flex; width:100%; padding:11px 12px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 13px 'Archivo',sans-serif; cursor:pointer; textAlign:left; minHeight:44px; alignItems:center">Run Mediation</button>
+      </div>
+      <div style="padding:14px; borderTop:2px solid #201e1d; background:#eae9e9">
+        <div style="font:800 10px 'Archivo',sans-serif; letterSpacing:0.14em; marginBottom:10px">수신자에게 보이는 메시지</div>
+        <div style="border:1px solid #201e1d; background:#f8f4f4; padding:11px; font:400 13px 'Archivo',sans-serif; lineHeight:1.7; marginBottom:10px">
+          안녕하세요. <strong style="font-weight:800">API 문서</strong><span style="font:600 9px 'IBM Plex Mono',monospace; verticalAlign:2px; color:#ae1800">(보존됨)</span>를 <strong style="font-weight:800">8월 7일(금)</strong><span style="font:600 9px 'IBM Plex Mono',monospace; verticalAlign:2px; color:#ae1800">(보존됨)</span>까지 공유해 주실 수 있을까요?
+        </div>
+        <div style="border:1px solid rgba(32,30,29,0.3); background:#f3f2f2; padding:10px; marginBottom:10px">
+          <div style="font:800 9px 'IBM Plex Mono',monospace; letterSpacing:0.1em; marginBottom:5px">역번역</div>
+          <div style="font:400 12px 'Archivo',sans-serif; lineHeight:1.55; marginBottom:7px">Hello. Could you share the API document by Friday, August 7?</div>
+          <div style="display:flex; gap:6px; alignItems:flex-start; paddingTop:6px; borderTop:1px solid rgba(32,30,29,0.2)">
+            <span style="display:inline-flex; alignItems:center; justifyContent:center; width:13px; height:13px; border:1px solid rgba(32,30,29,0.5); font:600 9px 'Archivo',sans-serif; flexShrink:0; marginTop:1px">i</span>
+            <span style="font:400 10px 'Archivo',sans-serif; lineHeight:1.45; color:rgba(32,30,29,0.7)">완전한 검증이 아니라 큰 오역을 걸러내는 1차 안전장치입니다.</span>
+          </div>
+        </div>
+        <details style="border:1px solid #201e1d; background:#f8f4f4; marginBottom:10px">
+          <summary style="padding:8px 10px; cursor:pointer; display:flex; alignItems:center; gap:6px; font:800 11px 'Archivo',sans-serif">
+            <span style="display:inline-flex; alignItems:center; justifyContent:center; width:13px; height:13px; border:1px solid #201e1d; font:800 8px 'Archivo',sans-serif">!</span>오해 위험 2건
+          </summary>
+          <div style="padding:8px 10px; borderTop:1px solid rgba(32,30,29,0.25); font:400 10px 'Archivo',sans-serif; lineHeight:1.5">"계속 늦어서" · 예상 오해: 비난으로 읽힐 수 있음 · 근거: 빈도 표현 + 부정 결과 연결</div>
+        </details>
+        <button type="button" style="display:flex; width:100%; padding:11px 12px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 13px 'Archivo',sans-serif; cursor:pointer; textAlign:left; minHeight:44px; alignItems:center">Approve &amp; Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ UX-016 ══════════════════════════════════════════════════ -->
+  <div style="marginTop:64px; paddingTop:40px; borderTop:2px solid rgba(32,30,29,0.4)" data-screen-label="UX-016 Panel">
+    <div style="display:flex; alignItems:baseline; gap:12px; marginBottom:14px">
+      <div style="font:800 13px 'Archivo',sans-serif; letterSpacing:0.09em; textTransform:uppercase">UX-016 — 선택 텍스트 중재 패널</div>
+      <div style="font:400 11px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.55)">확장 프로그램 인라인 팝오버 360 · 임의 페이지 위에 얹힘</div>
+    </div>
+
+    <div style="border:1px solid rgba(32,30,29,0.25); background:#f8f4f4; padding:12px 14px; marginBottom:18px; display:grid; gap:10px">
+      <div style="display:flex; alignItems:center; gap:10px; flexWrap:wrap">
+        <span style="font:600 9px 'IBM Plex Mono',monospace; letterSpacing:0.12em; width:78px; color:rgba(32,30,29,0.6)">모드</span>
+        <sc-for list="{{ modeOpts }}" as="o" hint-placeholder-count="3">
+          <button type="button" style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex; alignItems:center; gap:10px; flexWrap:wrap">
+        <span style="font:600 9px 'IBM Plex Mono',monospace; letterSpacing:0.12em; width:78px; color:rgba(32,30,29,0.6)">상태</span>
+        <sc-for list="{{ p16States }}" as="o" hint-placeholder-count="7">
+          <button type="button" style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex; alignItems:center; gap:10px; flexWrap:wrap">
+        <span style="font:600 9px 'IBM Plex Mono',monospace; letterSpacing:0.12em; width:78px; color:rgba(32,30,29,0.6)">수신자 영역</span>
+        <sc-for list="{{ recipOpts }}" as="o" hint-placeholder-count="3">
+          <button type="button" style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</button>
+        </sc-for>
+        <span style="width:14px"></span>
+        <span style="font:600 9px 'IBM Plex Mono',monospace; letterSpacing:0.12em; color:rgba(32,30,29,0.6)">표시 모드 결과</span>
+        <sc-for list="{{ markOpts }}" as="o" hint-placeholder-count="3">
+          <button type="button" style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- host page context -->
+    <div style="width:940px; border:1px solid rgba(32,30,29,0.3); background:#eae9e9; padding:20px; position:relative">
+      <div style="font:400 10px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.5); marginBottom:12px">임의의 제3자 페이지 (컨텍스트)</div>
+      <div style="display:grid; gridTemplateColumns:1fr 380px; gap:28px; alignItems:flex-start">
+        <div style="font:400 13px 'Archivo',sans-serif; lineHeight:1.9; color:rgba(32,30,29,0.45)">
+          <div style="height:9px; background:#d7d3d3; width:70%; marginBottom:9px"></div>
+          <div style="height:9px; background:#d7d3d3; width:92%; marginBottom:9px"></div>
+          <div style="marginBottom:9px"><span style="background:rgba(236,48,19,0.28); color:#201e1d; padding:1px 0">이번 주까지 API 문서 주세요. 계속 늦어서 일정이 다 밀립니다 😤</span></div>
+          <div style="height:9px; background:#d7d3d3; width:84%; marginBottom:9px"></div>
+          <div style="display:inline-flex; alignItems:center; gap:5px; padding:4px 8px; background:#201e1d; color:#f8f4f4; font:800 10px 'Archivo',sans-serif; letterSpacing:0.06em; marginTop:2px">
+            <span style="width:6px; height:6px; background:#ec3013; display:inline-block"></span>중재
+          </div>
+          <div style="font:400 9px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.5); marginTop:5px">선택 시 나타나는 트리거 버튼 · 선택 해제 시 즉시 사라짐</div>
+        </div>
+
+        <!-- the panel -->
+        <div style="width:380px; background:#f3f2f2; border:2px solid #201e1d; boxShadow:0 12px 32px rgba(45,43,43,0.22)">
+          <div style="display:flex; alignItems:center; justifyContent:space-between; padding:8px 11px; borderBottom:2px solid #201e1d">
+            <span style="font:800 11px 'Archivo',sans-serif; letterSpacing:0.14em">MEDIATE</span>
+            <span style="font:600 9px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.6)">ESC 닫기</span>
+          </div>
+
+          <div style="display:flex; borderBottom:1px solid rgba(32,30,29,0.3)">
+            <sc-for list="{{ panelTabs }}" as="o" hint-placeholder-count="3">
+              <button type="button" style="{{ o.style }}" onClick="{{ o.onClick }}">{{ o.label }}</button>
+            </sc-for>
+          </div>
+
+          <div style="padding:11px">
+            <sc-if value="{{ p16Logout }}">
+              <div style="display:grid; gap:9px; padding:14px 4px">
+                <div style="font:800 13px 'Archivo',sans-serif">로그인이 필요합니다</div>
+                <div style="font:400 11px 'Archivo',sans-serif; lineHeight:1.55; color:rgba(32,30,29,0.75)">웹 앱에서 먼저 로그인하면 이 패널을 사용할 수 있습니다.</div>
+                <button type="button" style="display:flex; alignItems:center; padding:8px 10px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 12px 'Archivo',sans-serif; cursor:pointer" style-hover="background:#dd2b0f">웹 앱에서 로그인</button>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ p16NotLogout }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid; gap:10px">
+                <sc-if value="{{ recipDetected }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex; gap:7px; alignItems:flex-start; padding:6px 8px; background:#eae9e9; border:1px solid rgba(32,30,29,0.3); font:400 10px 'Archivo',sans-serif; lineHeight:1.5">
+                    <span style="font:800 9px 'IBM Plex Mono',monospace; flexShrink:0; paddingTop:1px">감지됨</span>
+                    <span style="flex:1">김민준 — 근거: 페이지 상단 발신자 이름 · <a href="#chg" style="color:#ae1800">변경</a></span>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ recipCandidates }}">
+                  <div style="padding:7px 8px; background:#eae9e9; border:1px solid rgba(32,30,29,0.3)">
+                    <div style="font:800 9px 'IBM Plex Mono',monospace; marginBottom:5px">수신자 후보 — 선택해 주세요</div>
+                    <div role="radiogroup" aria-label="수신자 후보" style="display:grid; gap:4px">
+                      <label style="display:flex; alignItems:center; gap:6px; font:400 11px 'Archivo',sans-serif; cursor:pointer"><input type="radio" name="cand16" style="accentColor:#ec3013; margin:0">김민준</label>
+                      <label style="display:flex; alignItems:center; gap:6px; font:400 11px 'Archivo',sans-serif; cursor:pointer"><input type="radio" name="cand16" style="accentColor:#ec3013; margin:0">박지훈</label>
+                      <label style="display:flex; alignItems:center; gap:6px; font:400 11px 'Archivo',sans-serif; cursor:pointer"><input type="radio" name="cand16" style="accentColor:#ec3013; margin:0">tech-support@acme.io</label>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <div style="border:1px solid #201e1d; background:#f8f4f4; padding:8px 9px">
+                  <div style="font:800 9px 'IBM Plex Mono',monospace; letterSpacing:0.08em; marginBottom:4px; color:rgba(32,30,29,0.65)">선택한 텍스트</div>
+                  <div style="font:400 12px 'Archivo',sans-serif; lineHeight:1.6">이번 주까지 API 문서 주세요. 계속 늦어서 일정이 다 밀립니다 😤</div>
+                </div>
+
+                <sc-if value="{{ modeMark }}">
+                  <div style="display:grid; gap:9px">
+                    <div style="display:grid; gap:4px">
+                      <label for="p16-cp" style="font:600 11px 'Archivo',sans-serif">상대 식별자 <span style="color:#ae1800">*</span></label>
+                      <input id="p16-cp" type="text" value="minjun.kim@acme.io" autocomplete="off" style="width:100%; padding:7px 8px; font:400 12px 'Archivo',sans-serif; background:#f8f4f4; border:1px solid #201e1d; color:#201e1d" style-focus="outline:2px solid #ec3013; outline-offset:1px">
+                      <div style="font:400 10px 'Archivo',sans-serif; color:rgba(32,30,29,0.6)">직접 입력합니다 (목록·자동완성 없음)</div>
+                    </div>
+                    <sc-if value="{{ markError }}">
+                      <div style="display:flex; gap:7px; alignItems:flex-start; border:2px solid #ec3013; background:#fff2ef; padding:8px 9px">
+                        <span style="display:inline-flex; alignItems:center; justifyContent:center; width:14px; height:14px; border:1px solid #ae1800; color:#ae1800; font:800 9px 'Archivo',sans-serif; flexShrink:0">!</span>
+                        <div style="flex:1">
+                          <div style="font:600 11px 'Archivo',sans-serif; color:#7c1405">추가하지 못했습니다. 선택한 텍스트와 입력한 식별자는 그대로 있습니다.</div>
+                          <button type="button" style="marginTop:6px; padding:5px 9px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 10px 'Archivo',sans-serif; cursor:pointer">다시 시도</button>
+                        </div>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ markSuccess }}">
+                      <div style="display:flex; gap:7px; alignItems:center; border:1px solid #201e1d; background:#f8f4f4; padding:8px 9px">
+                        <span style="display:inline-flex; alignItems:center; justifyContent:center; width:14px; height:14px; border:1px solid #201e1d; background:#201e1d; color:#f8f4f4; font:800 9px 'Archivo',sans-serif; flexShrink:0">✓</span>
+                        <span style="font:400 11px 'Archivo',sans-serif; flex:1">표본에 추가되었습니다 (총 12건) · <a href="#ux019" style="color:#ae1800">표본 관리 보기</a></span>
+                      </div>
+                    </sc-if>
+                    <button type="button" style="display:flex; alignItems:center; padding:8px 10px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 12px 'Archivo',sans-serif; cursor:pointer" style-hover="background:#dd2b0f">표본에 추가</button>
+                    <div style="font:400 10px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.55); lineHeight:1.5">식별자가 비어 있으면 비활성 · 추가 후에도 패널은 열린 상태로 유지됩니다</div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ modeInterpret }}">
+                  <div style="display:grid; gap:9px">
+                    <div style="border:1px solid #201e1d; background:#f8f4f4; padding:9px">
+                      <div style="font:800 9px 'IBM Plex Mono',monospace; letterSpacing:0.08em; marginBottom:5px">이 메시지의 요지</div>
+                      <div style="font:400 12px 'Archivo',sans-serif; lineHeight:1.65">8월 7일(금)까지 API 문서를 요청하고 있으며, 지연이 반복되어 일정에 영향이 있다는 점을 함께 전달합니다.</div>
+                    </div>
+                    <div style="border:1px solid rgba(32,30,29,0.3); padding:8px 9px">
+                      <div style="font:800 9px 'IBM Plex Mono',monospace; letterSpacing:0.08em; marginBottom:5px">보존된 항목</div>
+                      <div style="display:flex; gap:5px; flexWrap:wrap; font:600 10px 'Archivo',sans-serif">
+                        <span style="padding:2px 6px; border:1px solid #201e1d; background:#f8f4f4">8월 7일(금)</span>
+                        <span style="padding:2px 6px; border:1px solid #201e1d; background:#f8f4f4">API 문서</span>
+                        <span style="padding:2px 6px; border:1px solid #201e1d; background:#f8f4f4">회신 요청</span>
+                      </div>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ modeMediate }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:grid; gap:10px">
+                    <sc-if value="{{ p16Loading }}">
+                      <div style="border:1px solid #201e1d; background:#f8f4f4; padding:11px; display:grid; gap:7px">
+                        <div style="display:flex; gap:7px; alignItems:center; font:800 11px 'Archivo',sans-serif"><span style="display:inline-flex; alignItems:center; justifyContent:center; width:14px; height:14px; border:1px solid #201e1d; background:#201e1d; color:#f8f4f4; font:800 8px 'Archivo',sans-serif">✓</span>분류 중</div>
+                        <div style="display:flex; gap:7px; alignItems:center; font:800 11px 'Archivo',sans-serif"><span style="display:inline-flex; alignItems:center; justifyContent:center; width:14px; height:14px; border:1px solid #201e1d; font:800 8px 'Archivo',sans-serif">2</span>변환 중<span style="font:400 9px 'IBM Plex Mono',monospace; color:#ae1800">진행 중</span></div>
+                        <div style="height:3px; background:#d7d3d3; overflow:hidden"><div style="width:34%; height:100%; background:#ec3013; animation:om-sweep 1.4s ease-in-out infinite"></div></div>
+                        <div style="display:flex; gap:7px; alignItems:center; font:800 11px 'Archivo',sans-serif; color:rgba(32,30,29,0.45)"><span style="display:inline-flex; alignItems:center; justifyContent:center; width:14px; height:14px; border:1px solid rgba(32,30,29,0.45); font:800 8px 'Archivo',sans-serif">3</span>역번역 중</div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ p16Error }}">
+                      <div style="display:flex; gap:7px; alignItems:flex-start; border:2px solid #ec3013; background:#fff2ef; padding:8px 9px">
+                        <span style="display:inline-flex; alignItems:center; justifyContent:center; width:14px; height:14px; border:1px solid #ae1800; color:#ae1800; font:800 9px 'Archivo',sans-serif; flexShrink:0">!</span>
+                        <div style="flex:1">
+                          <div style="font:800 11px 'Archivo',sans-serif; color:#7c1405">처리에 실패했습니다</div>
+                          <div style="font:400 10px 'Archivo',sans-serif; color:#7c1405; marginTop:2px">선택한 텍스트는 그대로 남아 있습니다.</div>
+                          <button type="button" style="marginTop:6px; padding:5px 9px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 10px 'Archivo',sans-serif; cursor:pointer">다시 시도</button>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ p16Result }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:grid; gap:10px">
+                        <sc-if value="{{ p16PersoOff }}" hint-placeholder-val="{{ true }}">
+                          <div style="display:flex; gap:7px; alignItems:flex-start; padding:6px 8px; background:#eae9e9; border:1px solid rgba(32,30,29,0.3)">
+                            <span style="display:inline-flex; alignItems:center; justifyContent:center; width:13px; height:13px; border:1px solid #201e1d; font:600 9px 'Archivo',sans-serif; flexShrink:0; marginTop:1px">i</span>
+                            <span style="font:400 10px 'Archivo',sans-serif; lineHeight:1.5"><span style="font-weight:600">개인화 미적용</span> — 수신자가 지정되지 않았습니다. 결과는 그대로 표시됩니다.</span>
+                          </div>
+                        </sc-if>
+
+                        <div style="display:flex; alignItems:center; gap:7px; flexWrap:wrap">
+                          <span style="font:800 9px 'IBM Plex Mono',monospace; letterSpacing:0.08em">긴급도</span>
+                          <span style="display:inline-block; padding:2px 7px; background:#201e1d; color:#f8f4f4; font:800 10px 'Archivo',sans-serif; letterSpacing:0.08em">NORMAL</span>
+                          <div role="radiogroup" aria-label="긴급도 변경" style="display:flex; marginLeft:auto">
+                            <span style="padding:2px 6px; border:1px solid rgba(32,30,29,0.5); font:600 9px 'Archivo',sans-serif">CRITICAL</span>
+                            <span style="padding:2px 6px; border:1px solid rgba(32,30,29,0.5); borderLeft:0; font:600 9px 'Archivo',sans-serif; background:#201e1d; color:#f8f4f4">NORMAL</span>
+                            <span style="padding:2px 6px; border:1px solid rgba(32,30,29,0.5); borderLeft:0; font:600 9px 'Archivo',sans-serif">LOW</span>
+                          </div>
+                        </div>
+
+                        <div style="border:1px solid #201e1d; background:#f8f4f4; padding:9px">
+                          <div style="font:400 12px 'Archivo',sans-serif; lineHeight:1.7">안녕하세요. <strong style="font-weight:800">API 문서</strong><span style="font:600 8px 'IBM Plex Mono',monospace; verticalAlign:2px; color:#ae1800">(보존됨)</span>를 <strong style="font-weight:800">8월 7일(금)</strong><span style="font:600 8px 'IBM Plex Mono',monospace; verticalAlign:2px; color:#ae1800">(보존됨)</span>까지 공유해 주실 수 있을까요?</div>
+                        </div>
+
+                        <div style="border:1px solid rgba(32,30,29,0.3); padding:8px 9px">
+                          <div style="font:800 9px 'IBM Plex Mono',monospace; letterSpacing:0.08em; marginBottom:4px">역번역</div>
+                          <div style="font:400 11px 'Archivo',sans-serif; lineHeight:1.55; marginBottom:6px">Hello. Could you share the API document by Friday, August 7?</div>
+                          <div style="display:flex; gap:5px; alignItems:flex-start; paddingTop:5px; borderTop:1px solid rgba(32,30,29,0.2)">
+                            <span style="display:inline-flex; alignItems:center; justifyContent:center; width:12px; height:12px; border:1px solid rgba(32,30,29,0.5); font:600 8px 'Archivo',sans-serif; flexShrink:0; marginTop:1px">i</span>
+                            <span style="font:400 9px 'Archivo',sans-serif; lineHeight:1.45; color:rgba(32,30,29,0.7)">완전한 검증이 아니라 1차 안전장치입니다.</span>
+                          </div>
+                        </div>
+
+                        <div style="display:flex; gap:7px; alignItems:flex-start; border:1px solid #201e1d; borderLeft:3px solid #ec3013; background:#f8f4f4; padding:7px 9px">
+                          <span style="display:inline-flex; alignItems:center; justifyContent:center; width:13px; height:13px; border:1px solid #201e1d; font:800 8px 'Archivo',sans-serif; flexShrink:0; marginTop:1px">!</span>
+                          <span style="font:400 10px 'Archivo',sans-serif; lineHeight:1.5">이 이모지는 해석이 갈릴 수 있습니다 — 상대와 합의된 규칙이 없습니다.</span>
+                        </div>
+
+                        <details style="border:1px solid #201e1d; background:#f8f4f4">
+                          <summary style="padding:6px 9px; cursor:pointer; display:flex; alignItems:center; gap:6px; font:800 10px 'Archivo',sans-serif" style-focus-visible="outline:2px solid #ec3013; outline-offset:-2px">
+                            <span style="display:inline-flex; alignItems:center; justifyContent:center; width:12px; height:12px; border:1px solid #201e1d; font:800 8px 'Archivo',sans-serif">!</span>오해 위험 1건
+                          </summary>
+                          <div style="padding:7px 9px; borderTop:1px solid rgba(32,30,29,0.25); font:400 10px 'Archivo',sans-serif; lineHeight:1.5">"계속 늦어서" · 예상 오해: 비난으로 읽힐 수 있음 · 근거: 빈도 표현 + 부정 결과 연결</div>
+                        </details>
+
+                        <sc-if value="{{ p16Copied }}">
+                          <div style="display:flex; gap:7px; alignItems:center; border:1px solid #201e1d; background:#eae9e9; padding:7px 9px">
+                            <span style="display:inline-flex; alignItems:center; justifyContent:center; width:13px; height:13px; border:1px solid #201e1d; background:#201e1d; color:#f8f4f4; font:800 8px 'Archivo',sans-serif">✓</span>
+                            <span style="font:600 10px 'Archivo',sans-serif">복사되었습니다</span>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ p16Inserted }}">
+                          <div style="display:flex; gap:7px; alignItems:center; border:1px solid #201e1d; background:#eae9e9; padding:7px 9px">
+                            <span style="display:inline-flex; alignItems:center; justifyContent:center; width:13px; height:13px; border:1px solid #201e1d; background:#201e1d; color:#f8f4f4; font:800 8px 'Archivo',sans-serif">✓</span>
+                            <span style="font:600 10px 'Archivo',sans-serif">입력창에 삽입되었습니다 — 패널이 닫힙니다</span>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ p16InsertFailed }}">
+                          <div style="display:flex; gap:7px; alignItems:flex-start; border:2px solid #ec3013; background:#fff2ef; padding:7px 9px">
+                            <span style="display:inline-flex; alignItems:center; justifyContent:center; width:13px; height:13px; border:1px solid #ae1800; color:#ae1800; font:800 8px 'Archivo',sans-serif; flexShrink:0; marginTop:1px">!</span>
+                            <span style="font:400 10px 'Archivo',sans-serif; lineHeight:1.5; color:#7c1405">입력창에 삽입하지 못했습니다. 아래 복사하기는 정상 동작합니다.</span>
+                          </div>
+                        </sc-if>
+
+                        <div style="display:flex; gap:7px; paddingTop:2px">
+                          <button type="button" style="display:flex; alignItems:center; padding:8px 11px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 12px 'Archivo',sans-serif; cursor:pointer" style-hover="background:#dd2b0f">복사하기</button>
+                          <sc-if value="{{ p16ShowInsert }}">
+                            <button type="button" style="display:flex; alignItems:center; padding:8px 11px; background:transparent; color:#201e1d; border:1px solid #201e1d; font:800 12px 'Archivo',sans-serif; cursor:pointer" style-hover="background:#ffe0d9">입력창에 삽입</button>
+                          </sc-if>
+                        </div>
+                        <div style="font:400 9px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.55); lineHeight:1.5">이 패널에는 발송 버튼이 없습니다 — 전송은 해당 사이트의 버튼으로</div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ UX-017 ══════════════════════════════════════════════════ -->
+  <div style="marginTop:64px; paddingTop:40px; borderTop:2px solid rgba(32,30,29,0.4)" data-screen-label="UX-017 Notice">
+    <div style="display:flex; alignItems:baseline; gap:12px; marginBottom:14px">
+      <div style="font:800 13px 'Archivo',sans-serif; letterSpacing:0.09em; textTransform:uppercase">UX-017 — 확장 프로그램 개인정보 고지</div>
+      <div style="font:400 11px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.55)">빌드에 따라 3 · 4 · 5항목 변형 · 상태는 표시/닫힘 하나뿐</div>
+    </div>
+
+    <div style="display:flex; gap:20px; flexWrap:wrap">
+      <div>
+        <div style="font:600 10px 'IBM Plex Mono',monospace; letterSpacing:0.1em; color:rgba(32,30,29,0.6); marginBottom:7px">3항목 — 기본 빌드</div>
+        <div style="width:340px; background:#f3f2f2; border:2px solid #201e1d; boxShadow:0 12px 32px rgba(45,43,43,0.22)">
+          <div style="padding:9px 12px; borderBottom:2px solid #201e1d; display:flex; alignItems:center; justifyContent:space-between">
+            <span style="font:800 11px 'Archivo',sans-serif; letterSpacing:0.14em">MEDIATE</span>
+            <button type="button" aria-label="닫기" style="width:20px; height:20px; border:1px solid #201e1d; background:transparent; font:800 10px 'Archivo',sans-serif; cursor:pointer; lineHeight:1" style-hover="background:#ffe0d9">✕</button>
+          </div>
+          <div style="padding:13px">
+            <h4 style="font:800 15px 'Archivo',sans-serif; margin:0 0 4px">이 확장 프로그램이 다루는 정보</h4>
+            <div style="font:400 10px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.6); marginBottom:11px">v1.0 · 버전당 한 번만 표시됩니다</div>
+            <ol style="margin:0; padding:0; listStyle:none; display:grid; gap:9px; counterReset:n">
+              <li style="display:flex; gap:9px; font:400 12px 'Archivo',sans-serif; lineHeight:1.55"><span style="font:800 10px 'IBM Plex Mono',monospace; paddingTop:2px; flexShrink:0">01</span><span>사용자가 선택한 텍스트만 전송됩니다. 페이지의 나머지 내용은 읽거나 저장하지 않습니다.</span></li>
+              <li style="display:flex; gap:9px; font:400 12px 'Archivo',sans-serif; lineHeight:1.55"><span style="font:800 10px 'IBM Plex Mono',monospace; paddingTop:2px; flexShrink:0">02</span><span>전송 대상은 이 제품의 자체 백엔드이며, 백엔드가 OpenAI로 전달합니다.</span></li>
+              <li style="display:flex; gap:9px; font:400 12px 'Archivo',sans-serif; lineHeight:1.55"><span style="font:800 10px 'IBM Plex Mono',monospace; paddingTop:2px; flexShrink:0">03</span><span>이 확장 프로그램은 사용자가 방문하는 모든 웹사이트에서 실행될 권한을 가집니다.</span></li>
+            </ol>
+            <div style="marginTop:14px; paddingTop:12px; borderTop:2px solid rgba(32,30,29,0.4)">
+              <button type="button" style="display:flex; alignItems:center; width:100%; padding:9px 11px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 13px 'Archivo',sans-serif; cursor:pointer; textAlign:left" style-hover="background:#dd2b0f">확인</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font:600 10px 'IBM Plex Mono',monospace; letterSpacing:0.1em; color:rgba(32,30,29,0.6); marginBottom:7px">4항목 — 수신자 후보 감지 포함</div>
+        <div style="width:340px; background:#f3f2f2; border:2px solid #201e1d; boxShadow:0 12px 32px rgba(45,43,43,0.22)">
+          <div style="padding:9px 12px; borderBottom:2px solid #201e1d; display:flex; alignItems:center; justifyContent:space-between">
+            <span style="font:800 11px 'Archivo',sans-serif; letterSpacing:0.14em">MEDIATE</span>
+            <button type="button" aria-label="닫기" style="width:20px; height:20px; border:1px solid #201e1d; background:transparent; font:800 10px 'Archivo',sans-serif; cursor:pointer; lineHeight:1" style-hover="background:#ffe0d9">✕</button>
+          </div>
+          <div style="padding:13px">
+            <h4 style="font:800 15px 'Archivo',sans-serif; margin:0 0 4px">이 확장 프로그램이 다루는 정보</h4>
+            <div style="font:400 10px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.6); marginBottom:11px">v1.2 · 고지 내용이 늘어나 다시 한 번 표시됩니다</div>
+            <ol style="margin:0; padding:0; listStyle:none; display:grid; gap:9px">
+              <li style="display:flex; gap:9px; font:400 12px 'Archivo',sans-serif; lineHeight:1.55"><span style="font:800 10px 'IBM Plex Mono',monospace; paddingTop:2px; flexShrink:0">01</span><span>사용자가 선택한 텍스트만 전송됩니다. 페이지의 나머지 내용은 읽거나 저장하지 않습니다.</span></li>
+              <li style="display:flex; gap:9px; font:400 12px 'Archivo',sans-serif; lineHeight:1.55"><span style="font:800 10px 'IBM Plex Mono',monospace; paddingTop:2px; flexShrink:0">02</span><span>전송 대상은 이 제품의 자체 백엔드이며, 백엔드가 OpenAI로 전달합니다.</span></li>
+              <li style="display:flex; gap:9px; font:400 12px 'Archivo',sans-serif; lineHeight:1.55"><span style="font:800 10px 'IBM Plex Mono',monospace; paddingTop:2px; flexShrink:0">03</span><span>이 확장 프로그램은 사용자가 방문하는 모든 웹사이트에서 실행될 권한을 가집니다.</span></li>
+              <li style="display:flex; gap:9px; font:400 12px 'Archivo',sans-serif; lineHeight:1.55"><span style="font:800 10px 'IBM Plex Mono',monospace; paddingTop:2px; flexShrink:0">04</span><span>수신자 후보를 찾기 위해 현재 페이지의 일부를 브라우저 안에서 읽습니다. 그 내용은 전송·저장하지 않습니다.</span></li>
+            </ol>
+            <div style="marginTop:14px; paddingTop:12px; borderTop:2px solid rgba(32,30,29,0.4)">
+              <button type="button" style="display:flex; alignItems:center; width:100%; padding:9px 11px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 13px 'Archivo',sans-serif; cursor:pointer; textAlign:left" style-hover="background:#dd2b0f">확인</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font:600 10px 'IBM Plex Mono',monospace; letterSpacing:0.1em; color:rgba(32,30,29,0.6); marginBottom:7px">5항목 — 수동 표시까지 포함</div>
+        <div style="width:340px; background:#f3f2f2; border:2px solid #201e1d; boxShadow:0 12px 32px rgba(45,43,43,0.22)">
+          <div style="padding:9px 12px; borderBottom:2px solid #201e1d; display:flex; alignItems:center; justifyContent:space-between">
+            <span style="font:800 11px 'Archivo',sans-serif; letterSpacing:0.14em">MEDIATE</span>
+            <button type="button" aria-label="닫기" style="width:20px; height:20px; border:1px solid #201e1d; background:transparent; font:800 10px 'Archivo',sans-serif; cursor:pointer; lineHeight:1; outline:2px solid #ec3013; outlineOffset:2px" style-hover="background:#ffe0d9">✕</button>
+          </div>
+          <div style="padding:13px">
+            <h4 style="font:800 15px 'Archivo',sans-serif; margin:0 0 4px">이 확장 프로그램이 다루는 정보</h4>
+            <div style="font:400 10px 'IBM Plex Mono',monospace; color:rgba(32,30,29,0.6); marginBottom:11px">v1.4 · 포커스는 열릴 때 패널 안으로 이동합니다</div>
+            <ol style="margin:0; padding:0; listStyle:none; display:grid; gap:9px">
+              <li style="display:flex; gap:9px; font:400 12px 'Archivo',sans-serif; lineHeight:1.55"><span style="font:800 10px 'IBM Plex Mono',monospace; paddingTop:2px; flexShrink:0">01</span><span>사용자가 선택한 텍스트만 전송됩니다. 페이지의 나머지 내용은 읽거나 저장하지 않습니다.</span></li>
+              <li style="display:flex; gap:9px; font:400 12px 'Archivo',sans-serif; lineHeight:1.55"><span style="font:800 10px 'IBM Plex Mono',monospace; paddingTop:2px; flexShrink:0">02</span><span>전송 대상은 이 제품의 자체 백엔드이며, 백엔드가 OpenAI로 전달합니다.</span></li>
+              <li style="display:flex; gap:9px; font:400 12px 'Archivo',sans-serif; lineHeight:1.55"><span style="font:800 10px 'IBM Plex Mono',monospace; paddingTop:2px; flexShrink:0">03</span><span>이 확장 프로그램은 사용자가 방문하는 모든 웹사이트에서 실행될 권한을 가집니다.</span></li>
+              <li style="display:flex; gap:9px; font:400 12px 'Archivo',sans-serif; lineHeight:1.55"><span style="font:800 10px 'IBM Plex Mono',monospace; paddingTop:2px; flexShrink:0">04</span><span>수신자 후보를 찾기 위해 현재 페이지의 일부를 브라우저 안에서 읽습니다. 그 내용은 전송·저장하지 않습니다.</span></li>
+              <li style="display:flex; gap:9px; font:400 12px 'Archivo',sans-serif; lineHeight:1.55"><span style="font:800 10px 'IBM Plex Mono',monospace; paddingTop:2px; flexShrink:0">05</span><span>메시지를 상대가 쓴 것으로 표시하면, 사용자가 직접 선택한 텍스트만 사용합니다. 저장되는 것은 집계 수치뿐이며 메시지 자체는 저장하지 않고, 처리는 브라우저 안에서 이루어집니다.</span></li>
+            </ol>
+            <div style="marginTop:14px; paddingTop:12px; borderTop:2px solid rgba(32,30,29,0.4)">
+              <button type="button" style="display:flex; alignItems:center; width:100%; padding:9px 11px; background:#ec3013; color:#f8f4f4; border:1px solid #ec3013; font:800 13px 'Archivo',sans-serif; cursor:pointer; textAlign:left" style-hover="background:#dd2b0f">확인</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  state = {
+    ux4: 'result', urgency: 'NORMAL', risk: 'full',
+    perso: true, emoji: true, hmix: false, hunk: false, holiday: true,
+    emotional: true, fallback: false, chars: false,
+    mode: 'mediate', p16: 'result-clip', recip: 'detected', mark: 'default'
+  };
+
+  sel(k, v) { return () => this.setState({ [k]: v }); }
+  tog(k) { return () => this.setState(s => ({ [k]: !s[k] })); }
+
+  bs(active) {
+    return {
+      font: "600 11px 'Archivo', sans-serif", padding: '5px 9px',
+      border: '1px solid #201e1d', borderRadius: 0, cursor: 'pointer',
+      letterSpacing: '0.02em', whiteSpace: 'nowrap',
+      background: active ? '#201e1d' : 'transparent',
+      color: active ? '#f3f2f2' : '#201e1d'
+    };
+  }
+
+  seg(k, opts) {
+    return opts.map(o => ({ label: o[1], style: this.bs(this.state[k] === o[0]), onClick: this.sel(k, o[0]) }));
+  }
+
+  joined(k, opts) {
+    return opts.map((o, i) => {
+      const st = this.bs(this.state[k] === o[0]);
+      if (i > 0) st.borderLeft = '0';
+      st.font = "600 10px 'Archivo', sans-serif";
+      st.padding = '4px 8px';
+      return { label: o[1], style: st, onClick: this.sel(k, o[0]) };
+    });
+  }
+
+  togs(list) {
+    return list.map(o => ({
+      label: (this.state[o[0]] ? '■ ' : '□ ') + o[1],
+      style: this.bs(this.state[o[0]]),
+      onClick: this.tog(o[0])
+    }));
+  }
+
+  tabs() {
+    const opts = [['mediate', '중재하기'], ['interpret', '해석'], ['mark', "상대가 쓴 것으로 표시"]];
+    return opts.map(o => {
+      const on = this.state.mode === o[0];
+      return {
+        label: o[1],
+        style: {
+          flex: 1, padding: '7px 6px', cursor: 'pointer', borderRadius: 0,
+          font: "800 10px 'Archivo', sans-serif", letterSpacing: '0.02em',
+          border: 0, borderBottom: on ? '2px solid #ec3013' : '2px solid transparent',
+          background: on ? '#eae9e9' : 'transparent',
+          color: on ? '#201e1d' : 'rgba(32,30,29,0.6)'
+        },
+        onClick: this.sel('mode', o[0])
+      };
+    });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const isResult = s.ux4 === 'result';
+    const urg = {
+      CRITICAL: '당일 회신을 요구하는 표현과 차단성 이슈가 함께 나타납니다.',
+      NORMAL: '마감일이 명시되어 있으나 당일 처리 요구는 아닙니다.',
+      LOW: '기한 표현이 없고 참고 공유에 가깝습니다.'
+    };
+    const p16 = s.p16;
+    const resultish = ['result-clip', 'result-insert', 'copied', 'inserted', 'insert-failed'].indexOf(p16) >= 0;
+
+    return {
+      ux4States: this.seg('ux4', [['empty', 'Empty'], ['loading', 'Loading'], ['result', 'Result'], ['error', 'Error'], ['delivered', 'Delivered']]),
+      urgencyOpts: this.seg('urgency', [['CRITICAL', 'CRITICAL'], ['NORMAL', 'NORMAL'], ['LOW', 'LOW']]),
+      urgencyOverride: this.joined('urgency', [['CRITICAL', 'CRITICAL'], ['NORMAL', 'NORMAL'], ['LOW', 'LOW']]),
+      riskOpts: this.seg('risk', [['full', 'Full'], ['reduced', 'Reduced'], ['none', '없음']]),
+      ux4Toggles: this.togs([['perso', '개인화 미적용'], ['emoji', '이모지 위험'], ['hmix', '경어체 혼용'], ['hunk', '호칭 미등록'], ['holiday', '연휴 충돌'], ['emotional', '감정적 메시지'], ['fallback', '폴백 응답'], ['chars', '5,000자 근접']]),
+
+      isEmpty: s.ux4 === 'empty',
+      hasText: s.ux4 !== 'empty',
+      isLoading: s.ux4 === 'loading',
+      isError: s.ux4 === 'error',
+      isDelivered: s.ux4 === 'delivered',
+      isResult: isResult,
+      disabledApprove: s.ux4 === 'empty' || s.ux4 === 'loading' || s.ux4 === 'error',
+      showCharCount: s.chars,
+      showPersoOff: s.perso,
+      showFallback: s.fallback && isResult,
+      showTicketLink: s.emotional,
+      showSecondaryActions: s.urgency !== 'CRITICAL',
+      urgencyLabel: s.urgency,
+      urgencyReason: urg[s.urgency],
+      urgencyChip: {
+        display: 'inline-block', padding: '2px 7px',
+        font: "800 10px 'Archivo', sans-serif", letterSpacing: '0.08em',
+        background: s.urgency === 'CRITICAL' ? '#ec3013' : '#201e1d', color: '#f8f4f4'
+      },
+      warnEmoji: isResult && s.emoji,
+      warnHonorificMix: isResult && s.hmix,
+      warnHonorificUnknown: isResult && s.hunk,
+      warnHoliday: isResult && s.holiday,
+      showAnyWarning: isResult && (s.emoji || s.hmix || s.hunk || s.holiday),
+      riskFull: isResult && s.risk === 'full',
+      riskReduced: isResult && s.risk === 'reduced',
+
+      modeOpts: this.seg('mode', [['mediate', '중재하기'], ['interpret', '해석'], ['mark', '상대가 쓴 것으로 표시']]),
+      panelTabs: this.tabs(),
+      p16States: this.seg('p16', [['loading', 'Loading'], ['logged-out', '미로그인'], ['result-clip', '복사만'], ['result-insert', '복사+삽입'], ['copied', 'Copied'], ['inserted', 'Inserted'], ['insert-failed', '삽입 실패'], ['error', 'Error']]),
+      recipOpts: this.seg('recip', [['none', '없음'], ['detected', '감지됨'], ['candidates', '후보 목록']]),
+      markOpts: this.seg('mark', [['default', '기본'], ['success', '추가됨'], ['error', '실패']]),
+      modeMediate: s.mode === 'mediate',
+      modeInterpret: s.mode === 'interpret',
+      modeMark: s.mode === 'mark',
+      markSuccess: s.mode === 'mark' && s.mark === 'success',
+      markError: s.mode === 'mark' && s.mark === 'error',
+      p16Logout: p16 === 'logged-out',
+      p16NotLogout: p16 !== 'logged-out',
+      p16Loading: p16 === 'loading',
+      p16Error: p16 === 'error',
+      p16Result: resultish,
+      p16Copied: p16 === 'copied',
+      p16Inserted: p16 === 'inserted',
+      p16InsertFailed: p16 === 'insert-failed',
+      p16ShowInsert: ['result-insert', 'inserted', 'insert-failed'].indexOf(p16) >= 0,
+      p16PersoOff: s.recip === 'none',
+      recipDetected: s.recip === 'detected',
+      recipCandidates: s.recip === 'candidates'
+    };
+  }
+}
+
+</script>
+</body>
+</html>
