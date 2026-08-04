@@ -1,12 +1,12 @@
 /**
  * LLM 실행 수단의 **인터페이스** — core는 이것만 알고 구현을 모른다.
  *
- * 위치 근거: `docs/Architecture.md:130` 폴더 구조 — *"`llm/client.ts` # interface LLMClient —
+ * 위치 근거: `docs/Architecture.md:131` 폴더 구조 — *"`llm/client.ts` # interface LLMClient —
  * 구현은 주입받는다"*. 구현체는 `apps/web/lib/llm/openai.ts` 이며(같은 문서 :104),
  * core는 `openai` 를 import할 수 없다(Conventions 1 · ESLint `no-restricted-imports` 로 빌드 실패).
  *
  * ⚠️ **이 파일의 형태는 architect가 지정하지 않았다 — implementer(T1)가 정한 최소 형태다.**
- * architect가 준 것은 이름(`LLMClient`)과 호출 형태 1줄뿐이다(`docs/Architecture.md:402`:
+ * architect가 준 것은 이름(`LLMClient`)과 호출 형태 1줄뿐이다(`docs/Architecture.md:552`:
  * *"core/steps/* → LLMClient.complete(step, promptVersion, payload)"*).
  * `MediationDeps.llm` 이 타입 체크되려면 이 인터페이스가 존재해야 해서 여기서 정의하되,
  * **추측으로 필드를 늘리지 않았다.** 실제 호출 요구가 드러나는 T4(프록시)·T10(C2)에서
@@ -65,7 +65,7 @@ export interface LLMResponse {
  * 를 만들면 같은 실패가 여러 응답으로 갈리고, 빈 `catch` 는 Critical 위반이다.
  *
  * ⚠️ **`LLMUnavailableError` 자체를 여기서 정의하지 않는다** — `CoreError` 계열의 정의 위치는
- * `packages/core/src/errors.ts` 로 이미 지정돼 있다(`docs/Architecture.md:126` 폴더 구조,
+ * `packages/core/src/errors.ts` 로 이미 지정돼 있다(`docs/Architecture.md:127` 폴더 구조,
  * *"errors.ts # CoreError 계열 + ErrorCode enum"*). 그 파일은 아직 없으며 **T1의 범위가 아니다.**
  *
  * ⚠️ **부분 실패는 예외가 아니다.** 공휴일 조회·이모지 판정·C6 게이트 산출이 실패해도 중재

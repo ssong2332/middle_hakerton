@@ -15,7 +15,7 @@
  *    boundaries" ①, `docs/API.md` Conventions "입력 검증"). core 안에 재검증을 만들지 않는다.
  * 2. **구현 코드·함수 본문 금지.** `docs/CodingRules.md` Directory Rules:
  *    *"`packages/core/src/contract.ts` … 타입·interface·enum 외의 export가 있으면 위반."*
- * 3. **필드 배치를 재설계하지 않는다.** `docs/Architecture.md:239` — *"필드 배치 판정은 이미
+ * 3. **필드 배치를 재설계하지 않는다.** `docs/Architecture.md:245` — *"필드 배치 판정은 이미
  *    Planning Decision #49 / T1이 확정했다 — architect는 이를 바꾸지 않고 형식만 고정한다."*
  *    아래 각 필드의 TSDoc이 그 판정의 근거를 담고 있으므로, "정리"·"통합" 목적의 변경은
  *    근거를 지우는 변경이다.
@@ -32,7 +32,7 @@
  * 정규화해 core에 넘긴다.
  */
 
-import type { DecisionAuthorityStatus } from './rules/decision-authority';
+import type { DecisionAuthorityJudged } from './rules/decision-authority';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 공용 스칼라 타입
@@ -133,7 +133,7 @@ export interface PairProtocol {
 }
 
 /**
- * 발신자 컨텍스트 — `docs/Architecture.md:219` 의 주석 *"프로필(빈 상태 가능) + 언어"* 를 형식화한 것.
+ * 발신자 컨텍스트 — `docs/Architecture.md:224` 의 주석 *"프로필(빈 상태 가능) + 언어"* 를 형식화한 것.
  *
  * 🔴 **세션에서 도출되며 클라이언트가 body로 보내지 않는다**(`docs/API.md` `POST /api/mediate`
  * Request: *"`sender` 는 세션에서 도출하므로 body에 받지 않는다 — 클라이언트가 남을 사칭할 수 없게"*).
@@ -172,7 +172,7 @@ export interface RecipientContext {
 }
 
 /**
- * 요청 컨텍스트 — `docs/Architecture.md:221` 의 주석 *"채널·언어방향·override 등"* 을 형식화한 것.
+ * 요청 컨텍스트 — `docs/Architecture.md:226` 의 주석 *"채널·언어방향·override 등"* 을 형식화한 것.
  */
 export interface RequestContext {
   /** 변환 방향(AC-045 KO→EN / AC-046 EN→KO). */
@@ -195,7 +195,7 @@ export interface RequestContext {
 
 /**
  * 중재 요청 입력 — AC-027이 규정한 `{ text, sender, recipient, context }` **4개 필드가 전부**다.
- * 형태는 `docs/Architecture.md:217~222` 의 F1 코드 블록이 고정했다.
+ * 형태는 `docs/Architecture.md:222~227` 의 F1 코드 블록이 고정했다.
  */
 export interface MediationInput {
   /**
@@ -375,22 +375,23 @@ export type TicketOptionBasis = 'signal_present' | 'signal_absent' | 'undetermin
  * 🔴 **저장·로그 대상이 아니다**: `POST /api/mediate` 는 저장하지 않고, `sent_messages` 에 대응
  * 컬럼이 없으며(AC-070 ②), 구조화 로그 필드 목록에도 추가하지 않는다(DECISIONS #27 불변).
  * AC-058의 증거는 **T11 회귀 검증셋의 실행 출력**이지 운영 로그가 아니다.
+ *
+ * 🔴 **F1-c (DECISIONS #38 · ADR-0006) — 판별 유니온.** 불변식
+ * `offered === true` ⟺ `basis === 'signal_present'` 이 이제 **타입으로 강제**된다
+ * (`docs/Architecture.md:404~407`). 이 타입의 값을 만드는 유일한 통로는
+ * `rules/ticket-gate.ts` 의 `ticketOptionFrom()` 뿐이다 — 짝을 손으로 조립하지 않는다
+ * (Conventions 13 위반 판정 ②).
+ *
+ * - `{ offered: true; basis: 'signal_present' }` — **화면이 읽는 유일한 값이 `true` 일 때만**
+ *   "Convert to Task Ticket" 링크를 렌더한다(AC-058 ①).
+ * - `{ offered: false; basis: 'signal_absent' | 'undetermined' }` — `false` 면 레이아웃에서
+ *   **완전히 제거**한다 — 비활성·회색 링크 금지(AC-058 ②, `docs/UX.md` UX-004 TicketLinkAbsent
+ *   "Absent-not-disabled controls"). `basis` 는 **내부 상태·테스트 출력 전용**이며 화면에
+ *   렌더하지 않는다(`TicketOptionBasis` 주석 참조).
  */
-export interface TicketOption {
-  /**
-   * 🔴 **화면이 읽는 유일한 값.** `true` 일 때만 "Convert to Task Ticket" 링크를 렌더하고(AC-058 ①),
-   * `false` 면 레이아웃에서 **완전히 제거**한다 — 비활성·회색 링크 금지(AC-058 ②,
-   * `docs/UX.md` UX-004 TicketLinkAbsent "Absent-not-disabled controls").
-   *
-   * 🔴 **불변식: `offered === true` ⟺ `basis === 'signal_present'`.**
-   * `undetermined` 에서 `true` 를 만들면 AC-058이 금지한 "항상 제시"에 가까워진다.
-   */
-  offered: boolean;
-  /**
-   * 🔴 **내부 상태·테스트 출력 전용. 화면에 렌더하지 않는다.** `TicketOptionBasis` 주석 참조.
-   */
-  basis: TicketOptionBasis;
-}
+export type TicketOption =
+  | { offered: true; basis: 'signal_present' }
+  | { offered: false; basis: 'signal_absent' | 'undetermined' };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 응답 (Result) — 주 경로
@@ -398,7 +399,7 @@ export interface TicketOption {
 
 /**
  * 중재 결과 — `POST /api/mediate` 의 응답 본문 (`docs/API.md` 가 이 타입을 역참조한다).
- * 형태는 `docs/Architecture.md:224~236` 의 F1 코드 블록이 고정했다.
+ * 형태는 `docs/Architecture.md:229~241` 의 F1 코드 블록이 고정했다.
  *
  * 🔴 **부분 실패는 실패가 아니다.** 공휴일 조회·이모지 판정이 실패해도 중재 전체를 실패시키지
  * 않는다 — 해당 배열이 비어 나가고 나머지는 정상 반환된다(`docs/Architecture.md` Error Handling
@@ -462,7 +463,7 @@ export interface MediationResult {
    * C6 티켓 옵션 게이트 판정 (AC-058). `TicketOption` 주석 참조.
    *
    * 🔴 **앞의 11개 필드는 이 추가로 바뀌지 않았다** — 순서·이름·타입 모두 그대로이고
-   * 12번째로 덧붙었을 뿐이다(`docs/Architecture.md:242`). 위치는 원래
+   * 12번째로 덧붙었을 뿐이다(`docs/Architecture.md:241`). 위치는 원래
    * `docs/API.md` 의 `POST /api/ticket` 게이트 행이 확정해 두었고 **빠져 있던 것은 형식**이다.
    *
    * 🔴 `null` 이 아니라 **항상 존재하는 객체**다. `nullable boolean` 으로 두면 `if (x)` 에서
@@ -497,6 +498,28 @@ export interface TicketSections {
   concernLevel: string;
 }
 
+/** 티켓 결과의 공통부(4섹션 + 출처) — 불변식 2와 무관한 필드. `TicketAuthority` 와 결합해 `TicketResult` 가 된다. */
+export interface TicketResultBase {
+  /** 4섹션 본문. 항상 4개가 존재한다 — `TicketSections` 주석 참조(AC-062). */
+  sections: TicketSections;
+  /** 이 응답의 출처 (AC-041). */
+  source: ResponseSource;
+}
+
+/**
+ * 🔴 **F1-c (DECISIONS #38 · ADR-0006) — 불변식 2의 판별 유니온.** *ⓒ-1 — 티켓 1건에 대한
+ * 최상위 단일값*(AC-064 ①). 티켓 하나당 상태가 하나이므로 배열이 아니다. enum·판정 로직은
+ * `rules/decision-authority.ts` 를 C7과 **공유**한다(AC-064 ④ — C7이 별도 판정 파이프라인을
+ * 만들지 않는다). 값을 만드는 유일한 통로는 `resolveAuthority()` 다 — 짝을 손으로 조립하지 않는다.
+ *
+ * - 판정값(`'확정'`/`'내부 승인 필요'`/`'검토 중'`)이면 **근거 문장이 반드시 함께 있다.**
+ * - `'불명'` 이면 근거는 `null` 일 수 있다 — 🔴 **근거 없이 `'확정'` 같은 값이 오는 조합은
+ *   타입에서 표현 불가능하다**(AC-064 ⑤ = AC-050 ①, 이전에는 주석으로만 존재하던 불변식).
+ */
+export type TicketAuthority =
+  | { decisionAuthority: DecisionAuthorityJudged; decisionAuthorityEvidence: string }
+  | { decisionAuthority: '불명'; decisionAuthorityEvidence: string | null };
+
 /**
  * C6 하소연 → 태스크 티켓 변환 결과 (`POST /api/ticket`, UX-007).
  *
@@ -504,45 +527,35 @@ export interface TicketSections {
  * C7의 `SummaryResult.decisions[].authorityStatus` 와 **이름이 다르고 둘 다 존재**한다(AC-064 ③).
  * 두 이름을 통합·재사용하지 말 것: 자세한 이유는 `SummaryResult` 주석에 있다.
  */
-export interface TicketResult {
-  /** 4섹션 본문. 항상 4개가 존재한다 — `TicketSections` 주석 참조(AC-062). */
-  sections: TicketSections;
-  /**
-   * 🔴 **ⓒ-1 — 티켓 1건에 대한 최상위 단일값** (AC-064 ①).
-   * 티켓 하나당 상태가 하나이므로 배열이 아니다. enum은 `rules/decision-authority.ts` 를
-   * C7과 **공유**한다(AC-064 ④ — C7이 별도 판정 파이프라인을 만들지 않는다).
-   * 🔴 근거가 없으면 `'불명'` 이며 임의 판정하지 않는다(AC-064 ⑤ = AC-050 ①).
-   */
-  decisionAuthority: DecisionAuthorityStatus;
-  /**
-   * 위 판정의 근거 문장 (AC-050 ②).
-   * 🔴 근거가 없으면 `null` 이고, 그때 `decisionAuthority` 는 반드시 `'불명'` 이다.
-   * 근거 없이 `'확정'` 같은 값이 오면 그것이 곧 AC-064 ⑤ 위반이다.
-   */
-  decisionAuthorityEvidence: string | null;
-  /** 이 응답의 출처 (AC-041). */
-  source: ResponseSource;
-}
+export type TicketResult = TicketResultBase & TicketAuthority;
 
-/**
- * C7 요약 표의 한 행 = 결정 항목 1건 (AC-019 / AC-020 / AC-064 ②).
- */
-export interface DecisionItem {
+/** 결정 항목의 공통부(내용/담당자/기한) — 불변식 3와 무관한 필드. `ItemAuthority` 와 결합해 `DecisionItem` 이 된다. */
+export interface DecisionItemBase {
   /** 결정 내용. */
   decision: string;
   /** 담당자. 🔴 스레드에 근거가 없으면 `null` — UI가 "미정"으로 렌더한다. 임의 생성 금지(AC-020). */
   owner: string | null;
   /** 기한. 🔴 근거가 없으면 `null` — 위와 동일(AC-020). */
   dueDate: string | null;
-  /**
-   * 🔴 **ⓒ-2 — 결정 항목마다 하나씩, `decisions[]` 배열의 각 객체 안** (AC-064 ②).
-   * 이름이 `decisionAuthority` 가 **아니다**. enum과 판정 로직은 C6와 공유한다(AC-064 ④).
-   * 🔴 근거가 없으면 `'불명'`(AC-064 ⑤). UI는 빈칸이 아니라 "불명"으로 명시 표기한다.
-   */
-  authorityStatus: DecisionAuthorityStatus;
-  /** 위 판정의 근거 문장. 근거가 없으면 `null` 이고 그때 `authorityStatus` 는 `'불명'` 이다. */
-  authorityEvidence: string | null;
 }
+
+/**
+ * 🔴 **F1-c (DECISIONS #38 · ADR-0006) — 불변식 3의 판별 유니온.** *ⓒ-2 — 결정 항목마다
+ * 하나씩, `decisions[]` 배열의 각 객체 안*(AC-064 ②). 이름이 `decisionAuthority` 가 **아니다**.
+ * enum·판정 로직은 C6와 공유한다(AC-064 ④). 값을 만드는 유일한 통로는 `resolveAuthority()` 다.
+ *
+ * 판정값이면 근거 문장이 반드시 함께 있고, `'불명'` 이면 근거는 `null` 일 수 있다 — 🔴 **근거
+ * 없이 `'확정'` 같은 값이 오는 조합은 타입에서 표현 불가능하다**(AC-064 ⑤, 불변식 2와 같은
+ * 문제의 C7쪽). UI는 `'불명'` 을 빈칸이 아니라 "불명"으로 명시 표기한다.
+ */
+export type ItemAuthority =
+  | { authorityStatus: DecisionAuthorityJudged; authorityEvidence: string }
+  | { authorityStatus: '불명'; authorityEvidence: string | null };
+
+/**
+ * C7 요약 표의 한 행 = 결정 항목 1건 (AC-019 / AC-020 / AC-064 ②).
+ */
+export type DecisionItem = DecisionItemBase & ItemAuthority;
 
 /**
  * "합의된 것으로 보이나 담당자 또는 기한이 비어 있는" 항목 (AC-038).
