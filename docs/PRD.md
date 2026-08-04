@@ -1,114 +1,615 @@
-# PRD — {{project-name}}
+# PRD — 크로스보더 협업 중재 서비스 (Cross-Border Collaboration Mediator)
 
 Owner: planner (see AGENTS.md). Others read-only.
-Document Version: {{v0.1}} · Last Updated: {{date}}
+Document Version: v2.5 · Last Updated: 2026-08-04
+
+> **v2.5 변경 요약** (ux-design·architect 재검증용): ① 층 2 Slack·Gmail **동순위 + 스파이크 판정 규칙**(#68) ② `docs/TestCases.md`·`docs/DemoScript.md` **planner 인수**(#69) ③ 시드 diff **전량 C3 유지 + 규약 2건 파생**(#75) ④ **C3 전용 데모 신설**(#76) ⑤ 이모지 **위험도 3단계 룩업**(#77, AC-056 갱신) ⑥ 공휴일 **영국→일본 교체**(#74, AC-057) ⑦ 시연 순서 **C6→C2→C4→C3→C1**(#78) ⑧ **OQ#21·#24 해소**(#79) ⑨ 신규 **AC-058**(C6 오탐 방지). v2.4 항목(2계층 어댑터·EU AI Act·지형도·P3 조건부)은 그대로 유효하다.
+
+> 기준 문서: 사용자 인수인계 문서(확정본). Manyfast PRD는 보조 자료이며 충돌 시 인수인계 문서를 따른다.
+> 컨셉: "번역기가 아니라, 국경 위에서 무너지는 신뢰를 잡아주는 중재자"
+> 설계 철학: "AI는 감정과 긴급성을 지우지 않는다. 형태만 바꿔서 상대가 알아볼 수 있게 만든다."
+
+---
 
 ## Problem Statement
-Before scoping any feature, planner decomposes what the user described into individual, concrete problems — not "the product doesn't exist yet" but the actual pain each affected person has today. This is a recommendation, like Monetization below: the user approves, overrides, or rejects each problem block at the PRD approval gate. A problem with no approved block does not get a feature in MVP Scope; a feature with no Problem ID it addresses is scope invented without a stated reason, not a requirement.
 
-If the user's request already states multiple distinct problems, give each its own block rather than merging them — a merged block hides which part of the recommendation the user is actually approving. If the user rejects a block, it stays here (never deleted) with Status `rejected` and a one-line reason, so the decision isn't re-litigated later without new information.
+아래 5개 문제 블록의 해결책은 모두 **사용자가 요청 시점에 이미 지정**했다(C1~C7 기능 매핑). 기본 규칙은 처방된 해결책의 대안 재도출 금지이나, **사용자가 이 규칙을 명시적으로 override 하여 후보표 작성을 지시**했다(v1.1). 따라서 각 문제에 Refined / Inventive / Unconventional 후보를 기록하되, **채택안은 변경되지 않으며** Status는 `user-approved (prescribed in the request)`를 유지한다. 후보표는 결정을 되돌리기 위한 것이 아니라, 채택안이 공유하는 가정을 드러내고 향후 로드맵의 재료로 남기기 위한 것이다. 억지 후보는 "Why this fits" 칸에 약점을 그대로 적었다.
 
-If the user already prescribed the solution to a problem, refine that prescription instead of re-deriving alternatives — the candidate table below is for problems whose solution is still open, not a license to re-litigate a decision the user brought with the request. Record the prescribed idea as Recommended with Status `user-approved (prescribed in the request)`, and challenge it only through an Open Question naming a concrete risk, never by padding the table with competing pitches.
-
-For each problem whose solution is still open, propose at least 3 candidate solution ideas spanning genuinely different registers — not 3 variations on the same idea. At minimum: one **Refined** idea (the well-validated, conventional answer — what a careful practitioner would ship), one **Inventive** idea (a less obvious angle that reframes the problem, still practical), and one **Unconventional** idea (a deliberately unconventional or provocative option — worth naming even if unlikely to be picked, because it can surface an assumption the safe options share and don't question). A row that's just a hedged restatement of the Refined idea in different words is not an Inventive or Unconventional entry — if the honest inventive/unconventional idea is weak, say so in its "Why this fits" cell rather than padding the table with a near-duplicate.
-
-### {{Problem name}} (Problem ID: {{PS-001}})
+### Border 01 — 시차로 인한 긴급도 붕괴 (Problem ID: PS-001)
 | Item | Value |
 |---|---|
-| Problem | {{the problem itself, stated concretely — what goes wrong, for whom, today}} |
-| Who's Affected & Impact | {{who experiences this and what it costs them — time, money, errors, missed opportunity}} |
+| Problem | 발신자에게 "지금 당장"인 요청이 수신자 로컬 시간으로는 새벽/퇴근 후에 도착한다. 반대로 진짜 급하지 않은 메시지가 상대의 업무 시간을 깨뜨린다. 발신자는 상대가 무시했다고 느끼고, 수신자는 배려가 없다고 느낀다. |
+| Who's Affected & Impact | 시차 지역 협업 실무자. 1회 왕복에 12~24시간이 소모되어 하루 걸릴 결정이 3일이 되고, 반복되면 "저 팀은 답이 없다"는 신뢰 손상으로 굳는다. |
 
 **Candidate Solution Ideas**
-| Flavor | Idea | Why this fits |
-|---|---|---|
-| Refined | {{the safe, well-validated approach}} | {{...}} |
-| Inventive | {{a creative angle that reframes the problem, still practical}} | {{...}} |
-| Unconventional | {{a deliberately out-of-the-box or provocative option}} | {{...}} |
-| {{optional additional flavor}} | {{...}} | {{...}} |
+| Flavor | Idea | Why this fits | Status |
+|---|---|---|---|
+| Refined (채택) | C1 긴급도 3단계 분류(근거+override) + 수신자 로컬 시간 기준 발송 타이밍 추천(R2/R3) | 검증된 접근. 판단을 AI가 제시하고 사람이 확정하므로 오분류를 감당할 수 있다. | user-approved (prescribed in the request) |
+| Inventive | **응답 기한 협상** — 발신자가 "언제까지 필요한지"를 명시하면, 수신자의 근무시간과 대조해 물리적으로 가능한 기한을 역제안하고 양측이 그 기한에 합의 | 실제 갈등의 원인은 "긴급 라벨"이 아니라 "지킬 수 없는 암묵적 기한"이라는 재프레이밍. 라벨보다 합의가 남는다. 채택안 위에 얹을 수 있는 확장. | **user-approved (adopted from candidate table, 2026-08-04)** → MVP Scope #23, AC-036, P2 |
+| Unconventional | **발송 쿨다운** — 수신자 로컬 새벽 시간에 보내려 하면 "지금 상대는 03:12"를 전면에 띄우고 발송 버튼을 10초 잠근다 | 문제를 AI 판단이 아니라 발신자의 체감으로 해결. 약점: 사용자가 짜증을 내고 도구를 우회할 가능성이 크고, 반복 사용 시 효과가 소멸한다. 시연 임팩트는 크지만 제품으로는 약하다. | rejected — 사용자 미채택(2026-08-04). 우회 가능하고 반복 시 효과가 소멸해 제품 가치가 남지 않음 |
 
 | Item | Value |
 |---|---|
-| Recommended | {{which flavor planner actually recommends, or a synthesis of two}} |
-| Reasoning | {{one line — why this beats the other candidates for this specific problem}} |
-| Status | {{one of: proposed / user-approved / user-overridden — name the idea the user chose / rejected — with a one-line reason}} |
+| Recommended | C1 긴급도 3단계 분류(근거 출력 + 사용자 override) — CRITICAL은 지연 없이 즉시 발송, NORMAL/LOW는 R2 회의시간 추천·R3 수신자 아침 예약 발송으로 흡수 |
+| Reasoning | 시차 문제의 핵심은 "언제 보낼지"가 아니라 "이 메시지가 상대의 잠을 깨울 값어치가 있는가"의 판단이며, 그 판단을 AI가 근거와 함께 제시하고 사람이 최종 결정하는 구조가 유일하게 오분류를 감당할 수 있다. |
+| Status | user-approved (prescribed in the request) |
+
+### Border 02 — 비모국어 작성 메시지의 의도 왜곡 (Problem ID: PS-002)
+| Item | Value |
+|---|---|
+| Problem | 한국어 화자가 영어로(또는 그 반대로) 쓴 업무 메시지가 의도와 다르게 읽힌다. 더 큰 문제는 발신자가 **자기 메시지가 상대에게 어떻게 읽히는지 확인할 방법이 없다**는 것이다. 프로젝트 전문용어는 번역기가 임의로 의역해 뜻이 사라진다. |
+| Who's Affected & Impact | 해외 협업 실무자, 특히 영어가 제2언어인 구성원. 오해 1건당 재확인 왕복 1~2회가 추가되고, 전문용어 오역은 잘못된 구현으로 이어져 되돌리는 비용이 발생한다. |
+
+**Candidate Solution Ideas**
+| Flavor | Idea | Why this fits | Status |
+|---|---|---|---|
+| Refined (채택) | C4 백트랜슬레이션 미리보기 + C5 용어 사전(원문 유지 강제) | 발신자가 이해 가능한 언어로 되돌려 보여주는 것이 스스로 검증할 수 있는 가장 직접적인 수단. 구현 난이도도 가장 낮다. | user-approved (prescribed in the request) |
+| Inventive | **"상대는 이렇게 읽는다" 요약** — 역번역 대신 수신자가 받게 될 인상을 3줄로 요약하고 오해 가능 지점만 하이라이트 | 역번역은 단어를 비교하게 하지만, 실제 사고는 *해석* 차이에서 난다. 정보량은 적지만 발신자가 놓치는 지점을 직접 지목한다. 채택안과 병행 표시 가능. | **rejected** — 사용자 미채택(2026-08-04). C4 역번역과 화면 위치·역할이 겹쳐 2패널 데모의 초점을 흐리고, 추가 LLM 호출로 응답 시간만 늘어남 |
+| Unconventional | **원문 병기 전송** — 번역·변환하지 않고 원문+변환문을 항상 함께 보내 수신자가 스스로 대조 | "AI 번역을 믿어야 한다"는 채택안의 전제를 정면으로 의심한다. 약점: 언어 장벽 자체를 해결하지 않고 부담을 수신자에게 떠넘기며 메시지 길이가 2배가 된다. 제품으로 채택할 수 없다. | rejected — 사용자 미채택(2026-08-04). 부담을 수신자에게 전가하며 언어 장벽을 해결하지 못함 |
+
+| Item | Value |
+|---|---|
+| Recommended | C4 백트랜슬레이션 미리보기 + C5 용어 사전(원문 유지 강제) |
+| Reasoning | 발신자가 이해할 수 있는 언어로 되돌려 보여주는 것이, 발신자가 스스로 검증할 수 있는 유일한 수단이다. 단 "완벽한 검증"이 아니라 **큰 오역을 걸러내는 1차 안전장치**로만 포지셔닝한다(과장 금지). |
+| Status | user-approved (prescribed in the request) |
+
+### Border 03 — 직설/완곡 문화 차이로 무너지는 관계 (Problem ID: PS-003)
+| Item | Value |
+|---|---|
+| Problem | 같은 문장이 한쪽에서는 "명확함", 다른 쪽에서는 "무례함"으로 읽힌다. 이모지 하나가 친근함이 아니라 비꼼으로 해석된다. 기존 도구는 이를 "국가별 말투 규칙"으로 처리해 스테레오타입을 강화하고, 실제 개인차와 어긋난다. |
+| Who's Affected & Impact | 양쪽 실무자 전원. 업무 내용이 아니라 말투 때문에 감정이 상하고, 이후 모든 메시지가 방어적으로 변해 협업 속도가 구조적으로 느려진다. |
+
+**Candidate Solution Ideas**
+| Flavor | Idea | Why this fits | Status |
+|---|---|---|---|
+| Refined (채택) | C2 톤 변환 + C3 자기신고 프로필 & diff 3회 학습 + R1 이모지 경고 | 국적이 아니라 본인 신고와 관찰된 수정 패턴만 근거로 삼아 스테레오타입 없이 개인화한다. 프로필 열람·수정으로 되돌릴 수 있다. | user-approved (prescribed in the request) |
+| Inventive | **쌍방 커뮤니케이션 규약** — 두 사람이 협업 시작 시 "직설 허용 / 이모지 / 호칭 / 마감 표현"을 함께 합의하고, 그 합의문을 프롬프트로 사용 | 개인 프로필을 AI가 추정할 필요가 없어 프로파일링 리스크가 원천적으로 사라지고, 합의 자체가 관계를 개선한다. 약점: 양측이 모두 도구를 써야 해 도입 경로가 좁다. | **user-approved (adopted from candidate table, 2026-08-04)** → MVP Scope #24, AC-037, P2. **단, C3와 병행인지 대체인지 미확정 — Open Question #16 확정 전 착수 금지** |
+| Unconventional | **발신자를 고치지 않고 수신자의 해석을 교정** — 원문 그대로 보내되 수신자 화면에 "이 표현은 무례가 아니라 직설 스타일" 주석만 붙임 | "고쳐야 할 쪽은 발신자"라는 채택안의 가정을 뒤집는다. 약점: 수신자 측 설치가 전제라 발신자에게는 아무 가치가 없고, 단독 제품으로 팔리지 않는다. | rejected — 사용자 미채택(2026-08-04). 발신자에게 가치가 없어 도입 경로가 없음 |
+
+| Item | Value |
+|---|---|
+| Recommended | C2 톤 변환 + C3 자기신고 프로필 & diff 학습 (핵심 차별점) + R1 이모지 오해 경고 |
+| Reasoning | 국적이 아니라 **본인이 신고한 성향 + 실제로 관찰된 수정 패턴(동일 패턴 3회 이상)**만을 개인화 근거로 삼아, 스테레오타입 없이 개인화한다. 프로필은 사용자가 열람·수정할 수 있어 잘못 학습된 패턴을 되돌릴 수 있다. |
+| Status | user-approved (prescribed in the request) |
+
+### Border 04 — 감정과 조직 언어의 단절 (Problem ID: PS-004)
+| Item | Value |
+|---|---|
+| Problem | "이거 진짜 이렇게 계속 갈 건가요"라는 하소연은 실제로는 리스크 신고인데, 조직의 트래커에는 들어가지 못한 채 감정으로만 소비된다. 반대로 긴 스레드에서 합의된 내용이 누구의 책임인지 기록되지 않아 다시 논쟁이 시작된다. |
+| Who's Affected & Impact | 실무자(문제 제기가 묻힘)와 관리자(리스크를 늦게 인지). 스레드 재독해에 인당 수십 분이 반복 소모되고, 결정사항 누락은 재작업으로 이어진다. |
+
+**Candidate Solution Ideas**
+| Flavor | Idea | Why this fits | Status |
+|---|---|---|---|
+| Refined (채택) | C6 하소연→티켓 4섹션 변환 + C7 결정사항 자동 요약(C6 로직 재활용) | 감정을 [우려 수준] 메타필드로 보존하면서 조직이 다룰 수 있는 형태를 만든다. C7이 C6 구조를 재사용해 일정 효율이 높다. | user-approved (prescribed in the request) |
+| Inventive | **미확정 감지(Unresolved Detector)** — 스레드를 요약하는 대신, "합의된 것처럼 보이지만 담당자·기한이 비어 있는 지점"만 실시간으로 경고 | 요약은 읽어야 가치가 생기지만, 누락 경고는 읽지 않아도 작동한다. 재작업의 실제 원인(빈 담당자/기한)을 직접 겨냥한다. C7 이후의 자연스러운 확장. | **user-approved (adopted from candidate table, 2026-08-04)** → MVP Scope #25, AC-038, P2. C7(T26) 완료 이후에만 착수 가능 |
+| Unconventional | **사람에게 보내지 않고 티켓만 생성** — 감정형 메시지는 상대에게 전달하지 않고 익명 이슈로 트래커에만 등록 | 감정 전달 자체가 관계를 해친다는 가정을 취한 극단안. 약점: 대화를 끊어 "중재자" 컨셉과 정면 충돌하고, 익명 신고 도구로 성격이 변질된다. 채택 불가. | rejected — 사용자 미채택(2026-08-04). "중재자" 제품 컨셉과 정면 충돌 |
+
+| Item | Value |
+|---|---|
+| Recommended | C6 하소연→태스크 티켓 변환([문제 정의]/[영향·리스크]/[요청 사항]/[우려 수준]) + C7 결정사항 자동 요약(C6 로직 재활용) |
+| Reasoning | 감정을 삭제하지 않고 **[우려 수준]이라는 메타필드로 보존**하는 것이 이 제품의 철학과 직결되며, 동시에 조직이 다룰 수 있는 형태를 만든다. C7이 C6 구조를 재사용하므로 남은 일정 안에서 두 기능을 한 축으로 낼 수 있다. |
+| Status | user-approved (prescribed in the request) |
+
+> **(v2.4) 채널 관점의 보강 — Border 04와 층 1의 연결**: "조직 간" 마찰은 **서로 다른 회사가 서로 다른 툴을 쓴다**는 사실 위에서 발생한다(일본 1위 Teams / 한국 Slack·Jandi 등 — 일본 측 수치는 measured, Differentiation 7). 상대 조직의 툴을 우리가 미리 알 수 없으므로, **대상 사이트를 식별하지 않는 층 1(MVP #32)이 Border 04를 실제로 다룰 수 있는 유일한 채널 구조**다. 층 2(#16·#27·#31)는 그 위의 편의 기능이다. 발표 KEY 3의 근거로 이 연결을 사용한다(Planning Decision #61).
+
+### 중재 자체가 만드는 부작용 — 긴급성 희석 (Problem ID: PS-005)
+| Item | Value |
+|---|---|
+| Problem | 톤을 부드럽게 만드는 도구는 필연적으로 "내일까지 반드시"를 "가능하시면 확인 부탁드립니다"로 바꾼다. 마감일·필수 액션·책임자가 희석되면 중재 도구가 오히려 사고의 원인이 된다. |
+| Who's Affected & Impact | 도구 사용자 전원 + 조직. 이 부작용이 한 번이라도 드러나면 도구 신뢰도가 즉시 0이 되며, 심사·발표에서 가장 먼저 지적될 지점이기도 하다. 실패 예시: "프로덕션 3일째 다운되어 있습니다" → "시간 되실 때 한번 봐주시면 감사하겠습니다". |
+
+**Candidate Solution Ideas**
+| Flavor | Idea | Why this fits | Status |
+|---|---|---|---|
+| Refined (채택) | 보존 대상(마감일·수치·필수 액션)을 먼저 추출해 고정한 뒤 톤만 변환 + 굵게/요약 라인 표시 + human-in-the-loop 승인 | 톤 변환과 정보 보존을 한 프롬프트에 맡기지 않으므로 희석 여부가 AC-006으로 **검증 가능한 항목**이 된다. | user-approved (prescribed in the request) |
+| Inventive | **톤과 사실의 채널 분리** — 순화된 본문 + 기계 생성 "요구사항 블록(마감/액션/영향)"을 항상 별도 블록으로 강제 첨부 | 사실 블록은 LLM 톤 변환을 거치지 않으므로 구조적으로 희석될 수 없다. 다만 채택안의 요약 라인과 겹침이 크며, 독립 대안이라기보다 채택안을 더 엄격하게 만든 변형이다 — 정직하게 말해 별개 아이디어로서의 가치는 제한적이다. | **rejected** — 사용자 미채택(2026-08-04). 채택안의 요약 라인(AC-007)과 기능이 중복 |
+| Unconventional | **순화 기본 OFF** — 기본은 원문 그대로 발송하고, 사용자가 명시적으로 요청할 때만 톤 변환 | "톤 변환은 항상 이롭다"는 제품 전체의 전제를 의심한다. 약점: 주기능을 옵트인으로 만들어 사용률이 급감하고 제품 가치 제안이 무너진다. 다만 CRITICAL 경로에는 이 원칙이 이미 부분 적용되어 있다(AC-005). | **rejected** — 사용자 미채택(2026-08-04). 주기능을 옵트인화해 제품 가치 제안이 무너짐 |
+
+| Item | Value |
+|---|---|
+| Recommended | C2 내부의 **긴급도 보존 필터** — 마감일·필수 액션 등 보존 대상은 절대 희석 금지, 굵게 또는 별도 요약 라인으로 명시 표시. 여기에 C1 override와 human-in-the-loop 승인을 결합. |
+| Reasoning | 톤 변환과 정보 보존을 하나의 프롬프트에 맡기지 않고, **보존 대상을 먼저 추출해 고정한 뒤 톤만 바꾸는 순서**로 다루면 희석이 검증 가능한 항목(AC-006)이 된다. |
+| Status | user-approved (prescribed in the request) |
+
+---
 
 ## Goal
-{{one sentence — what this product does, synthesized from the user-approved Problem Statement blocks}}
+국경(시차·언어·문화·조직)을 넘는 업무 메시지에서 감정과 긴급성을 지우지 않고 형태만 바꿔 전달해, 협업 중 무너지는 신뢰를 붙잡아 주는 human-in-the-loop 중재 서비스.
 
 ## Target Users
-{{who, and their core problem — one-line summary; docs/PRD.md's Problem Statement above is the decomposed, reasoned version of this}}
+- **핵심**: 글로벌 프로젝트 팀원 / 해외 협업 실무자 (한국어↔영어 환경에서 매일 비동기 메시지를 주고받는 사람)
+- **보조**: 프로젝트 관리자(팀 용어집·규칙 관리), 외부 협력사 담당자, 신입/인턴
+- MVP 규모: 해커톤 심사·발표 시연이 1차 목표이나, **심사 데모 전용으로 한정하지 않고 발표 후 실사용자 확장을 고려한 설계로 진행**한다(OQ#1 확정, Planning Decision #27). 그 직접적 귀결로 간단 로그인이 MVP에 포함된다(MVP Scope #26).
+
+---
+
+## Differentiation & Market Reality
+
+발표·기획의 전제를 여기서 고정한다.
+
+> **표기 규칙 (모든 주장에 적용)**
+> - **(measured)** = 오케스트레이터가 2026-08-04 세션에 직접 웹 검색으로 확인한 사실.
+> - **(cited)** = 사용자·제3자가 제공했으나 독립 검증하지 않은 정보. 발표에서 단정하지 않는다.
+> - **(미검증)** = 확인 수단이 없어 열려 있는 항목. 발표에서 "확인된 사실"로 말하지 않는다.
+
+**0) 경쟁 지형 — 실명 확인 결과 (2026-08-04)**
+
+| 서비스 | 확인된 기능 | 우리와 겹치는 지점 | 근거 / 검증 등급 |
+|---|---|---|---|
+| **Tonero** | Chrome/Edge/Opera 확장. Slack·Gmail·Teams·LinkedIn의 **모든 텍스트 박스에 톤 툴바 삽입**. Professional/Direct/Casual 포함 6종 톤. 2026년 초 공개 출시, 월 30회 무료. "탭 전환·복사붙여넣기 없음"을 세일즈 포인트로 사용. custom voice profile(본인 문체 커스터마이즈) 보유 | **어댑터(Chrome 확장) 차별점과 정면 충돌** — "도구를 쓰러 가지 않고 쓰던 자리에서 작동"은 우리만의 것이 아니다. C2 톤 변환 자체도 중복 | https://tonero.app/ — **(measured)** |
+| **checktone.app** | Slack용 AI 커뮤니케이션 코치. `/tone` 명령으로 **발송 전** 톤 분석. 가입 불필요. 음성(speech) 분석도 제공 | "보내기 전에 검토한다"는 워크플로가 동일 | https://checktone.app/ — **(measured)** |
+| **Slack AI** | (a) 원하는 톤(격식~친근)으로 콘텐츠 재작성·형식 재구성·핵심 아이디어 정리·다음 단계 강조 (b) 허들의 **핵심 결정사항·다음 단계·액션 아이템을 캔버스에 자동 기록** | **C7(결정사항 자동 요약)과 기능 중복.** 플랫폼 기본 기능이므로 차별점으로 사용 불가 | https://slack.com/features/ai · https://slack.com/help/articles/31377193680019-Use-AI-to-take-huddle-notes-in-Slack — **(measured)** |
+| **Superhuman "Instant Reply"** | **수신자별(per-recipient)로 문체를 바꾼다**(CEO=격식체, 친구=캐주얼). 2~4주간 사용자 교정을 학습해 상대별 어조·어휘·구조를 맞춤. **alfred_** 도 정교함은 덜하나 수신자별 음성 매칭 제공 | **C3(개인 프로필 + diff 학습)의 "개인화" 주장에 대한 직접 반례** — 아래 2) 표의 C3 행을 이 사실에 맞춰 수정했다 | https://get-alfred.ai/blog/best-ai-assistant-that-learns · https://www.jenova.ai/en/resources/best-ai-email-writer-202606 — **(measured)** |
+| **Personos** | 크로스컬처 커뮤니케이션 **포지션은 실재 확인**. 단 확인된 것은 자사 블로그 콘텐츠이며 **제품 기능 스펙은 여전히 미확인** | 포지션 중복은 확정, 기능 중복 여부는 불명 | https://www.personos.ai/ — **부분 검증(포지션 measured / 기능 범위 미검증)** |
+| World Time Buddy, Reclaim.ai (R2 대비) | 회의 시간 조율 전용 도구가 이미 존재한다는 지적 | R2(최적 회의시간 추천, P2)와 중복 가능 | **(cited — 오케스트레이터가 독립 검증하지 않음).** R2 우선순위는 변경하지 않는다(Planning Decision #48) |
+
+**1) 레드오션이다 — "세상에 없는 아이디어" 프레이밍 금지**
+"문화 맥락을 반영한 톤 조정"은 이미 실제 제품으로 출시되어 있다 — Tonero(브라우저 확장, 6종 톤), checktone.app(Slack 발송 전 톤 분석), Slack AI(톤 재작성 + 결정사항 자동 기록) 모두 **(measured)** 로 확인됐다. Personos는 포지션만 확인됐다. 새로운 영역이 아니라 **이미 여러 제품이 각자의 각도로 점유한 영역**이다. 발표에서 "이런 건 세상에 없었다"고 말하는 순간 즉시 반박당한다. 답해야 할 질문은 "왜 없던 것인가"가 아니라 **"왜 우리 것이 다른가"**이다(Planning Decision #17 유지, #44로 보강).
+
+**2) 기술 해자는 없다 — 차별화는 제품화 요소에 있다**
+"LLM에 톤 순화 프롬프트를 넣는다"로 이 문제의 약 90%는 해결된다. 즉 모델·프롬프트는 해자가 아니다. ChatGPT에 직접 붙여넣는 것 대비 이 제품의 차별화는 전부 제품화 층위에 있다:
+
+| 차별화 요소 | ChatGPT 직접 사용 대비 무엇이 다른가 |
+|---|---|
+| 비교·승인 UX (원문/변환문/이유 3열, 2패널) | 결과를 신뢰할지 판단할 근거를 화면이 제공. 붙여넣기 왕복이 사라짐 |
+| 개인 프로필 + diff 3회 학습 (C3) | **차별점은 "개인화를 한다"가 아니라 "무엇을 개인화하는가"이다.** 매번 "내 스타일은 이렇다"를 설명할 필요가 없다는 점은 ChatGPT 대비로는 유효하지만, **전용 도구 대비로는 성립하지 않는다** — Superhuman "Instant Reply"가 수신자별로 문체를 학습·적용한다**(measured)**. **(v2.3 재서술 — Open Question #18 해소)** 서술 각도는 "무엇을 학습하는가"가 아니라 **"개인화 근거를 어디서 얻는가"** 다. Superhuman은 관찰로 상대 취향을 **추론**하고, 우리는 **수신자 본인이 합의한 규칙(#24, AC-037)을 받아** 적용하며 C3는 **발신자의 전역 기본값**(사용자 단위 카운팅, Decision #35)으로만 쓴다. **"C3가 수신자별로 학습한다"는 서술은 명세와 불일치하므로 사용하지 않는다.** ⚠️ 수신자 축 근거인 #24가 P2라 컷되면 이 차별점의 절반이 사라진다 → **Open Question #21** |
+| 프로젝트 용어 사전 (C5) | 팀 자산으로 축적되어 전문용어 오역이 반복되지 않음 |
+| 협업툴 어댑터 (Chrome 확장, **v2.4부터 2계층**) | 도구를 쓰러 가지 않고 쓰던 자리에서 작동 — 사용 습관 형성의 유일한 경로. **(v2.4) 층 1(범용 선택 오버레이, MVP #32)은 대상 사이트를 알 필요가 없으므로 브라우저 안의 모든 웹 협업툴에서 동작하고, 층 2(역삽입, #16·#27·#31)는 GitHub·Slack·Gmail에서만 DOM 삽입을 얹는다.** Tonero는 확인된 대상이 Slack·Gmail·Teams·LinkedIn의 **명시된 목록**이다(measured) — 목록 밖 사이트에 대한 동작은 확인되지 않았다(부재 증명 아님) |
+| 긴급도 보존 필터 (C2/C1) | 범용 순화 프롬프트가 만드는 **부작용(희석)을 명시적으로 방어**하는 장치. 범용 챗봇에는 없음 |
+
+**3) 발표 차별화 KEY 3 (사용자 승인 2026-08-04 · Planning Decision #44 — 재논의 대상 아님)**
+
+| # | KEY | 서술 | 묶이는 기능 | 검증 상태 |
+|---|---|---|---|---|
+| KEY 1 | **"톤 교정"이 아니라 "번역 손실 방지"** | 경쟁사는 polish(다듬기)를 판다. 우리는 preserve(잃으면 안 되는 것 지키기)를 판다. 확인한 경쟁 제품은 전부 polish 축이었다(Tonero 6종 톤 프리셋, checktone 톤 분석, Slack AI 재작성 — measured). "무엇이 사라지면 안 되는가"를 **먼저 고정한 뒤** 톤을 바꾸는 순서를 가진 제품은 이번 검색 범위에서 확인되지 않았다 | C4 백트랜슬레이션 + C2 긴급도 보존 필터 + C5 용어사전 = **하나의 축** | 경쟁사 기능은 (measured). "부재"는 검색 범위 내 미발견일 뿐 부재 증명이 아니다 |
+| KEY 2 | **추론된 개인화가 아니라 "합의된" 개인화** (v2.3 재서술, Open Question #18 resolved) | Superhuman은 2~4주간 사용자 교정을 관찰해 **상대의 취향을 추론**한다(measured). 우리는 **수신자의 성향을 추론하지 않는다** — 수신자 **본인이 직접 합의한 규칙**(#24 쌍방 규약: 직설 허용 / 이모지 / 호칭 / 마감 표현 4항목, AC-037)을 받아서 적용하고, 발신자의 전역 기본값(C3)은 그 아래에 둔다. **같은 항목이 충돌하면 규약이 이긴다**(AC-037, Planning Decision #26). 즉 차별점은 개인화의 유무가 아니라 **개인화 근거의 출처**다: 관찰에 의한 추정 vs 당사자의 합의 | **#24 쌍방 규약(AC-037, P2) = 수신자 축의 유일한 근거** + C3(AC-011·013·014, P1) = 발신자 전역 기본값 | ✅ **명세 정합 확인(2026-08-04)** — 아래 3-2 대조표 참조. ⚠️ **남은 리스크는 하나**: 수신자 축 근거인 #24가 **P2**라 8/18 컷 대상이며, 컷되면 KEY 2의 절반이 사라진다 → **Open Question #21** |
+| KEY 3 | **개인 간이 아니라 "조직 간" 마찰** | 감정으로 소비되고 마는 하소연을 조직이 다룰 수 있는 티켓으로 바꾼다. Border 04를 부가기능이 아니라 **차별화 핵심 축**으로 둔다. **(v2.2) 어댑터 선택이 이 서사를 뒷받침한다** — GitHub·Slack은 대개 사내(intra-company) 도구이고, **서로 다른 회사가 실제로 주고받는 채널은 이메일**이다. 그래서 Gmail 어댑터(MVP #31)가 KEY 3와 가장 잘 맞는 채널이다. **(v2.4) "플랫폼 독립 중재 레이어"를 말이 아니라 구조로 실증한다** — 층 1(범용 선택 오버레이, #32)은 대상 사이트를 식별하지 않으므로 브라우저 안의 어떤 웹 협업툴에서도 같은 엔진이 돈다. 반면 Slack AI는 Slack 안에서만 동작하고(measured), Tonero는 **명시된 사이트 목록**(Slack·Gmail·Teams·LinkedIn)에서 동작한다(measured). 아래 7) 지형도가 이 구조의 실제 이득을 보여준다 — 일본 1위 Teams(웹)·Chatwork, 중국 Feishu 웹처럼 **우리가 어댑터를 쓰지 않은 툴이 층 1만으로 커버된다** | C6(하소연→티켓) — 데모 하이라이트 · **층 1 범용 오버레이(#32)** · **Gmail 어댑터(#31)** · 결정 권한 상태(AC-050, 추정 가설) | 확인한 경쟁 서비스(Tonero·checktone·Slack AI·Superhuman)에서 동일 기능 **미발견**(measured, 부재 증명 아님). Gmail DOM 삽입 난이도는 **미검증(추정)** |
+
+**3-2) (v2.3) KEY 2 ↔ 실제 명세 정합 대조표 (Open Question #18 해소 근거)**
+
+발표 문구가 문서와 대조당해도 무너지지 않도록, KEY 2의 각 주장을 뒷받침 명세와 1:1로 대조한다.
+
+| KEY 2가 주장하는 것 | 뒷받침 명세 | 정합 |
+|---|---|---|
+| "수신자가 합의한 규칙을 적용한다" | **AC-037**(#24) — 직설 허용/이모지/호칭/마감 표현 4항목을 **두 사용자가 합의**해 저장, 해당 상대 메시지의 변환 프롬프트에 주입 | ✅ 정합 |
+| "수신자 성향을 추론하지 않는다" | **Planning Decision #6**(국가 스테레오타입 금지, 자기신고 + 본인 diff만 사용) + AC-037(당사자 합의) | ✅ 정합 — 오히려 #6을 강화 |
+| "발신자 전역 기본값은 그 아래에 둔다" | **AC-011·AC-012·AC-013·AC-014** + **Planning Decision #35**(3회 카운팅 = 사용자 단위) | ✅ 정합 |
+| "충돌하면 규약이 이긴다" | **AC-037** 마지막 문장 + **Planning Decision #26** | ✅ 정합 |
+| ~~"C3가 수신자별 수정 이력을 학습한다"~~ | **불성립** — AC-013의 카운팅 단위는 **사용자 전체**이며(Decision #35) diff 데이터에 recipient 축이 없다 | ❌ **삭제됨(v2.3)**. 이 문구는 발표·문서 어디에도 쓰지 않는다 |
+| ~~"C3가 수신자의 수용 방식을 학습한다"~~ | **불성립** — 같은 이유. v2.1~v2.2 서술의 결함이었다 | ❌ **삭제됨(v2.3)** |
+
+> **주의**: C3의 diff 3회 카운팅을 수신자별로 바꾸는 안은 **기각**되었다(사용자 결정 2026-08-04). 수신자별로 나누면 MVP 데이터량에서 3회에 도달하지 못해 학습 기능 자체가 시연되지 않는다(Open Question #9 결정 근거). **Planning Decision #35는 그대로 유효하며 변경하지 않는다.**
+> **부가 확인**: AC-011의 문항 목록(직설/완곡·이모지·격식도)에 v2.2에서 추가한 "존댓말 레벨"은 명시되어 있지 않다. 이 항목의 요구는 **AC-046 ②**가 소유하며 AC-011의 "3~5문항" 상한 안에서 T19가 구현한다 — AC-011 문구는 수정하지 않는다(승인된 AC의 조건 변경 금지).
+
+**3-1) (v2.2) 한국어 특화 축 — KEY 1의 가장 날카로운 실증 (이번 배치 헤드라인)**
+
+> **프레이밍 원칙(사용자 승인, 그대로 사용할 것)**: 차별점을 **"한국 문화를 안다"로 잡지 않는다.** 그렇게 잡는 순간 Planning Decision #6(국가 스테레오타입 사용 금지)과 Risks의 문화 프로파일링 항목에 정면으로 걸린다. 대신 **"한국어는 긴급도와 위계를 어휘가 아니라 문법(어미·부사)에 싣는다"** 는 **언어 구조적 사실**로 잡는다. 이는 개인·국민성에 대한 일반화가 아니라 **언어쌍(KO↔EN)의 속성**이므로 반박이 어렵고, 테스트 케이스로 **검증 가능**하다(AC-045·AC-046·AC-047).
+
+| 축 | 현상 | 흡수 위치 | AC |
+|---|---|---|---|
+| ① 어미에 숨은 긴급도 (KO→EN) | "혹시 오늘 중으로 가능하실까요?" → 직역 "Would it maybe be possible today?"(긴급도 0) → 보존 변환 "I need this by EOD today. Please confirm if that's not feasible." 쿠션어("바쁘신 와중에 죄송하지만")가 영어 직역 시 **과잉 사과**로 읽혀 신뢰도를 깎는 문제도 **같은 축**이다 | **C2(P0)의 한국어 특화 프롬프트 규칙 + 테스트셋** — 신규 행 없음. **PS-005(긴급성 희석)의 언어별 구체 사례**이며, 희석이 번역 단계에서 발생한다는 점에서 동일 문제의 하위 유형 | AC-045 |
+| ② 존댓말 레벨 일관성 (EN→KO) | 한 메시지 안에 합쇼체/해요체가 섞이면 "기계 번역 티"로 읽혀 신뢰도가 떨어진다 | **C3 프로필 항목 + C4 검증** — 혼용 경고는 *변환 결과의 문제*이므로 `warnings[]`에 담는다(Planning Decision #49의 판정 기준 적용) | AC-046 |
+| ③ 호칭·직급 매핑 | "Hi Sujin" → "수진님"인지 "김 대리님"인지 LLM이 결정할 수 없다. 역방향 "김 대리님이 확인해주셔야" → "Manager Kim must check"는 영어권에서 **과잉 위계**로 읽힌다 | **C5 용어 사전의 "사람(호칭)" 타입** — 신규 행 없음. 팀이 등록한 값만 사용하고 **추측 생성 금지** | AC-047 |
+
+⚠️ **미검증(추정)**: LLM이 실제로 존댓말 레벨을 얼마나 자주 혼용하는지는 **아무도 측정하지 않았다.** M1 첫날 KO↔EN 품질 스팟체크(docs/Tasks.md 착수 전 확인 항목)에서 함께 측정한다.
+
+**4) 발표에서의 위상 — 내세울 것 / 내세우지 않을 것**
+
+| 항목 | 발표 위상 | 근거 | 스코프·우선순위 영향 |
+|---|---|---|---|
+| C7 결정사항 자동 요약 | **차별점으로 내세우지 않는다** | Slack AI가 허들 결정사항·다음 단계·액션 아이템의 캔버스 자동 기록을 **플랫폼 기본 기능으로 이미 제공**(measured). 차별점으로 말하는 순간 "Slack에 이미 있다"로 반박된다 | **없음** — 기능은 MVP에 유지(#14), 우선순위 P1 유지, T26·T27 변경 없음 (Planning Decision #46) |
+| C6 하소연→티켓 | **데모 하이라이트.** KEY 3의 실물 증거 | 검색한 경쟁 서비스에서 동일 기능 미발견(measured) | **없음** — 우선순위는 이미 Planning Decision #15에서 Core 2차 착수 선두(C6→C3→C5→C7)로 반영 완료. **재조정 불필요** (Planning Decision #47) |
+| R2 최적 회의시간 추천 | 차별점으로 쓰지 않는다. 언급 시 "전용 도구가 이미 있고 우리는 보조 기능"으로만 서술 | World Time Buddy·Reclaim.ai 등 전용 도구 존재는 **(cited — 미검증)** | **없음** — P2 유지, 우선순위 변경 없음 (Planning Decision #48) |
+
+**5) 예상 킬러 질문 4개 (발표 대비, T37 Q&A에 포함 — v2.4에서 EU 규제 질문 1개 추가)**
+
+| 질문 | 답변 축 | 하지 말아야 할 답 |
+|---|---|---|
+| "Tonero 같은 게 이미 있지 않나요?" | **인정하고 시작한다** → KEY 1. Tonero는 톤 프리셋(polish)을 판다. 우리는 마감·수치·필수 액션이 사라지지 않았음을 AC-006의 10/10 회귀 결과로 보여준다 | "그건 다른 제품입니다"류의 회피, 존재 부정 |
+| "Slack이 내장하면 어떻게 되나요?" | **플랫폼 독립 어댑터 구조**(AC-028) — 코어 엔진이 어댑터에 의존하지 않으므로 Slack·GitHub·웹앱 어디서든 같은 엔진이 돈다. 한 플랫폼이 내장해도 **크로스 플랫폼 축은 남는다**. **(v2.4) 층 1(#32, AC-052)로 이를 실물로 보인다** — Slack이 내장해도 Teams 웹·Notion·Jira·사내 위키에서는 우리 오버레이가 그대로 동작한다 | "Slack엔 아직 없습니다" — Slack AI의 톤 재작성·결정사항 기록은 이미 존재한다(measured) |
+| "ChatGPT에 물어보면 되지 않나요?" | **맥락 축적** — 용어사전(C5)·프로필(C3)·쌍방 규약이 팀 자산으로 남고, 비교·승인 UX(AC-008)가 붙어 붙여넣기 왕복이 사라진다 | 모델·프롬프트 우위 주장(Planning Decision #17 위반) |
+| **(v2.4) "EU에서 감정 분석은 불법 아닌가요?"** | ① 조문을 먼저 인정한다 — **EU AI Act Article 5(1)(f)는 직장·교육기관에서 자연인의 감정을 추론하는 AI를 금지하며 2025-02-02 발효, EU 내 운영 고용주면 본사 소재지와 무관하게 적용, 위반 시 전 세계 연매출 최대 7%**(measured, 2026-08-04). ② **유럽집행위원회가 이 금지를 '생체 데이터(biometric) 기반 추론'으로 한정 해석**했고 우리 제품은 **텍스트에서 추론**하므로 금지 대상을 벗어날 가능성이 높다고 **판단**한다(measured — 해석의 존재까지가 확인된 사실). ③ **단, 법률 자문은 받지 않았고 회색지대임을 그 자리에서 말한다.** ④ 관리자에게 개인 커뮤니케이션 신호를 노출하는 "팀 마찰 리포트"는 이 조항의 정면 사정권이라 **스트레치에서도 EU 판매를 전제하지 않는다**고 덧붙인다 | **"안전하다 / 문제없다 / 적용 대상이 아니다"는 단정.** 법률 자문을 받은 것처럼 들리는 표현. 조항 자체를 모른다는 인상 |
+
+**6) 검증되지 않은 핵심 가정**
+- "글로벌 협업에서 불만·긴급성 표현이 어렵다"가 실제로 돈·시간을 쓸 만큼의 페인포인트인지 **검증되지 않았다**. 권장 액션: 다국적 협업 경험자 3~5명 인터뷰(각 20~30분)로 (a) 최근 3개월 내 실제 오해 사례, (b) 그때 무엇으로 해결했는지, (c) 도구가 있었다면 썼을지를 확인. 해커톤 일정상 P2 선택 태스크로 배치했다(T38) — 구현 일정을 잠식하지 않되, 발표에서 "가정"과 "확인된 사실"을 구분해 말할 근거가 된다.
+- ~~KEY 2의 "수신자 수용 방식 학습" 각도~~ → **폐기·해소(v2.3)**. 해당 서술은 명세와 불일치해 삭제했고, KEY 2는 "추론된 개인화 vs 합의된 개인화"로 재서술되어 3-2 대조표로 정합이 확인됐다(Planning Decision #58). **남은 미검증 요소는 "이 각도가 심사에서 통하는지"뿐이며, 이는 발표 전까지 확인할 수단이 없다(추정).** 별개로 근거의 절반(#24)이 P2 컷 대상이라는 구조적 리스크가 있다(Open Question #21).
+- **Personos의 제품 기능 범위 미검증** — 포지션만 확인됐다. 비교표에 기능을 적으려면 발표 전 제품 페이지를 직접 확인해야 한다(T37 조건, AC-034).
+- **R2 전용 경쟁 도구(World Time Buddy·Reclaim.ai) 존재는 cited** — 발표에서 단정하지 않는다.
+- **(v2.4) 층 1 범용 오버레이가 주요 웹 협업툴에서 실제로 동작하는지 미검증(추정)** — `mouseup` → `window.getSelection()` 패턴이 Teams 웹·Notion·Jira 등에서 선택 이벤트·패널 렌더링 모두 성공하는지 확인한 바 없다. "DeepL 번역 확장이 같은 상호작용 패턴을 쓴다"는 것은 **사용자 진술(cited)** 이며 오케스트레이터가 확인하지 않았다. 확인 수단: T55 착수 첫 1시간 스파이크(2개 사이트).
+- **(v2.4) EU AI Act가 우리 제품에 적용되는지 여부는 회색지대** — 조문·발효일·과징금 상한과 "생체 데이터 기반으로 한정한 유럽집행위원회 해석"의 **존재까지가 measured**이고, 그 해석이 우리 텍스트 기반 추론에 어떻게 적용되는지는 **법률 자문을 받지 않았다.** 발표에서 "안전하다"고 단정하지 않는다(아래 Risks 신규 행, Planning Decision #66).
+- **(v2.4) 중국 본토 네트워크에서 우리 웹앱·OpenAI API에 접근 가능한지 미검증** — 접근 불가라면 중국 툴은 층 1로도 커버되지 않는다(아래 7) 표).
+
+**7) (v2.4) 국가별 협업툴 지형도 — 어댑터 전략의 시장 근거 (measured, 2026-08-04)**
+
+> **인용 규칙(반드시 지킬 것)**: 일본 수치는 **두 조사를 함께** 적는다. 조사 방식이 달라(도입률 복수응답 vs 주 사용 툴) 수치 차이가 크며, **어느 한쪽만 단독 인용하면 발표에서 즉시 반박당한다.** 두 수치는 서로 모순이 아니다.
+
+| 국가 | 지형 | 층 1 커버 여부 | 근거 / 등급 |
+|---|---|---|---|
+| **일본 (조사 A)** | Microsoft Teams **67.8%** 압도적 1위, Google Chat 7.8%, **Slack 7.5%**, LINE WORKS 4.9%, Chatwork 2.3% | Teams 웹·Chatwork 웹은 **층 1로 커버**(층 2 어댑터 없음) | https://renue.co.jp/posts/business-chat-slack-teams-chatwork-line-works-comparison-2026 — **(measured)** |
+| **일본 (조사 B)** | 1,629명 대상 조사에서 Teams 17.25%, Google Chat 13.01%, LINE WORKS 9.21%, Chatwork 8.96%, Slack 7.00% (5개 합계 55.43%) | 동일 | https://boxil.jp/mag/a3438/ — **(measured)**. A와의 차이는 **도입률(복수응답) vs 주 사용 툴 조사**의 차이 |
+| **중국** | DingTalk **32.7%**(MAU 약 2억, 누적 8억), WeCom **23.4%**(MAU 약 1억), Feishu **18.9%**(MAU 약 3천만). **3사 합계 92%**, Teams는 8% | **커버 불가로 간주한다** — 네트워크 단절로 우리 서비스 접근 자체가 불투명하고(미검증), 주 사용 형태가 데스크톱 전용 클라이언트인 경우 브라우저 확장이 닿지 않는다(추정). Feishu 웹처럼 웹 클라이언트가 있으면 **원리상** 층 1이 동작하나 확인하지 않았다 | https://eu.36kr.com/en/p/3916363882387074 — **(measured, 점유율만)**. 커버 가능 여부는 **미검증** |
+
+**이 표에서 도출되는 것 (그리고 도출되지 않는 것)**
+1. **Decision #59(Slack을 Gmail보다 먼저 컷)의 근거를 보강한다** — 일본에서 Slack은 두 조사 모두 **7%대**인 반면 Teams는 1위다(measured). **단 결정 자체는 이미 확정이므로 뒤집지 않는다**(Planning Decision #67).
+2. **층 1의 실제 이득이 여기서 나온다** — 어댑터를 하나도 쓰지 않은 Teams 웹·Chatwork가 층 1만으로 커버된다.
+3. **중국은 정직하게 "커버 못 한다"고 말한다** — 발표에서 숨기지 않는다(AC-034의 "미구현을 구현된 것처럼 보이지 않게" 조항과 동일 원칙, T37 ⑧).
+4. **(cited — 사실로 쓰지 말 것)** "DingTalk↔Slack 메시지 동기화 4시간 지연으로 HK$100만 규모 주문 상실" 사례와 "DingTalk의 Ding 알림이 읽을 때까지 지속된다"는 문화 사례는 **원출처가 추적되지 않았다.** 발표 사용은 **원출처 확인을 선행 조건**으로 하며, 확인 전에는 슬라이드·대본에 넣지 않는다.
+
+---
 
 ## Monetization
-planner designs and recommends the revenue model that best fits this product; the user approves or overrides it at the PRD approval gate. For clearly non-commercial products, state "N/A — non-commercial" explicitly (optionally with a one-line future path) and skip the tables.
+
+해커톤 제출물 자체는 비상업이지만, 발표에서 "수익 모델은?" 질문이 반드시 나오므로 제안형으로 기록한다.
 
 | Candidate model | How it fits this product | Pros | Cons |
 |---|---|---|---|
-| {{e.g. subscription}} | {{...}} | {{...}} | {{...}} |
-| {{e.g. one-time purchase}} | {{...}} | {{...}} | {{...}} |
+| 팀 좌석당 구독 (Seat-based SaaS) | 협업 툴 위에서 쓰이는 도구이므로 팀 단위 도입이 자연스럽고, 용어사전·팀 규칙이 팀 자산이 됨 | 예측 가능한 매출, B2B 영업 경로 명확 | 개인 사용자 유입 장벽, 초기 팀 도입 설득 비용 |
+| 무료 개인 + B2B 리포트 유료 (프리미엄 업셀) | 개인은 무료로 중재 기능을 쓰고, 조직은 "팀 마찰 리포트"(스트레치)를 유료로 구매 | 바이럴 확산에 유리, 차별점(관계 데이터)이 곧 상품 | 조직 커뮤니케이션 데이터 분석은 프라이버시 반발 위험이 큼 |
+| 사용량 기반 크레딧 (LLM 원가 연동) | 변환 1건당 크레딧 차감 — 원가 구조와 직결 | 원가 리스크 없음, 소규모 시작 쉬움 | 사용자가 "쓸 때마다 돈"을 의식해 사용 빈도가 떨어짐 (중재는 습관이 되어야 가치가 남) |
 
 | Item | Value |
 |---|---|
-| Recommended model | {{planner's pick + one-line reasoning}} |
-| Pricing shape | {{suggested starting tiers or price points}} |
-| Revenue constraints | {{e.g. "MVP must work without a payment provider", or "none"}} |
-| Status | {{one of: proposed / user-approved / user-overridden — if overridden, name the model the user chose}} |
+| Recommended model | 팀 좌석당 구독. 이 제품의 가치는 개인 1회 변환이 아니라 팀 용어사전·개인 프로필이 누적되며 커지므로, 누적을 방해하는 사용량 과금보다 좌석 구독이 적합. |
+| Pricing shape | 무료(개인 1인, 월 변환 50건) / 팀 $8~12 per seat/month / 엔터프라이즈 별도 (SSO·리포트) — 숫자는 발표용 제안치이며 시장 검증 안 됨 |
+| Revenue constraints | MVP는 결제 수단을 일절 구현하지 않는다(해커톤 기간 내 불가). 수익 모델은 발표 슬라이드 수준으로만 존재. |
+| Status | **user-approved (2026-08-04)** — 팀 좌석당 구독 승인, 발표 자료에만 반영하며 MVP에 결제 구현 없음 (Open Question #6 resolved) |
+| **(v2.4) 규제 관점의 사후 확인** | **좌석 구독을 택한 결정이 결과적으로 EU AI Act 리스크를 회피했다.** 후보 2안(무료 개인 + B2B 리포트 유료)은 **"팀 마찰 리포트"를 유료 상품의 핵심으로 삼는 구조**인데, 그것은 관리자에게 직원 커뮤니케이션 신호를 노출하는 기능이고 **Article 5(1)(f)(직장 내 감정 추론 금지, measured)의 정면 사정권**이다. 즉 2안을 택했다면 **EU 시장에서 주 수익원이 판매 불가**가 될 수 있었다. 당시 선택 근거는 "누적 가치 vs 사용량 과금"이었고 규제는 고려하지 않았다 — **사후에 확인된 이득이며 예견해서 고른 것이 아니다**(과장 금지). Planning Decision #66 |
+
+---
 
 ## Delivery & Deployment
-How this product reaches its users, decided at planning time rather than discovered at release. planner fills this from the product's nature and the user's constraints; architect designs the mechanism against it (hosting, pipeline, rollback) in docs/Architecture.md. A product whose delivery is only considered after the code works tends to need scope changes it can no longer absorb — app-store review windows, a domain nobody registered, a compliance step with a lead time.
 
 | Item | Value |
 |---|---|
-| Target environment | {{where it runs — e.g. web (browser), server, user's machine, mobile (iOS/Android), CI job}} |
-| Distribution channel | {{how users get it — e.g. public URL, app store, package registry, internal install, binary download}} |
-| Release cadence | {{e.g. continuous on merge, weekly, single launch}} |
-| Environments needed | {{e.g. local only / local + staging + production, or "local only for MVP"}} |
-| Release constraints | {{lead times and gates outside the team's control — app store review, security sign-off, domain/certificate, third-party account approval — or "none"}} |
-| Downtime tolerance | {{e.g. "brief downtime acceptable" / "zero-downtime required"}} |
-| Rollback expectation | {{what must be possible when a release is bad — e.g. "revert to previous version within 10 min", or "N/A — no users yet"}} |
-| Deployment in MVP scope? | {{yes → deployment tasks appear in docs/Tasks.md / no → explicitly deferred, with what unblocks it}} |
+| Target environment | 웹 브라우저(Next.js 웹앱, 데모 기본 경로) + Chrome 확장(협업 툴 위 오버레이). 코어 엔진은 플랫폼 독립. |
+| Distribution channel | 웹앱: 공개 URL(무료 호스팅 기본 서브도메인, OQ#2). Chrome 확장: **개발자 모드 로드(unpacked)** — 웹스토어 정식 배포는 MVP 제외. **(v2.4) 확장은 2계층이다** — **층 1**: 사이트 무관 선택 오버레이(콘텐츠 스크립트 매칭 범위가 `all_urls` 수준으로 넓어짐, MVP #32) / **층 2**: 역삽입 대상 **GitHub·Slack·Gmail 3종**(#16·#27·#31). 층 2가 없는 사이트에서는 층 1의 **클립보드 복사**가 결과 전달 경로다 |
+| Release cadence | 단일 런치(2026-08-21 제출). 그 전까지는 main 머지 시 웹앱 자동 반영 |
+| Environments needed | 로컬 + 프로덕션(공개 URL) 2단계. 별도 스테이징 없음(팀 4명 규모에서 관리 비용 > 이득) |
+| Release constraints | Chrome 웹스토어 심사 리드타임(통상 수일~수주, 미검증)이 마감 17일보다 길 수 있어 정식 등록은 시도하지 않음. **(v2.4) 층 1이 광범위 권한(`all_urls`)을 요구하므로 웹스토어 심사는 더 까다로워진다(추정) — 다만 MVP는 개발자 모드 로드로 확정되어 있어(Planning Decision #4) 이 제약은 마감 17일 안에서는 차단 요인이 아니다.** 정식 등록을 하기로 방침이 바뀌면 #4의 "마감 재산정 선행" 조건이 그대로 발동한다(Planning Decision #64). OpenAI API 유료 크레딧 확보 필요(Open Questions #3). 배포 도메인/호스팅 계정 소유 여부 미확인(Open Questions #2). |
+| Downtime tolerance | 짧은 다운타임 허용. 단, **2026-08-21 발표 시각 전후에는 무중단이 요구**되며 발표 당일 배포 금지 |
+| Rollback expectation | 발표 직전 문제 발생 시 직전 정상 배포로 10분 이내 복귀 가능해야 함(수단은 architect 결정) |
+| Deployment in MVP scope? | yes — 웹앱 공개 URL 배포는 "데모 백업 필수" 결정에 따라 P0 태스크(T17 배포, T35 통합 리허설·배포 재검증, T36 배포 동결·롤백 확인)로 존재 |
+
+---
 
 ## Non-functional Expectations
-Product-level expectations the user confirms at the PRD gate — what the product must feel like and tolerate, not how (the technical means are architect's). Downtime tolerance lives in Delivery & Deployment above. State every row explicitly — "no specific expectation" is a valid entry; blank is not.
 
 | Item | Expectation |
 |---|---|
-| Performance | {{e.g. "interactions feel instant on a mid-range phone", or "no specific expectation"}} |
-| Scale | {{concurrent users and data volume the MVP must tolerate — e.g. "single user, <1k records"}} |
+| Performance | 메시지 1건 중재(분류→변환→역번역)가 시연에서 **체감 5초 이내**로 끝나야 한다. 초과 시 진행 상태를 반드시 시각적으로 표시해 "멈춘 것처럼" 보이지 않아야 한다. (수치는 목표 체감이며 측정치 아님) |
+| Scale | 동시 사용자 10명 내외(심사위원 + 팀), 누적 diff 히스토리 수천 건 미만, 용어사전 프로젝트당 수백 항목 미만. 대규모 부하 대응은 MVP 기대치 없음. |
+| **(v2.4) 층 1 오버레이 반응성** | 드래그(텍스트 선택)를 끝낸 뒤 플로팅 버튼이 **즉각 나타난 것처럼 느껴져야** 한다(체감 0.2초 이내 — 목표 체감이며 측정치 아님). 이 단계는 LLM 호출 전이므로 네트워크와 무관하다. 버튼 클릭 후 중재 결과까지는 위 Performance 행(체감 5초)이 적용된다. |
+| **(v2.4) 층 1의 페이지 간섭** | 오버레이가 대상 사이트의 기존 조작(텍스트 선택·단축키·스크롤)을 **눈에 띄게 방해하지 않아야** 한다. "방해하지 않는다"의 판정 기준은 AC-052 ⑤. 정량 측정 기대치는 없음. |
+
+---
 
 ## MVP Scope
+
 | # | Feature | Solves Problem(s) | Priority | Acceptance Criteria |
 |---|---|---|---|---|
-| 1 | {{...}} | PS-001 | P0 | AC-001 |
+| 1 | C4 백트랜슬레이션 미리보기 (1차 안전장치 포지셔닝) + **오해 사전 경고(Misread Risk) 출력 필드**(v2.1, 신규 행 아님 — 기존 기능의 출력 확장) + **존댓말 레벨 혼용 감지**(v2.2, EN→KO) | PS-002 | P0 | AC-001, AC-002, AC-043, AC-046 |
+| 2 | C1 긴급도 3단계 분류 + 근거 + override | PS-001, PS-005 | P0 | AC-003, AC-004, AC-005 |
+| 3 | C2 톤 변환 + 긴급도 보존 필터 + **오해 사전 경고(Misread Risk) 출력 필드**(v2.1) — 변환 **결과**만 주지 않고, 변환 **전에** "이 문장은 상대가 이렇게 오해할 수 있다"를 근거와 함께 제시 + **(v2.2) 한국어 어미·부사에 실린 긴급도 복원 + 쿠션어 과잉 사과 억제**(KO→EN 프롬프트 규칙, 신규 행 없음) + **(v2.2) 날짜·숫자 비모호 형식 정규화** | PS-002, PS-003, PS-005 | P0 | AC-006, AC-007, AC-008, AC-043, AC-045, AC-049 |
+| 4 | 발신자·수신자 2패널 데모 화면 | PS-002, PS-003 | P0 | AC-009 |
+| 5 | Human-in-the-loop 승인 후 전송 (자동 발송 없음) | PS-001, PS-002, PS-003, PS-004, PS-005 | P0 | AC-010 |
+| 6 | 코어 엔진 / 플랫폼 어댑터 분리 + 표준 I/O 스키마 | PS-001, PS-002, PS-003, PS-004 | P0 | AC-027, AC-028 |
+| 7 | LLM 지연·실패 폴백 UI (공통 전제) | PS-001, PS-002, PS-003, PS-004, PS-005 | P0 | AC-029 |
+| 8 | 백엔드 경유 OpenAI 호출(키 비노출) + 환경변수 정비 | PS-002, PS-003 (공통 전제) | P0 | AC-030, AC-031 |
+| 9 | 웹앱 공개 URL 배포 (데모 백업) | PS-001, PS-002, PS-003, PS-004 | P0 | AC-026 |
+| 10 | 발표 데모 시나리오 + 합성 데이터 | PS-001, PS-002, PS-003, PS-004, PS-005 | P0 | AC-033 |
+| 11 | C3 자기신고 프로필 + diff 3회 반복 학습 (핵심 차별점) — **사용자 전역 기본값**. #24 쌍방 규약과 **병행**이며, 같은 항목이 충돌하면 규약이 우선(Planning Decision #26) + **(v2.2) 프로필 항목에 "존댓말 레벨(합쇼체/해요체)" 추가** | PS-003 | P1 | AC-011, AC-012, AC-013, AC-014, AC-046 |
+| 12 | C5 프로젝트 용어 사전 (원문 유지 강제) + **(v2.2) "사람(호칭)" 타입 엔트리** — 실명/한국어 호칭/영어 호칭. 미등록 인물의 호칭 추측 생성 금지 | PS-002 | P1 | AC-015, AC-016, AC-047 |
+| 13 | C6 하소연 → 태스크 티켓 변환 + **(v2.2) 결정 권한 상태 메타 필드**(확정/내부 승인 필요/검토 중/불명) — **전제 가설은 추정이며 미검증** + **(v2.4) 오탐 방지** — 감정 신호가 낮은 입력에는 티켓 변환 옵션을 제시하지 않는다(AC-058) | PS-004 | P1 | AC-017, AC-018, AC-050, AC-058 |
+| 14 | C7 결정사항 자동 요약 (C6 로직 재활용) + **(v2.2) 결정 권한 상태 메타 필드** | PS-004 | P1 | AC-019, AC-020, AC-050 |
+| 15 | 전체 처리 플로우 오케스트레이션 (C1→C3→C5→C2→C4→(C6)→승인→저장) | PS-001, PS-002, PS-003, PS-004, PS-005 | P1 | AC-032 |
+| 16 | **층 2 — GitHub 역삽입** (v2.4 역할 재정의, 행 삭제 아님) — 승인된 텍스트를 PR/이슈 코멘트 입력창에 **DOM 직접 삽입**. **중재 호출·패널 표시는 층 1(#32)이 소유**하므로 이 행에 남는 것은 **대상 사이트 DOM 선택자 + 삽입 로직**뿐이다. 전송 버튼 자동 클릭 금지(AC-040 / Decision #5 불변). **컷되면 해당 사이트에서 층 1의 클립보드 복사로 폴백**한다 | PS-001, PS-002, PS-003, PS-004 | P1 | AC-021, AC-040 |
+| 17 | 발표 자료 (구현 범위 vs 스트레치 로드맵 구분) | PS-001, PS-002, PS-003, PS-004, PS-005 | P1 | AC-034 |
+| 18 | R1 이모지 오해 경고 **(v2.4 근거 전환 — 기능 유지, 신규 행 없음)** — 판정 근거를 **국가**가 아니라 ⓐ 국가 라벨이 없는 **위험도 3단계 고정 룩업**(높음 🙏 ❤️ 💦 / 중간 👍 😂 🔥 😅 / 낮음 😊 ✅ 🆗 — 사용자 결정 ②, Planning Decision #77)와 ⓑ **쌍방 규약(#24)·자기신고 프로필의 이모지 항목**으로 삼는다. 경고 문구는 **"이 이모지는 해석이 갈릴 수 있습니다 — 상대와 합의된 규칙이 없습니다"**로 고정한다. "어느 나라에서 어떻게 읽힌다"는 서술을 데이터·프롬프트·UI에서 사용하지 않는다(Planning Decision #6·#71) | PS-003 | P2 | AC-022, AC-056 |
+| 19 | R2 최적 회의 시간 추천 | PS-001 | P2 | AC-023 |
+| 20 | R3 비동기 예약 발송(수신자 로컬 아침) | PS-001 | P2 | AC-024 |
+| 21 | R4 피드백 루프 검증 (답장 도착 시각 + 감정 분류) | PS-003 | P2 | AC-025 |
+| 22 | 페인포인트 인터뷰 검증 3~5명 (제품 기능 아님 — 전제 검증 활동) | PS-001, PS-002, PS-003, PS-004, PS-005 (전제 검증) | P2 | AC-035 |
+| 23 | **응답 기한 협상** (후보표 Inventive 채택, v1.2) — 발신자가 필요 기한을 명시하면 수신자 근무시간과 대조해 가능한 기한을 역제안 | PS-001 | P2 | AC-036 |
+| 24 | **쌍방 커뮤니케이션 규약** (후보표 Inventive 채택, v1.2) — 직설 허용/이모지/호칭/마감 표현을 양측이 합의하고 합의문을 프롬프트로 사용. **상대(pair)별 커스텀 규칙**이며 #11 C3(전역 기본값)와 **병행 — 충돌 시 규약 우선**, 두 데이터는 별도 저장(Planning Decision #26). **(v2.3) 발표 차별화 KEY 2의 "수신자 축" 근거가 이 행 하나뿐이다** — 컷되면 KEY 2의 절반이 사라지므로 컷 판단 시 발표 영향까지 함께 본다(Open Question #21) | PS-003 | P2 | AC-037 |
+| 25 | **미확정 감지 (Unresolved Detector)** (후보표 Inventive 채택, v1.2) — 담당자·기한이 비어 있는 합의 지점을 경고 | PS-004 | P2 | AC-038 |
+| 26 | **간단 로그인/인증** (OQ#4 결정, v2.0) — 사용자별로 프로필·규약·diff 히스토리·용어사전을 분리 소유. 인증 수단(Supabase Auth 등)은 architect 결정 | PS-002, PS-003, PS-004 (개인·팀 데이터 소유의 전제) | P1 | AC-039 |
+| 27 | **층 2 — Slack 역삽입** (OQ#7 결정, v2.0 · v2.4 역할 재정의) — 메시지 입력창에 DOM 직접 삽입. 호출·패널은 층 1(#32) 소유. 전송 자동 클릭 금지. **컷 순서 ②(가장 먼저 컷)이며, 컷되어도 Slack 웹에서 층 1은 그대로 동작한다** | PS-001, PS-002, PS-003, PS-004 | P1 | AC-042, AC-040 |
+| 28 | **LLM 비용·한도 대응** (OQ#3 결정, v2.0) — 응답 캐싱 + 요청 횟수 제한 + 크레딧 소진·실패 시 사전 준비된 데모 응답 폴백 | PS-001, PS-002, PS-003, PS-004, PS-005 (공통 전제) | P0 | AC-041 |
+| 29 | **침묵 감지 (Silence Detector)** (v2.2) — 발송 목록에서 사용자가 **"답장 받음"을 수동 표시**하고, 미표시 건에 대해 수신자 로컬 업무일 경과를 계산해 "업무일 N일째 무응답입니다. 리마인드할까요?"를 제안. 리마인드 문구는 **C2 톤 변환으로 생성**(재촉이 아닌 정중한 확인). **자동 응답 감지는 구현하지 않는다**(mock-send 구조 + human-in-the-loop 원칙). #30 공휴일 데이터로 오탐을 줄이고, R4(#21)와 저장 구조를 공유한다 | PS-001 | P2 | AC-044 |
+| 30 | **상대국 공휴일·연휴 인지** (v2.2) — 한국·미국·영국·중국 **2026년 공휴일 하드코딩**(외부 API 의존 금지). 마감일이 상대국 연휴에 걸리면 "연휴 N일차" 경고 + **#23 응답 기한 협상으로 연결**. #29 침묵 감지의 업무일 계산에도 사용. **(v2.4 갱신, 사용자 결정 ③ / Planning Decision #74) 대상국을 한국·미국·일본·중국 4개국으로 교체한다** — **영국 제거, 일본 추가**(국가 수 불변 = 작성 비용 증가 없음). 데모 시나리오가 한국·일본·미국 3사이고 영국은 어디에도 등장하지 않는다. 대상국 조건은 **AC-057**이 관장하며 **AC-048 원문은 수정하지 않는다** | PS-001 | P2 | AC-048, AC-057 |
+| 31 | **층 2 — Gmail 역삽입** (v2.2 사용자 결정 · v2.4 역할 재정의) — 작성창 본문에 승인 텍스트 삽입, **보내기 버튼 자동 클릭 금지**. 호출·패널은 층 1(#32) 소유. 전략 근거: GitHub·Slack은 대개 사내 도구이고 **회사 간 실제 채널은 이메일**이므로 KEY 3(조직 간 마찰) 서사와 가장 잘 맞는다. **컷 순서 ③** | PS-001, PS-002, PS-003, PS-004 | P1 | AC-051, AC-040 |
+| 32 | **(v2.4 신규) 층 1 — 범용 선택 오버레이 (사이트 무관)** — 사용자가 웹페이지에서 **텍스트를 드래그로 선택**하면 선택 영역 옆에 플로팅 버튼이 뜨고, 클릭하면 중재 패널이 열린다(`mouseup` → `window.getSelection()` → 선택 영역 좌표에 버튼 배치 → 패널). **어느 사이트인지 알 필요가 없으므로 브라우저 안의 모든 웹 협업툴에서 동작한다**(Teams 웹·Chatwork·Feishu 웹·Notion·Jira·사내 위키 등 — 실제 동작은 T55 스파이크로 확인). 결과 전달의 기본 경로는 **클립보드 복사**이며, 층 2가 있는 사이트에서만 역삽입 버튼이 추가로 뜬다. **컷 대상이 아니다** — 층 2가 전부 컷되어도 제품은 이 행으로 살아 있다(Planning Decision #61·#62) | PS-001, PS-002, PS-003, PS-004 | P1 | AC-052, AC-053, AC-054, AC-010 |
+
+> P2(R1~R4)는 2026-08-18 시점에 Core(C1~C7)가 완료되지 않았다면 전부 포기한다 (Planning Decision #1). **v2.2 신규 P2 항목(#29 침묵 감지, #30 공휴일)도 동일한 컷라인 적용 대상이며, P2 내부 유지 순위는 Planning Decision #52를 따른다.**
+> **(v2.4) #32 층 1은 P1이지만 컷 대상이 아니다** — 컷 순서에서 층 1이 이전의 "GitHub 어댑터"가 갖던 보호 위치를 넘겨받는다(Planning Decision #62).
+
+### MVP Scope — 조건부 대기 (P3, MVP 아님)
+
+> **P3의 정의(v2.4 신설)**: MVP에 포함되지 않으며, 아래 **발동 조건이 참인 경우에만** 착수한다. 조건 판정은 **docs/Tasks.md의 Status 열만으로 수행**하며 **재논의하지 않는다.** 조건이 거짓이면 그대로 미착수로 종료하고, 폐기(rejected)로 기록하지 않는다.
+
+| # | Feature | Solves Problem(s) | Priority | Acceptance Criteria |
+|---|---|---|---|---|
+| 33 | **(v2.4 신규, 보류) 받은 메시지 해석 (Inbound Intent Reading)** — 받은 메시지를 드래그로 선택하면 "상대가 무슨 의도로 쓴 것인지"의 해석을 보여준다. **층 1(#32)의 선택·패널 메커니즘을 그대로 재사용**하므로 추가 비용이 낮다(추정 — 실제 비용은 T59 착수 전 확인). **수신자 전용 화면을 새로 만들지 않는다.** | PS-002, PS-003 | **P3 (조건부)** | AC-055 |
+
+**발동 조건 (전부 참일 때만 착수 — 하나라도 거짓이면 미착수, 재논의 없음)**
+
+| # | 조건 | 판정 방법 |
+|---|---|---|
+| ① | 판정 시각: **2026-08-18 21:00 KST**(Planning Decision #1의 컷라인 점검 시점과 동일) | 시각 도달 여부 |
+| ② | **T5~T29가 전부 `done`** (Core 전체 + GitHub 역삽입) | docs/Tasks.md Status 열 |
+| ③ | **T55~T58이 전부 `done`** (층 1 전체) | docs/Tasks.md Status 열 |
+| ④ | **P2 코드 태스크(T30~T33, T39~T44, T50~T54, **T62** = 총 16건) 중 `todo`가 6건 이하** *(v2.4: T62 추가로 15→16건, 임계값 6은 유지)* | docs/Tasks.md Status 열 카운트 |
+
+**중단 조건**: 착수했더라도 **2026-08-19 12:00 KST까지 T59·T60이 `done`이 아니면 즉시 중단하고 되돌린다**(M4 안정화·리허설을 잠식하지 않기 위함). 되돌린 뒤에는 재착수하지 않는다.
+
+**Decision #21과의 관계 (중요)**: 이 항목은 **Planning Decision #21을 뒤집지 않는다.** #21이 반려한 것은 **"원문 병기 전송"**(원문+변환문을 항상 함께 보내 수신자에게 대조 부담을 전가하고 메시지 길이를 2배로 만드는 안)이다. #33은 **전송물을 바꾸지 않고**, 수신자가 **자기 브라우저에서 원할 때만** 해석을 요청하는 **다른 접근**이다. 즉 #21이 풀려던 문제(수신자가 상대 의도를 확인할 수단이 없다)를 **수신자 화면을 새로 만들지 않고** 다룬다. #21의 반려 사유(수신자에게 부담 전가·길이 2배)는 #33에 해당하지 않는다.
 
 ## Acceptance Criteria
+
 | ID | Verifiable Condition |
 |---|---|
-| AC-001 | {{...}} |
+| AC-001 | 원문 입력 후 변환을 실행하면, 변환문을 원어로 역번역한 결과가 원문과 나란히 화면에 표시된다. |
+| AC-002 | 역번역 영역에 "완전한 검증이 아니라 큰 오역을 걸러내는 1차 안전장치"라는 한계 문구가 항상 표시된다. |
+| AC-003 | 임의의 입력 메시지에 대해 CRITICAL / NORMAL / LOW 중 하나가 출력되고, 그 판단 근거 문장이 함께 표시된다. |
+| AC-004 | 사용자가 분류 결과를 다른 등급으로 override 할 수 있고, override 한 값이 이후 변환·발송 처리에 반영된다. |
+| AC-005 | CRITICAL로 확정된 메시지는 예약·지연 경로를 거치지 않고 즉시 발송 경로로 진행되며, 적용되는 변형은 톤 정제뿐이다. |
+| AC-006 | 사전 정의된 테스트 케이스 10건에서, 원문의 마감일·수치·필수 액션 문구가 변환문에 누락 없이 유지된다(10/10). **(v2.2 주석 — 조건 변경 아님)** 여기서 "유지"는 **의미·값의 보존**을 뜻하며 문자열 동일성을 요구하지 않는다. 날짜 표기를 비모호 형식으로 정규화하는 것은 **AC-049**가 관장하며, 이 조항의 "누락"에 해당하지 않는다(Planning Decision #53). |
+| AC-007 | 보존된 핵심 요구사항이 변환문에서 굵게 표시되거나 별도 요약 라인으로 분리 표시된다. |
+| AC-008 | 원문 / 변환문 / 변환 이유가 한 화면에서 나란히 비교 가능하다. |
+| AC-009 | 한 화면에 발신자 패널과 수신자 패널이 동시에 표시되어, 같은 메시지의 중재 전/후를 나란히 확인할 수 있다. |
+| AC-010 | 사용자의 명시적 승인 동작 없이는 어떤 경로로도 메시지가 전송되지 않는다(자동 발송 코드 경로 부재). |
+| AC-011 | 온보딩에서 3~5문항(직설/완곡, 이모지 선호, 격식도)에 응답하면 프로필이 저장되고 이후 변환에 반영된다. |
+| AC-012 | AI 제안문과 사용자 최종 발송문의 diff가 저장소에 기록된다. |
+| AC-013 | 동일 수정 패턴이 3회 미만이면 프로필이 변경되지 않고, 3회 이상 반복되었을 때만 프로필에 반영된다(양쪽 케이스 모두 확인). |
+| AC-014 | 사용자가 자신의 프로필 항목을 화면에서 열람하고 수정·삭제할 수 있다. |
+| AC-015 | 용어 사전에 등록된 용어는 변환 결과에서 의역되지 않고 원문 그대로 유지된다. |
+| AC-016 | 사용자가 용어 매핑을 추가·수정·삭제할 수 있다. |
+| AC-017 | 감정이 섞인 장문 입력이 [문제 정의] / [영향·리스크] / [요청 사항] / [우려 수준] 4개 섹션 구조로 변환된다. |
+| AC-018 | [우려 수준] 필드에 원문의 감정 강도가 메타 정보로 보존되어 표시된다(감정 삭제 아님). |
+| AC-019 | 대화 스레드 입력에 대해 결정사항 / 담당자 / 기한이 표 형태로 요약된다. |
+| AC-020 | 스레드에 근거가 없는 항목(담당자·기한 등)은 임의 생성하지 않고 "미정"으로 표기된다. |
+| AC-021 | Chrome 확장이 개발자 모드로 로드되어, **GitHub**(PR/이슈 코멘트 입력창)에서 중재를 호출하고 결과를 삽입할 수 있다. |
+| AC-022 | 문화적 오해 가능성이 있는 이모지 사용 시 경고와 대안이 표시된다. |
+| AC-023 | 두 사용자의 타임존과 근무 가능 시간을 입력하면, 양쪽 근무시간이 겹치는 회의 시간 후보가 3개 제시된다. |
+| AC-024 | NORMAL/LOW 메시지에 대해 수신자 로컬 아침 시간으로 예약 발송을 설정할 수 있다. |
+| AC-025 | 발송된 메시지의 **답장 도착 시각**이 기록되어 소요 시간이 계산되고, 답장 본문에 **간단한 감정 분류(긍정/중립/부정)**가 적용되어, 중재 적용 전/후의 (a) 응답 소요 시간과 (b) 감정 분류 분포가 비교 표시된다. |
+| AC-026 | 배포된 공개 URL에서 팀 로컬 환경 없이 전체 데모 플로우(작성→분류→변환→역번역→승인)가 동작한다. |
+| AC-027 | 코어 I/O 스키마 문서가 존재하고, 입력 `{ text, sender, recipient, context }`와 응답 필드가 정의되어 프론트·백엔드가 동일 스키마로 통신한다. |
+| AC-028 | 코어 엔진이 특정 어댑터(웹/확장)에 의존하지 않으며, 동일 인터페이스로 두 어댑터에서 호출된다. |
+| AC-029 | LLM 타임아웃/실패 시 사용자에게 실패 상태와 재시도 수단이 표시되고, 작성 중이던 원문이 소실되지 않는다. |
+| AC-030 | OpenAI API 키가 프론트엔드 번들과 네트워크 응답 어디에도 노출되지 않는다(백엔드 경유 호출만 존재). |
+| AC-031 | `.env.example`에 필요한 환경변수가 플레이스홀더로 정의되어 있고, README 설정 표와 항목이 일치한다. |
+| AC-032 | 처리 플로우가 명세 순서(C1 → (CRITICAL 즉시) → C3 → C5 → C2 → C4 → (감정형이면 C6) → 사용자 승인 → 전송 + diff 저장)대로 실행됨을 로그 또는 테스트로 확인할 수 있다. |
+| AC-033 | 발표용 데모 시나리오가 합성 데이터로 준비되어 있고, 실제 사내·개인 정보를 포함하지 않는다. |
+| AC-034 | 발표 자료에 실제 구현된 범위와 스트레치 로드맵이 명확히 구분되어 표시되고(미구현을 구현된 것처럼 보이지 않게), "세상에 없는 아이디어"류의 신규성 주장이 포함되지 않으며, 차별화가 Differentiation 섹션의 제품화 요소 5개로 서술된다. **(v2.1 확장)** 발표 자료에 **기존 도구 대비 비교표 슬라이드 1장**이 포함되고, 그 표의 모든 경쟁 제품 기능 서술은 (a) 발표 전 해당 제품 페이지를 **직접 확인한 결과**에 근거하며 확인일이 함께 기재되고, (b) 확인하지 못한 항목은 빈칸이 아니라 **"미확인"으로 명시**되며, (c) 경쟁 제품의 기능 **부재를 단정하는 문구**("어디에도 없다", "최초")가 포함되지 않는다. |
+| AC-035 | 다국적 협업 경험자 3~5명 인터뷰 기록이 존재하고, 각 기록에 (a) 최근 3개월 내 실제 오해 사례 유무, (b) 당시 해결 방법, (c) 도구 사용 의사가 포함되며, 결과가 "가정 확인 / 반증 / 불충분" 중 하나로 결론지어진다. **(v2.2 확장)** 여기에 (d) **결정 권한 표현으로 인한 오해 경험**("위에 보고 후 답변드리겠습니다" 가 권한 없음으로 읽힌 경험 / "I'll take care of it"이 확답인지 불확실했던 경험) 항목을 추가하고, AC-050의 전제 가설에 대해서도 별도로 "확인 / 반증 / 불충분" 결론을 남긴다. |
+| AC-036 | (신규 v1.2) 발신자가 "필요 기한"을 입력하면, 수신자의 타임존·근무 가능 시간과 대조해 (a) 그 기한이 수신자 근무시간 기준으로 실현 가능한지 판정하고, (b) 불가능한 경우 가능한 대체 기한을 최소 1개 역제안하며, (c) 발신자가 원래 기한 유지 또는 역제안 수용을 선택할 수 있다(자동 변경 금지). |
+| AC-037 | 두 사용자가 직설 허용 / 이모지 사용 / 호칭 / 마감 표현 4개 항목에 대해 합의한 규약이 **C3 프로필과 별도로** 저장되고, 해당 상대에게 보내는 메시지의 변환 프롬프트에 그 규약이 주입되어 결과에 반영된다. 규약은 양측이 열람·수정할 수 있다. **동일 항목이 C3 전역 프로필과 충돌하는 경우 규약 값이 우선 적용된다**(예: 프로필 "이모지 선호" + 규약 "이모지 미사용" → 결과에 이모지 없음). |
+| AC-038 | 스레드 입력에서 "합의된 것으로 보이나 담당자 또는 기한이 비어 있는" 항목이 경고로 표시되고, 각 경고에 어떤 필드가 비었는지(담당자/기한)가 명시된다. 근거 없는 담당자·기한을 임의 생성하지 않는다(AC-020과 동일 원칙). |
+| AC-039 | (신규 v2.0) 사용자가 로그인·로그아웃할 수 있고, 로그인한 사용자별로 프로필·쌍방 규약·diff 히스토리·용어사전이 분리되어 저장되며, 다른 사용자의 데이터가 조회되지 않는다(계정 2개로 교차 확인). |
+| AC-040 | (신규 v2.0) Chrome 확장은 사용자가 **승인한** 텍스트를 대상 사이트(GitHub/Slack)의 텍스트 입력창에 삽입한다. **전송 버튼을 자동으로 클릭하지 않으며**, 실제 전송은 사용자가 직접 수행한다(자동 클릭 코드 경로 부재 — Planning Decision #5 준수). |
+| AC-041 | (신규 v2.0) 동일 입력에 대한 LLM 응답이 캐시되어 재호출이 발생하지 않고, 세션당 요청 횟수 상한이 적용되며, API 실패·크레딧 소진 시 사전 준비된 데모 응답으로 폴백하면서 **폴백 중임을 화면에 표시**한다(실제 LLM 결과인 것처럼 보이지 않게). |
+| AC-042 | (신규 v2.0) Chrome 확장이 **Slack** 메시지 입력창에서 중재를 호출하고 결과를 삽입할 수 있다. |
+| AC-043 | **(신규 v2.1 — 오해 사전 경고 / Misread Risk)** 사전 정의된 테스트 케이스 **10건(오해 위험이 있는 케이스 6건 + 위험 근거가 없는 중립 케이스 4건)**에 대해 다음이 모두 성립한다. ① 위험 케이스 6건에서는 각 항목이 (a) 원문에서 문제가 되는 **인용 구간**, (b) **예상되는 오해**(예: "확인 부탁드립니다" → 상대가 '단순 참고'로 받아들여 액션을 취하지 않을 수 있음), (c) 그렇게 판단한 **근거**의 3요소를 모두 갖춰 출력된다(6/6). ② 중립 케이스 4건에서는 **빈 배열이 반환**되어, 근거 없는 위험을 지어내지 않는다(4/4, hallucination 방지). ③ 이 정보는 사용자가 **변환문을 승인하기 전 단계**에서 확인 가능하도록 노출되며, 원문 기준으로 산출된다. ④ 위 ①②의 판정 결과가 실행 출력으로 기록된다(주장만으로는 충족 불가). |
+| AC-044 | **(신규 v2.2 — 침묵 감지)** ① 발송 목록 화면에서 사용자가 각 발송 건에 **"답장 받음"을 수동으로 표시**할 수 있고 그 상태가 저장된다. ② 미표시 건에 대해 **수신자 로컬 시간 기준 업무일 경과 수**가 계산된다 — 주말과 **AC-048 공휴일 데이터에 등록된 수신자 국가 휴일은 경과일에서 제외**된다(오탐 감소). ③ 임계값 이상 경과 시 "업무일 N일째 무응답입니다. 리마인드할까요?" 제안과 함께 **C2 톤 변환으로 생성된 리마인드 문구**가 제시되며, 그 문구가 재촉이 아닌 확인 형태임을 테스트 케이스 3건으로 확인한다. ④ 리마인드는 사용자의 명시적 승인 없이 발송되지 않는다(AC-010 원칙). ⑤ **자동 응답 감지 코드 경로가 존재하지 않는다**(수동 마킹만). |
+| AC-045 | **(신규 v2.2 — 한국어 어미에 숨은 긴급도 복원, KO→EN)** 한국어 완곡 긴급 표현 테스트 케이스 **10건**(어미·부사로만 긴급도를 표시한 문장 6건 + 쿠션어가 포함된 문장 4건)에 대해 영어 변환문이 다음을 모두 만족한다(10/10, 실행 출력으로 증명). ① 원문에 기한 정보가 있으면 변환문에 **명시적 기한**(날짜·시각 또는 EOD 등)이 남는다. ② **명시적 액션 요청 문장**이 1개 이상 존재한다. ③ 원문에 없는 완화 표현(maybe / if possible / when you get a chance 등)이 **추가되지 않는다**. ④ 쿠션어("바쁘신 와중에 죄송하지만", "번거로우시겠지만")는 영어 변환문에서 **사과 문장 1개 이하**로 축약된다(과잉 사과 억제). |
+| AC-046 | **(신규 v2.2 — 존댓말 레벨 일관성, EN→KO)** EN→KO 변환 테스트 케이스 10건에서 ① 한 메시지 안의 **종결어미 레벨(합쇼체/해요체) 혼용이 0건**이고, ② 적용 레벨은 C3 프로필의 "존댓말 레벨" 항목을 따르며, 해당 상대에 대한 #24 쌍방 규약이 있으면 **규약 값이 우선**한다(Planning Decision #26). ③ 혼용이 감지되면 `warnings[]`에 경고가 출력되어 화면에 표시된다. |
+| AC-047 | **(신규 v2.2 — 호칭·직급 매핑)** C5 용어 사전에 **"사람(호칭)" 타입 엔트리**(실명 / 한국어 호칭 / 영어 호칭)를 추가·수정·삭제할 수 있고, ① 등록된 인물의 호칭은 양방향 변환에서 **등록값 그대로** 사용된다. ② **미등록 인물의 호칭은 추측해 생성하지 않고** 원문 형태를 유지한 뒤 `warnings[]`로 "호칭 미등록"을 알린다. ③ 한국어 직급 호칭을 영어로 옮길 때 등록된 영어 호칭이 없으면 직급을 직역해 위계를 덧붙이지 않는다("Manager Kim" 류 자동 생성 금지). |
+| AC-048 | **(신규 v2.2 — 상대국 공휴일·연휴 인지)** ⚠️ **(v2.4 주석 — 조건 재작성이 아니라 대체 관계 표기)** 대상국 목록에 관한 한 **본 조항은 AC-057로 대체되었다**(한국·미국·**일본**·중국 / 영국 제외 — 사용자 결정 ③, Planning Decision #74). 아래 원문은 **이력 보존을 위해 그대로 남기며 수정하지 않는다.** ① **대한민국·미국·영국·중국의 2026년 공휴일 데이터가 리포 내에 하드코딩**되어 있고 **외부 API 호출이 없다**(네트워크 의존 0). ② 메시지의 마감일이 수신자 국가의 공휴일·연휴 기간에 해당하면 "이 마감일은 상대 국가 연휴 N일차입니다" 경고가 출력된다(음력 기반 설날·추석, 서구 크리스마스~신년, 중국 춘절 포함 케이스 각 1건 이상으로 확인). ③ 경고에서 **대체 기한 제안(AC-036 응답 기한 협상)으로 이동하는 경로**가 제공된다. ④ 데이터가 없는 국가는 경고를 만들지 않고 **"휴일 데이터 없음"으로 표기**한다(임의 추정 금지). |
+| AC-049 | **(신규 v2.2 — 날짜·숫자 형식 모호성 제거)** 변환문에서 날짜는 **비모호 형식**(예: `Aug 4, 2026` / `2026년 8월 4일`)으로 정규화되어 `8/4`·`04/08` 같은 순서 모호 표기가 남지 않는다. 통화·단위는 원문에 명시된 단위를 유지하고 **임의 환산하지 않는다**. 사전 정의된 테스트 케이스 6건에서 ① 정규화 후에도 **날짜 값이 원문과 동일**하고(값 변경 0건), ② 모호 표기 잔존 0건임을 실행 출력으로 확인한다. |
+| AC-050 | **(신규 v2.2 — 결정 권한 상태)** C6 티켓 변환과 C7 결정사항 요약 결과에 **결정 권한 상태 메타 필드**(`확정` / `내부 승인 필요` / `검토 중` / `불명`)가 포함되고, ① 원문에 근거가 없으면 임의 판정하지 않고 **`불명`으로 표기**하며(AC-020과 동일 원칙), ② 판정된 경우 근거 문장이 함께 표시된다. ③ **이 기능의 전제 가설(권한 표현 차이가 실제 오해를 만든다)은 오케스트레이터의 관찰에 기반한 추정이며 검증되지 않았다** — 발표·문서에서 확인된 사실로 서술하지 않고, AC-035(d) 인터뷰로 검증한다. |
+| AC-051 | **(신규 v2.2 — Gmail 어댑터)** Chrome 확장이 **Gmail 작성창**에서 중재를 호출하고, 승인된 텍스트를 본문 입력 영역에 삽입할 수 있다. **보내기 버튼을 자동으로 클릭하지 않는다**(AC-040과 동일 원칙, 자동 클릭 코드 경로 부재). |
+| AC-052 | **(신규 v2.4 — 층 1 선택 오버레이)** ① 확장이 로드된 상태에서 임의의 웹페이지 텍스트를 드래그로 선택하고 마우스를 놓으면(`mouseup`), **선택 영역 옆에 플로팅 버튼이 표시**된다. ② 버튼을 클릭하면 **선택된 텍스트가 입력으로 채워진 중재 패널**이 열린다(사용자가 다시 붙여넣지 않는다). ③ **대상 사이트를 식별하는 코드 없이 동작함**을 확인한다 — 층 2 어댑터가 없는 사이트 **최소 3곳**(예: Microsoft Teams 웹 / Notion / 사내 위키 성격의 임의 페이지)에서 ①②가 성립한다(3/3, 실행 화면 기록으로 증명). ④ 선택이 해제되면 버튼이 사라진다. ⑤ **간섭 금지**: 버튼·패널이 열리기 전에는 대상 사이트의 클릭·스크롤·단축키 동작을 가로채지 않으며, 위 3개 사이트에서 텍스트 선택 자체가 정상 동작함을 확인한다. |
+| AC-053 | **(신규 v2.4 — 층 2 폴백 판정)** ① 층 1 패널의 결과 영역에는 **항상 "클립보드 복사"** 경로가 존재하고, 복사 후 대상 입력창에 붙여넣기가 가능하다. ② 현재 사이트에 **층 2 모듈이 등록되어 있을 때만** "입력창에 삽입" 버튼이 추가로 표시되고, 없으면 표시되지 않는다(빈 버튼·비활성 버튼 금지). ③ 층 2 모듈을 **전부 제거한 상태에서도** 층 1의 전체 경로(선택 → 패널 → 중재 → 승인 → 클립보드 복사)가 동작한다 — **층 2 전면 컷 시나리오를 실제로 1회 실행해 확인**한다. ④ 삽입 경로에서도 **전송 버튼을 자동 클릭하지 않는다**(AC-040과 동일 원칙). |
+| AC-054 | **(신규 v2.4 — 권한 범위·프라이버시 고지)** ① 확장 최초 실행 시 **어떤 데이터가 어디로 전송되는지** 고지가 1회 표시된다 — 최소 항목: (a) **사용자가 선택한 텍스트만** 전송되며 페이지 전체를 읽거나 저장하지 않는다, (b) 전송 대상은 우리 백엔드를 경유한 OpenAI API다(AC-030), (c) 확장이 **모든 사이트에서 동작할 수 있는 권한**을 갖는다. ② manifest의 권한 범위가 문서에 명시되고, **기능에 필요한 최소 범위인지 1회 검토한 기록**이 남는다. ③ 고지 문구는 **구현되지 않은 보호 조치를 있는 것처럼 서술하지 않는다**(AC-034와 동일 원칙 — 예: "데이터를 저장하지 않습니다"는 실제 저장 여부와 일치할 때만 쓴다). |
+| AC-056 | **(신규 v2.4 — 이모지 경고의 무국가 판정 · 사용자 결정 ②로 갱신, Planning Decision #77)** ① 이모지 판정 고정 데이터에 **국가·지역·국적 필드가 존재하지 않는다**(스키마·데이터 파일 grep으로 확인). 데이터는 이모지별 **위험도 3단계**(`높음` / `중간` / `낮음`)만 갖는다 — 초기값: **높음 🙏 ❤️ 💦 / 중간 👍 😂 🔥 😅 / 낮음 😊 ✅ 🆗**. **"어느 나라에서 어떤 뜻"이라는 열을 만들지 않는다.** ② 경고는 **위험도 `높음`(또는 `중간`) 이모지가 사용되었고**, 해당 상대에 대한 **#24 쌍방 규약 또는 자기신고 프로필의 이모지 항목에 값이 없거나 "미사용/거의 안 씀"일 때**만 발생한다. **규약·프로필에 "이모지 사용 OK"가 있으면 경고하지 않는다**(테스트 2건: 경고 발생 1건 / 규약으로 억제 1건). ③ 경고 문구는 **"이 이모지는 해석이 갈릴 수 있습니다 — 상대와 합의된 규칙이 없습니다"** 형태이며, 경고 문구·프롬프트·UI 어디에도 **국가·국민성 서술이 포함되지 않는다**("일본에서는", "한국 사람은" 등 — 문구 검사로 확인). |
+| AC-057 | **(신규 v2.4 — 공휴일 대상국 교체 · 사용자 결정 ③으로 갱신, Planning Decision #74)** 공휴일 하드코딩 대상은 **한국·미국·일본·중국 4개국**이다 — **영국은 대상에서 제외**되고 **일본이 추가**된다. ① 일본 2026년 공휴일이 리포 내 정적 데이터로 존재하고, **연속 휴일 사례 1건 이상**(골든위크 또는 오봉)에서 "연휴 N일차" 경고가 출력된다. ② AC-048의 나머지 조건(외부 API 호출 0, 음력 연휴 케이스, 데이터 없는 국가는 "휴일 데이터 없음" 표기, 임의 추정 금지)은 그대로 적용된다. ③ **AC-048 원문은 수정하지 않으며**, 대상국 목록에 관한 한 **본 AC-057이 AC-048을 대체한다**(영국 데이터는 만들지 않아도 AC 위반이 아니다). |
+| AC-058 | **(신규 v2.4 — C6 오탐 방지)** 감정 신호가 낮은 입력(예: "이 부분 확인이 좀 필요할 것 같은데 언제쯤 가능하실까요?")에 대해 **C6 티켓 변환 옵션이 제시되지 않는다.** ① 대조군 케이스 최소 1건에서 옵션 미제시를 확인하고, ② 감정형 케이스에서는 정상적으로 제시됨을 함께 확인해 **"항상 제시" 또는 "항상 미제시"가 아님을 증명**한다(각 1건 이상, 실행 출력으로 기록). |
+| AC-055 | **(신규 v2.4 — 받은 메시지 해석, 조건부 P3)** ① 받은 메시지 텍스트를 드래그로 선택하면 층 1 패널에서 **"해석" 경로**를 선택할 수 있고, (a) 상대가 의도했을 요청·기대, (b) 그렇게 판단한 **근거 인용 구간**, (c) 오해 가능 지점이 함께 출력된다. ② **근거가 없으면 항목을 지어내지 않는다** — 근거 없는 케이스 3건에서 빈 결과 또는 "판단 근거 부족" 표기가 반환된다(3/3, AC-043·AC-020과 동일 원칙). ③ 출력은 **"해석(추정)"으로 명시 표기**되며 상대의 감정·의도를 **단정하는 문구를 쓰지 않는다**(Out of Scope "수신자의 감정·의도 단정" 조항 준수). ④ 이 기능은 **원문 전송 형식을 바꾸지 않으며**(수신자에게 원문을 병기해 보내는 경로를 만들지 않는다, Planning Decision #21 불변) 수신자 전용 화면을 신설하지 않는다. |
 
 ## Out of Scope (Future)
-- {{...}}
+
+**스트레치 (구현 없음, 발표 로드맵으로만)**
+
+| 항목 | 출처 | 배치 근거 |
+|---|---|---|
+| 브리핑 큐 | 기존 | 기존 스트레치 유지 |
+| **팀 마찰 리포트 (B2B)** = 신규 아이디어 "협업 마찰 리포트" | 기존 + 신규(동일) | 신규 제안 "톤 교정이 강하게 발생하는 지점을 감지해 팀 리더에게 제공"은 기존 스트레치와 **동일 항목**이므로 신설하지 않고 통합. 관리자에게 개인 커뮤니케이션 신호를 노출하는 구조라 프로파일링 리스크 최상위 — 수익 모델상 매력적이나 MVP 진입 불가. **(v2.4 추가) EU 판매가 사실상 막힌다** — **EU AI Act Article 5(1)(f)는 직장에서 자연인의 감정을 추론하는 AI 시스템을 금지**하며 2025-02-02 발효, EU 내 운영 고용주에게 본사 소재지와 무관하게 적용되고 위반 시 **전 세계 연매출 최대 7%** 과징금이다(measured, 2026-08-04). 텍스트 기반 추론은 유럽집행위원회의 **생체 데이터 한정 해석** 덕에 금지를 벗어날 가능성이 있으나(measured — 해석의 존재까지), **"관리자에게 팀의 감정·마찰 신호를 리포트로 제공"은 이 조항이 겨냥하는 사용처 그 자체**여서 해석 여지가 가장 좁다(추정, 법률 자문 없음). **스코프 변경은 없다** — 이미 MVP 제외 상태이며, 이 행은 **로드맵으로 제시할 때 EU 시장을 전제하지 않는다**는 조건을 추가한 것이다(Planning Decision #66) |
+| **프로젝트 온보딩 브리핑** = 신규 아이디어 "프로젝트 기억상실증" | 기존 + 신규(통합) | 신규 제안(신규 멤버 합류 시 AI가 프로젝트를 시각화해 브리핑)은 기존 스트레치 "온보딩 브리핑"의 구체화. 별도 항목으로 만들지 않고 통합. 프로젝트 히스토리 전체를 인덱싱해야 해 17일 내 불가 |
+| **협업 평가 (팀워크 신용 등급)** | 신규 | 대화가 아닌 행동 데이터(GitHub 리뷰 속도, 마감 준수율)로 조직 간 신뢰를 정량화. 스트레치 배치 근거 2가지: (1) 개인 평가·프로파일링 민감도가 이 제품에서 가장 높고(HR/법무 리스크 행 참조), 자기신고 원칙(Planning Decision #6)과 정면 충돌할 소지가 있음, (2) 외부 데이터 소스 연동이 전제라 구현 비용이 Core 전체와 맞먹음. **단, 발표 로드맵에서는 "관계 데이터 기반"이라는 차별화 축을 가장 잘 보여주는 항목**이므로 슬라이드에는 반드시 포함 |
+| **제3자의 검증 (합의된 완료 조건 검증 후 전달)** | 신규 | 양측이 합의한 객관적 완료 조건을 학습해, 개발 완료 시 조건 충족을 검증한 뒤 전달. **C7(결정사항 요약)의 자연스러운 확장**으로 판단 — C7이 "무엇을 합의했는가"를 뽑아내면, 이 기능은 "그 합의가 지켜졌는가"를 판정한다. C7이 P1로 아직 미구현이므로 그 위에 얹는 이번 스코프 진입은 불가. C7 완료 후 1순위 확장 후보로 기록 |
+| **(v2.4) 층 2 — Microsoft Teams 역삽입** | 신규(사용자 결정) | **MVP 미포함, 로드맵으로만.** 일본 1위 툴이지만(측정: 두 조사 모두 1위) **층 1이 이미 커버**하므로 층 2를 만들어 얻는 것은 삽입 자동화뿐이고, **Teams 웹 DOM은 난이도 최상으로 추정**된다(미검증). 발표에서는 "층 1로 이미 동작하며, 삽입 자동화는 로드맵"으로 서술한다 — **"Teams를 지원한다"고 말하지 않는다**(AC-034) |
+| Jira/GitHub 실연동 | 기존 | 기존 스트레치 유지 |
+| 음성/영상 분석 | 기존 | 기존 스트레치 유지 |
+
+**신규 아이디어 중 기존 기능과 동일해 신설하지 않은 것**
+- "퇴근 요정"(새벽 발송 시 상대국 시간 기준 예약 추천) = **R3 비동기 예약 발송과 동일**. 이름만 별칭으로 기록하고 항목을 늘리지 않는다(R3는 P2, AC-024).
+- "최적 회의시간 추천" = **R2와 동일**. 근무 가능 시간 기반이라는 설명을 AC-023에 반영.
+- "피드백 루프 검증" = **R4와 동일**하되 구현 방법이 구체화됨(답장 도착 시간 + 간단한 감정 분류). AC-025를 보강했다.
+
+**그 외 제외 항목**
+- 신뢰도 점수 표시 — 보류. 휴리스틱 수준을 넘는 정확도 주장 금지
+- 자동 전송 (영구 제외 — 설계 원칙)
+- 수신자의 감정·의도 단정 (Manyfast 스코프 제외 항목 흡수)
+- 한국어·영어 외 언어쌍
+- 결제/구독 기능
+- Chrome 웹스토어 정식 등록
+- 실제 협업 툴(Slack/GitHub) 서버 연동을 통한 실제 메시지 전송
 
 ## Planning Decisions
-The authoritative record of planning-level decisions (scope exclusions, priority calls, MVP boundary judgments). Downstream agents (ux-design, architect) must respect these even when other sections don't repeat them. Technical/architectural decisions do NOT belong here — those go in docs/DECISIONS.md (architect-owned). Append-only: if a decision changes, add a new row and mark the old one Superseded.
 
 | # | Decision | Reason | Affects | Status |
 |---|---|---|---|---|
-| 1 | {{e.g. "Login is out of MVP scope"}} | {{why}} | {{e.g. UX, Architecture, or "All"}} | {{Active / Superseded}} |
+| 1 | 2026-08-18 시점에 Core(C1~C7)가 미완이면 권장기능 R1~R4를 전부 포기한다 | 마감 17일, 팀 4명. 기능 과다가 가장 큰 실패 요인 | All | Active |
+| 2 | 우선순위 2단계: 1차 C1·C2·C4(P0) → 2차 C3·C5·C6·C7(P1), R1~R4는 P2 | 사용자 확정 | All | Active |
+| 3 | 웹앱이 데모 기본 경로이고 Chrome 확장은 부가 채널. 웹앱 백업 없이 확장만으로 시연하지 않는다 | 발표 현장 플랫폼 이슈 시 시연 자체가 불가능해지는 것을 막기 위함 | UX, Architecture | Active |
+| 4 | Chrome 웹스토어 정식 배포는 MVP 제외. 개발자 모드 로드로 시연 | 심사 리드타임이 마감보다 길 수 있음(미검증). 정식 등록이 필요해지면 마감 재산정이 선행 조건 | Architecture, 배포 | Active |
+| 5 | 자동 발송 금지. 모든 AI 판단은 override 가능하고 최종 확인은 항상 사람 | 오분류·오변환의 책임을 사용자가 통제할 수 있어야 도구가 신뢰를 얻음 | All | Active |
+| 6 | 문화 개인화는 국가 스테레오타입을 사용하지 않는다. 자기신고 프로필 + 관찰된 diff 패턴(3회 이상)만 근거로 삼는다 | 제품의 핵심 차별점이자 윤리 리스크 방어선 | UX, Architecture | Active |
+| 7 | C4를 최우선 착수한다(구현 난이도 최저, 데모 임팩트 즉시 확보) | 사용자 일정 확정 | Tasks | Active |
+| 8 | C7은 C6의 구조화 로직을 재활용해 구현한다(별도 파이프라인 신설 금지) | 남은 일정에서 두 기능을 한 축으로 내기 위함 | Architecture | Active |
+| 9 | 언어쌍은 한국어↔영어 양방향으로 한정 | 사용자 확정 | All | Active |
+| 10 | 신뢰도 점수 표시는 보류하며, 역번역은 "1차 안전장치"로만 표기한다(과장 금지) | 과장된 검증 주장은 발표 Q&A에서 즉시 반박당하고 제품 신뢰를 깎음 | UX | Active |
+| 11 | 데모·테스트에는 합성 데이터만 사용한다(실제 사내 메시지 반입 금지) | 개인정보·내부정보 보호 리스크 | All | Active |
+| 12 | 배포(웹앱 공개 URL)는 MVP 범위에 포함하며 별도 태스크로 관리한다 | "마지막에 올리면 된다"고 두면 발표 당일 리스크가 됨 | Tasks, Architecture | Active |
+| 13 | 기준 문서는 인수인계 문서. Manyfast PRD는 보조 자료이며 충돌 시 인수인계 문서를 따른다. Manyfast의 타겟·KPI·리스크·스코프 제외 항목만 흡수 | 사용자 확정. Manyfast는 톤 교정 중심의 더 좁은 범위 | All | Active |
+| 14 | **우선순위 매트릭스 내부 모순 해소.** 사용자 제공 매트릭스는 C5·C7을 "권장 2순위"로, 같은 메시지의 Border별 표는 C5·C7을 "Core(승격)"로 표기해 서로 충돌했다. 해소: **기존 user-approved 2단계 구조(C1·C2·C4=P0 / C3·C5·C6·C7=P1)를 그대로 유지**한다 | 두 표기 중 하나를 고르면 다른 하나를 부정하게 되지만, 2단계 구조는 이미 사용자가 확정한 결정이며 양쪽 표기를 모두 포함한다(C5·C7은 권장 2순위보다 위, Core 1차보다 아래 = P1). 새 정보 없이 확정 결정을 뒤집지 않는다는 원칙에 따름. **Open Question이 아니라 Decision으로 처리** — 모순은 이미 해소 가능하므로 사용자를 다시 멈춰 세울 이유가 없다 | All | Active |
+| 15 | **Core 2차 내부 착수 순서를 C6 → C3 → C5 → C7로 조정** | 사용자 매트릭스의 임팩트/난이도 판단 반영: C6은 "임팩트 매우 높음 / 난이도 낮음"으로 투자 대비 회수가 가장 크고(가장 참신한 기능이라 데모 임팩트도 큼), C3은 "매우 높음 / 중"으로 핵심 차별점이며 diff 누적에 시간이 필요해 일찍 시작할수록 유리. C5는 C3보다 난이도가 낮지만 데모 임팩트가 작고, C7은 C6 로직 재활용이므로 C6 이후여야 한다. 우선순위(P0/P1) 자체는 변경 없음 — 바뀌는 것은 착수 순서뿐 | Tasks | Active |
+| 16 | LLM은 **OpenAI API**를 사용한다(user-approved). 사용자 우선순위 표에 "Claude API로 긴급도 판단"이라는 문구가 있으나, 이는 앞서 확정된 결정과 충돌하므로 채택하지 않고 노트로만 남긴다 | LLM 선택은 이미 user-approved 항목이며, 표 안의 예시 문구는 결정 변경 의사로 보기 어렵다. 뒤집으려면 사용자의 명시적 지시가 필요하다 | Architecture | Active |
+| 17 | 발표에서 **"세상에 없는 아이디어" 류의 신규성 주장 금지**. 차별화는 제품화 요소 5가지(비교·승인 UX / diff 학습 / 용어사전 / 어댑터 / 보존 필터)로만 설명한다 | 시장 조사 결과 동일 컨셉의 서비스가 이미 존재(Personos 등)하며, LLM 프롬프트만으로 90%가 해결되어 기술 해자가 없다. 신규성을 주장하는 순간 반박당한다 | 발표, UX | Active |
+| 18 | 신규 아이디어 7건 배치 확정: R2·R3·R4와 중복 3건은 기존 기능에 흡수(항목 신설 없음), "프로젝트 기억상실증"은 기존 스트레치 "온보딩 브리핑"에 통합, "협업 마찰 리포트"는 기존 스트레치와 동일 항목, "협업 평가(팀워크 신용 등급)"와 "제3자의 검증"은 스트레치(로드맵)로 신규 등재 | 마감 17일·팀 4명 조건에서 Core 완주가 유일한 성공 조건이므로 스코프에 항목을 늘리지 않는다. 다만 두 신규 항목은 발표에서 차별화 축을 설명하는 재료로 가치가 있어 로드맵에는 남긴다 | All | Active |
+| 19 | 페인포인트 인터뷰 검증(3~5명)을 P2 선택 태스크(T38)로 추가한다. 코드와 무관하므로 디자인/기획 담당이 수행 | 제품의 핵심 전제가 미검증 상태이며, 검증 없이 발표에서 "확인된 문제"라고 말하면 근거 없는 주장이 된다. 코드 일정과 병렬 진행 가능해 Core를 잠식하지 않는다 | Tasks, 발표 | Active |
+| 20 | **PS-001 후보 결정(사용자, 2026-08-04)**: 채택안 C1+R2/R3 유지 + Inventive "응답 기한 협상" **도입 확정**. Unconventional "발송 쿨다운"은 반려 | 기한 협상은 채택안을 대체하지 않고 위에 얹는 확장이라 C1을 건드리지 않음. 쿨다운은 우회 가능·효과 소멸로 제품 가치가 남지 않음 | Tasks, UX | Active |
+| 21 | **PS-002 후보 결정(사용자, 2026-08-04)**: 채택안 C4+C5만 유지. "상대는 이렇게 읽는다" 요약과 "원문 병기 전송" 모두 **반려** | 요약안은 C4와 화면 역할이 겹쳐 2패널 데모의 초점을 흐리고 LLM 호출만 1회 늘림. 병기안은 부담을 수신자에게 전가. **재논의 방지**: 새로운 근거(예: C4가 사용자 검증에 실패했다는 관찰) 없이 다시 제안하지 않는다 | UX | Active |
+| 22 | **PS-003 후보 결정(사용자, 2026-08-04)**: 채택안 C2+C3+R1 유지 + Inventive "쌍방 커뮤니케이션 규약" **도입 확정**. Unconventional "수신자 측 해석 주석"은 반려 | 규약은 프로파일링 리스크 없이 개인화를 얻는 경로. 해석 주석안은 발신자에게 가치가 없어 도입 경로가 없음. **단, 규약이 C3를 대체하는지 병행하는지는 미확정 → Open Question #16** | Tasks, UX | Active |
+| 23 | **PS-004 후보 결정(사용자, 2026-08-04)**: 채택안 C6+C7 유지 + Inventive "미확정 감지" **도입 확정**. Unconventional "익명 티켓만 생성"은 반려 | 미확정 감지는 C7 산출물 위에서 동작하는 확장. 익명 티켓안은 "중재자" 컨셉과 정면 충돌 | Tasks | Active |
+| 24 | **PS-005 후보 결정(사용자, 2026-08-04)**: 채택안(보존 대상 선추출 후 톤 변환)만 유지. "톤/사실 채널 분리"와 "순화 기본 OFF" 모두 **반려** | 채널 분리는 AC-007 요약 라인과 중복. 순화 기본 OFF는 주기능을 옵트인화해 제품 가치 제안이 무너짐. **재논의 방지** 규칙 적용 | All | Active |
+| 25 | **신규 3기능(응답 기한 협상 / 쌍방 규약 / 미확정 감지)을 모두 P2에 배치**하고, Planning Decision #1의 8/18 컷라인 적용 대상에 포함한다 | 세 기능 모두 Core(C1~C7) 위에 얹는 확장이며, Core를 밀어내면 안 된다는 것이 사용자 지시. 개별 근거: **응답 기한 협상**은 C1(P0) 확장이지만 근무시간 데이터 모델을 R2(P2, T31)와 공유하므로 R2보다 먼저 만들 수 없어 P2가 유일하게 일관됨. **쌍방 규약**은 C3(P1)의 온보딩 방식을 바꿀 수 있어 관계가 확정되기 전 P1으로 올리면 C3 일정을 위협함. **미확정 감지**는 C7(P1, T26) 산출물에 의존하므로 C7 완료 전 착수 불가 → 실제 착수 가능 시점이 M3 이후 | Tasks | Active |
+| 26 | **쌍방 커뮤니케이션 규약과 C3 자기신고 프로필은 병행 관계로 확정(사용자 승인, 2026-08-04)** — 규약 = 상대(pair)별 커스텀 규칙 / C3 = 사용자 전역 기본값, **충돌 시 규약 우선**. 두 데이터는 **별도로 저장**한다(테이블 설계·정규화는 architect 몫이며, 여기서는 "별도 저장 + 우선순위" 원칙만 기록). T19(온보딩 설문)·T20(diff 학습)·T21(프로필 화면)은 변경 없이 유지하고, 쌍방 규약(T41·T42)은 **P2 유지, 승격 없음** | planner 권고안을 사용자가 그대로 승인. 대체로 만들면 상대가 도구를 쓰지 않는 경우 개인화가 0이 되어 C3의 핵심 차별점이 사라진다. Open Question #16 해소 | Tasks, UX, Architecture | Active |
+| 27 | **(OQ#1) 심사 데모 전용이 아니라 실사용자 확장을 고려해 설계한다** (권고안 미채택) | 사용자 결정 2026-08-04. 발표 후 실배포 가능성을 열어 둠 | All | Active |
+| 28 | **(OQ#2) 무료 호스팅의 기본 서브도메인을 사용하고 커스텀 도메인은 구매하지 않는다** | 사용자 결정. 도메인 리드타임을 일정에서 제거 | 배포 | Active |
+| 29 | **(OQ#3) OpenAI 크레딧을 "제한적"이라고 가정하고 설계한다** — 응답 캐싱 + 요청 횟수 제한 + 실패/소진 시 사전 준비된 데모 응답 폴백을 T4·T16에 필수 요구사항으로 포함(AC-041) | 사용자 결정. 잔액을 확인하지 못한 상태에서 낙관적으로 가정하면 발표 중 복구 수단이 없음. **잔액 수치 자체는 여전히 미검증**이며 Tasks 미검증 표에 유지 | Architecture, Tasks | Active |
+| 30 | **(OQ#4) 간단 로그인을 MVP에 포함한다** (권고안 미채택). Supabase Auth 활용 여부 판단은 architect 몫 | 사용자 결정. #27 실사용자 확장의 직접적 귀결이며, 사용자별 프로필·규약·diff·용어사전 소유를 위해 필요 | All | Active |
+| 31 | **(OQ#5) 오프라인 지원 없음, 상시 온라인 전제** | 사용자 결정(권고안 채택) | Architecture | Active |
+| 32 | **(OQ#6) 수익 모델은 팀 좌석당 구독 $8~12/seat로 승인.** 발표 자료에만 반영, MVP에 결제 구현 없음 | 사용자 승인(권고안 채택) | 발표 | Active |
+| 33 | **(OQ#7) Chrome 확장은 GitHub와 Slack 둘 다 지원한다** (권고안 미채택). 어댑터 태스크를 T29(GitHub)/T47(Slack)으로 분리, 둘 다 P1 | 사용자 결정. 프론트 작업량이 늘어나므로 컷 순서(#42)에서 Slack을 1순위 컷 대상으로 지정 | Tasks, UX | Active |
+| 34 | **(OQ#8) 제출물 형식·데모 영상 필수 여부는 미해결로 유지한다** — 주최 측 규칙을 팀이 직접 확인해야 하는 외부 사실이므로 planner가 닫지 않는다. 잠정 조치로 백업 영상 촬영(T48)만 준비하되 **필수 여부 미정** 표기 | 추측 금지 원칙. 규칙 확인 전에 편집·제출 태스크를 만들면 근거 없는 일정이 됨 | Tasks, 발표 | Active |
+| 35 | **(OQ#9) C3 diff "3회" 카운팅은 사용자 단위(전체 발송 기준)** | 사용자 결정(권고안 채택) | Architecture, Tasks | Active |
+| 36 | **(OQ#10) 데모 언어 방향은 한→영 주 + 영→한 보조 1건** | 사용자 결정(권고안 채택) | UX, 발표 | Active |
+| 37 | **(OQ#11) "전송"의 정의**: 웹앱 = 모의 전송(수신자 패널 도착 + 로그), **Chrome 확장 = 대상 사이트 입력창에 자동 삽입(DOM 삽입)**. 외부 이메일·웹훅 발송은 하지 않으며, **전송 버튼 자동 클릭 금지** | 사용자 결정(권고안 확장 채택). 자동 클릭까지 하면 Planning Decision #5(자동 발송 금지·human-in-the-loop)를 위반하므로 삽입까지만 허용 | UX, Architecture, Tasks | Active |
+| 38 | **(OQ#12) Manyfast KPI 중 정보 보존율만 AC-006으로 측정**, 나머지는 향후 지표로만 제시 | 사용자 결정(권고안 채택) | 발표 | Active |
+| 39 | **(OQ#13) 페인포인트 인터뷰 수행 확정** — 디자인 담당, 2026-08-07~08-12, 3명 | 사용자 결정(권고안 채택) | Tasks, 발표 | Active |
+| 40 | **(OQ#14) 기밀·GDPR 질문에는 "현재 미구현" 명시 + 로드맵 3줄로 답한다** | 사용자 결정(권고안 채택). 미구현 보호 조치를 있는 것처럼 말하지 않음 | 발표 | Active |
+| 41 | **(OQ#15) "협업 평가"를 발표 로드맵에 포함하되 "행동 데이터 기반, 개인 평가 아님"을 같은 슬라이드에 병기** | 사용자 결정(권고안 채택) | 발표 | Active |
+| 42 | **일정 압박 시 컷 순서를 사전에 확정한다(재논의 없이 즉시 적용).** ① P2 전체(R1~R4, T39~T44) → ② **Slack 어댑터(T47)** → ③ 로그인 고도화(기본 로그인·세션 외의 비밀번호 재설정·계정 관리 등) → ④ 실사용자 확장 대비 여분(권한 분리·다중 워크스페이스 등). **Core(C1~C7)와 GitHub 어댑터, 웹앱 배포는 컷 대상이 아니다** | #27(실사용자 확장) + #30(로그인 포함) + #33(어댑터 2종)이 한꺼번에 얹히면서 8/18 컷라인의 압박이 커졌다. 컷 시점에 무엇을 버릴지 미리 정해 두지 않으면 마감 직전에 가장 비싼 것(Core)을 건드리게 된다 | All | Active |
+| 43 | **인증(T45·T46)의 우선순위는 P1** — P0로 올리지 않는다 | P0 데모 경로(C1·C2·C4 + 2패널)는 인증 없이도 완결되므로 인증은 P0 위에 얹히는 전제 조건이 아니다. 반대로 인증을 P0로 올리면 C4 최우선 착수(Planning Decision #7)가 밀려 Core 1차 일정이 위협받는다. 단 사용자별 데이터 분리가 필요한 T18(스토리지) **이전**에 완료해야 하므로 M2 착수 시점의 첫 태스크로 배치한다 | Tasks | Active |
+| 44 | **(v2.1) 경쟁사 실명 검증 결과를 Differentiation 섹션에 정식 반영하고, 발표 차별화 KEY 3을 확정한다(사용자 승인 2026-08-04).** KEY 1 = 번역 손실 방지(polish가 아니라 preserve), KEY 2 = 프리셋이 아니라 "이 사람", KEY 3 = 조직 간 마찰. **Planning Decision #17을 대체하지 않고 보강한다** — 신규성 주장 금지 원칙은 그대로 유효 | Tonero·checktone.app·Slack AI·Superhuman "Instant Reply"의 실재와 기능을 오케스트레이터가 2026-08-04에 직접 확인(measured). 실명 없이 "Personos 등"으로만 서술하면 발표에서 구체적 반박에 대응할 수 없다. 채택 여부는 사용자가 이미 결정했으므로 재논의하지 않는다 | 발표, UX | Active |
+| 45 | **(v2.1) C3 차별화 서술 각도를 "개인화를 한다"에서 "무엇을 개인화하는가"로 수정한다** — Superhuman = 발신자 문체 학습 / C3 = 수신자 수용 방식 학습. **단 이 각도가 발표에서 통할지는 미검증이며, 현재 C3 명세와도 불일치함을 문서에 명시**(Open Question #18) | Superhuman "Instant Reply"가 수신자별 문체 학습을 이미 제공(measured)하므로, 기존 서술("세션이 끊기는 챗봇은 구조적으로 못 함")은 ChatGPT 대비로만 성립하고 전용 도구 대비로는 반례가 존재한다. 그대로 두면 발표에서 반박당한다. **기능·우선순위·AC는 변경하지 않는다 — 바뀌는 것은 서술 각도뿐** | 발표, UX | **Superseded by #58 (2026-08-04)** — "C3 = 수신자 수용 방식 학습"이 명세와 불일치함이 확인되어 각도를 다시 바꿨다. 결정 원문은 이력 보존을 위해 남긴다 |
+| 46 | **(v2.1) C7(결정사항 자동 요약)을 발표에서 차별점으로 내세우지 않는다.** 기능은 MVP에 유지하고 우선순위(P1)·태스크(T26·T27)·AC(AC-019·AC-020)는 **변경하지 않는다** | Slack AI가 허들의 핵심 결정사항·다음 단계·액션 아이템을 캔버스에 자동 기록하는 기능을 플랫폼 기본으로 제공(measured). 차별점으로 말하면 "Slack에 이미 있다"로 즉시 반박된다. 기능 자체는 웹앱·GitHub 경로에서 여전히 유효하므로 스코프에서 빼지 않는다 | 발표 | Active |
+| 47 | **(v2.1) C6(하소연→티켓 변환)를 차별화 축이자 데모 하이라이트로 격상한다. 우선순위 재조정은 하지 않는다** | 검색한 경쟁 서비스(Tonero·checktone·Slack AI·Superhuman)에서 동일 기능을 발견하지 못함(measured — 단 부재 증명은 아님). 우선순위는 이미 Planning Decision #15에서 Core 2차 착수 선두(C6→C3→C5→C7)로 반영되어 있어 **추가 조정이 불필요**하다. 바뀌는 것은 발표에서의 위상뿐 | 발표, UX | Active |
+| 48 | **(v2.1) R2(최적 회의시간 추천)에 전용 경쟁 도구(World Time Buddy·Reclaim.ai)가 존재한다는 정보를 cited(미검증)로 기록한다. 우선순위 변경 없음(P2 유지)** | 이 정보는 사용자 제공이며 오케스트레이터가 독립 검증하지 않았다. 미검증 정보를 근거로 이미 확정된 우선순위를 움직이지 않는다. 발표에서는 차별점으로 쓰지 않고 보조 기능으로만 서술 | 발표 | Active |
+| 49 | **(v2.1) "오해 사전 경고(Misread Risk)"는 신규 MVP 행을 만들지 않고 기존 C2/C4의 출력 필드 확장으로 흡수한다**(사용자 결정). 스키마에는 **기존 `warnings[]`를 확장하지 않고 전용 필드 `misreadRisks[]`(항목당 인용 구간 / 예상 오해 / 근거 3요소, 근거 없으면 빈 배열)를 신설**한다. AC-043, T1·T10·T11·T12에 반영 | 신규 행 미신설은 8/18 컷라인을 건드리지 않기 위한 사용자 지시. **전용 필드 신설 판단 근거 4가지**: (1) 대상이 다르다 — `warnings[]`는 *변환 결과*의 문제(예: R1 이모지 경고)를 담지만, 오해 경고는 *원문*이 상대에게 어떻게 읽히는지를 담는다. (2) 구조가 다르다 — 단일 문자열이 아니라 3요소 구조체가 필요하다. (3) **AC-043의 "빈 배열이면 위험을 지어내지 않은 것" 판정이 `warnings[]`에 섞이면 검증 불가**해진다(이모지 경고가 들어 있어도 배열이 비지 않으므로). (4) `reason`은 변환 이유 1건을 담는 단일 필드라 다건 리스트를 담을 수 없다 | Architecture, Tasks, UX | Active |
+| 50 | **(v2.2) 한국어 특화 3건(어미 긴급도 / 존댓말 레벨 / 호칭 매핑)의 프레이밍을 "문화 지식"이 아니라 "언어 구조적 사실"로 고정한다.** 서술 문장: "한국어는 긴급도와 위계를 어휘가 아니라 문법(어미·부사)에 싣는다". 세 건 모두 **신규 MVP 행을 만들지 않고** C2(P0 프롬프트 규칙)·C3(프로필 항목)·C4(검증)·C5(호칭 타입)에 흡수한다 | "한국 문화를 안다"로 잡으면 Planning Decision #6(국가 스테레오타입 금지)과 Risks의 문화 프로파일링 항목에 정면으로 걸린다. 언어쌍의 구조적 속성으로 잡으면 국민성 일반화가 아니며 테스트 케이스로 **검증 가능**해진다(AC-045·046·047). 흡수 판단 근거: 세 건 모두 새로운 데이터·화면이 아니라 **기존 변환 경로의 프롬프트 규칙·사전 항목**으로 표현 가능하다 | All(발표 포함) | Active |
+| 51 | **(v2.2) 침묵 감지는 신규 MVP 행(#29)으로 만들고, 응답 여부는 사용자의 "답장 받음" 수동 마킹으로만 확보한다. 자동 응답 감지는 만들지 않는다. 우선순위 P2** | **신규 행을 만든 근거**: 다른 7건과 달리 이 기능은 프롬프트 규칙이 아니라 **새로운 저장 상태(발송 기록·마킹)와 새로운 화면(발송 목록)**을 요구한다 — 기존 행에 숨기면 실제 비용이 문서에서 사라진다. **수동 마킹 근거**: 현재 MVP의 발송은 mock-send이고 수신자 화면이 없어 자동 감지가 물리적으로 불가능하며, 수동 확인은 Planning Decision #5(human-in-the-loop)와도 일치한다. **P2 근거**: P0로 올리면 Core 1차를 침범하고, P1로 올리면 인증·어댑터와 M2~M3 자원을 두고 경합한다. **R4(AC-025)와의 관계**: 침묵 감지는 boolean+타임스탬프만, R4는 답장 본문·감정 분류까지 필요 — **동일한 발송 기록 저장 구조를 공유하고 R4가 그 위에 얹는다**(중복 구현 금지, T33 선행 의존) | Tasks, UX, Architecture | Active |
+| 52 | **(v2.2) 공휴일 인지를 신규 MVP 행(#30, P2)으로 만들고, 데이터는 한국·미국·영국·중국 4개국 2026년 공휴일을 리포에 하드코딩한다. 외부 공휴일 API에 의존하지 않는다.** 아울러 **P2 내부 유지 순위**를 정한다: ① #30 공휴일 → ② #23 응답 기한 협상 → ③ #29 침묵 감지 → ④ R1~R4·#24·#25 | **신규 행 근거**: 공휴일 데이터는 특정 기능의 출력이 아니라 R2·R3·#23·#29가 **공유하는 데이터 자산**이라 한 기능 안에 숨기면 중복 구현이 생긴다. **국가 선정 근거**: 언어쌍이 한↔영이므로 한국·미국·영국이 필수이고, 음력 연휴 사례(춘절)와 데모 서사를 위해 중국을 포함했다. **라마단·인도 제외 근거**: 종교력·주별 휴일은 국가 단위 테이블과 데이터 형식이 달라 별도 소스가 필요하다(추정) — 범위에 넣지 않는다. **API 금지 근거**: 발표 중 네트워크 의존을 늘리지 않기 위함(Planning Decision #29와 동일 취지). **P2 내부 순위 근거**: 공휴일은 다른 P2 3건이 참조하는 선행 데이터라 가장 먼저 확보해야 값이 있다. **Planning Decision #42(컷 순서)는 수정하지 않으며, 본 결정은 #42의 ① 계층 내부 순서만 정한다** | Tasks, Architecture | Active |
+| 53 | **(v2.2) 날짜·숫자 비모호 형식 정규화는 AC-006을 고쳐 쓰지 않고 신규 AC-049로 분리한다.** AC-006에는 "유지 = 의미·값의 보존이며 문자열 동일성이 아니다"라는 주석만 덧붙인다 | AC-006은 "원문 문구가 누락 없이 유지"를 요구하는데, `8/4` → `Aug 4, 2026` 정규화는 **문자열을 바꾸므로 문자 그대로 읽으면 AC-006 위반으로 판정될 수 있다.** 이미 승인된 AC의 판정 기준을 재작성하면 기존 회귀 테스트의 의미가 흔들리므로, 정규화 규칙은 별도 AC로 두고 AC-006에는 해석 주석만 남긴다(AC 번호 재부여 없음) | Tasks, 구현 | Active |
+| 54 | **(v2.2) 결정 권한 상태(AC-050)는 C6·C7 경로(P1)에서만 산출하고 P0 경로(C1·C2)에는 넣지 않는다. 전제 가설은 "추정"으로 표기하고 T38 인터뷰(AC-035 d항)로 검증한다** | 이 항목의 근거는 오케스트레이터의 관찰이며 **측정된 사실이 아니다(추정)**. 검증되지 않은 가설을 P0 데모 경로에 넣으면 (a) 이미 v2.1에서 증가한 P0 작업량을 더 키우고, (b) 발표 중 근거를 요구받았을 때 답할 자료가 없다. C6·C7은 Border 04(조직 축) 기능이라 이 메타 필드의 자연스러운 위치이기도 하다 | Tasks, 발표 | Active |
+| 55 | **(v2.2) Gmail 어댑터를 MVP에 추가한다(신규 행 #31, P1, AC-051, T49).** 기존 확장 구조(DOM 텍스트 삽입, 보내기 자동 클릭 금지 — AC-040·Decision #5)를 그대로 따르며 자동 발송 경로를 만들지 않는다. **컷 순서상의 위치는 planner가 정하지 않고 Open Question #19로 사용자에게 올린다** | 사용자 결정(2026-08-04). 전략 근거: KEY 3이 "조직 간 마찰"인데 GitHub·Slack은 대개 사내(intra-company) 도구이고 **회사 간 실제 채널은 이메일**이므로 Gmail이 차별화 서사와 가장 잘 맞는다. **신규 행 근거**: 어댑터는 프롬프트·필드 확장이 아니라 별도 대상 사이트 코드이며 기존 #16·#27과 동일 층위다. **컷 순서를 planner가 못 바꾸는 이유**: Planning Decision #42는 사전 합의된 append-only 항목이므로 수정하지 않는다 | Tasks, UX | Active |
+| 56 | **(v2.2) 이번 8건 반영으로 늘어난 P0 작업량을 명시적으로 기록한다** — 늘어난 곳은 **① AC-045(한국어 어미 긴급도, T10·T11) ② AC-046 중 혼용 감지·경고(T5·T6·T10·T11) ③ AC-049(날짜 정규화, T10·T11)** 세 곳뿐이며, 모두 **C2/C4 프롬프트 규칙 + 테스트 케이스**여서 새 화면·새 저장소를 만들지 않는다. 나머지 5건은 P1(#12 호칭, #13·#14 결정 권한, #31 Gmail) 또는 P2(#29 침묵 감지, #30 공휴일)에 배치했다 | v2.1에서 이미 오해 사전 경고가 P0에 얹혔고(Risks 참조), 여기에 P0를 더 얹으면 Core 1차(M1, 8/7~8/11)가 위태로워진다. **P0 증가를 "프롬프트 규칙 + 테스트 케이스"로만 한정한 것이 이번 배치의 배치 원칙**이며, 이 원칙을 명문화해 두어야 이후 요청에서도 같은 기준으로 판단할 수 있다 | All | Active |
+| 57 | **(v2.3, OQ#17 resolved) 오해 사전 경고는 "부분 컷" 규칙을 적용한다** — ① 스키마 `misreadRisks[]`(T1)와 ② 생성 로직(T10)·검증셋(T11)은 **컷 대상이 아니다**. ③ 일정 압박 시 **T12의 표시 UI만** 최소 형태(경고 개수 배지 + 툴팁)로 축소한다. **축소 시에도 데이터는 정상 생성·저장되어야 하며**, 표시 UI만 다시 붙이면 **복원 가능**한 상태여야 한다(데이터 생성 자체를 끄지 않는다). **Planning Decision #42를 대체하지 않고 그 ① 계층에 적용되는 예외 규칙으로 추가**한다 | 사용자 결정(권고안 채택). 스키마·데이터를 나중에 되살리려면 프론트·백엔드 통합 재작업이 발생하지만(T1 규칙: 스키마 불일치가 재작업 최대 원인), 화면 표현은 마지막에 붙여도 비용이 낮다. 데이터를 계속 생성해 두면 컷 이후 복원이 UI 작업만으로 끝난다 | Tasks, UX | Active |
+| 58 | **(v2.3, OQ#18 resolved) 발표 KEY 2의 근거를 "C3 + #24 쌍방 규약의 조합"으로 재서술하고, 각도를 "무엇을 개인화하는가"에서 "개인화 근거를 어디서 얻는가(추론 vs 합의)"로 바꾼다.** **"C3가 수신자별로 학습한다 / 수신자의 수용 방식을 학습한다"는 서술은 명세와 불일치하므로 발표·문서에서 전면 폐기**한다. **C3의 diff 3회 카운팅을 수신자별로 바꾸는 안은 기각** — Planning Decision #35는 변경 없이 유효 | 사용자 결정(권고안 채택). 대조 결과 수신자 축 데이터의 유일한 출처는 AC-037(#24)이며 C3(AC-011·013 + #35)는 사용자 단위라 수신자 축이 없다. 재서술된 각도는 오히려 Planning Decision #6(스테레오타입 금지·자기신고 원칙)을 강화한다. 수신자별 카운팅으로 바꾸면 MVP 데이터량에서 3회에 도달하지 못해 학습 기능이 시연되지 않는다(OQ#9 근거) | 발표, UX | Active |
+| 59 | **(v2.3, OQ#19 resolved) 컷 순서에서 Gmail 어댑터(T49)를 Slack 어댑터(T47)보다 위에 둔다** — 일정 압박 시 **Slack을 먼저 포기하고 GitHub + Gmail을 지킨다**. **Planning Decision #42를 대체하지 않고 그 ② 계층의 대상을 갱신하는 관계**이며 #42 원문은 수정하지 않는다. 갱신 후 순서: ① P2 전체 → ② **Slack 어댑터(T47)** → ③ **Gmail 어댑터(T49)** → ④ 로그인 고도화 → ⑤ 실사용자 확장 여분 | 사용자 결정(권고안 채택). KEY 3(조직 간 마찰)의 실제 채널은 이메일이고 GitHub·Slack은 대개 사내(intra-company) 도구다 — 차별화 서사를 지키는 쪽이 Gmail이다. **단서**: Gmail DOM 삽입 난이도는 여전히 **미검증(추정)**이므로, T49 착수 첫 1시간 스파이크 결과가 "Gmail이 Slack보다 현저히 어렵다"로 나오면 **이 순서를 재검토**한다(재검토 시 새 Decision 행으로 기록) | Tasks, UX, 발표 | Active |
+| 60 | **(v2.3, OQ#20 resolved) 침묵 감지의 무응답 임계값은 업무일 2일**(주말 + #30 공휴일 데이터의 수신자 국가 휴일 제외) | 사용자 결정(권고안 채택). PS-001의 전제상 왕복 1회에 12~24시간이 걸리므로 1일은 정상 왕복을 무응답으로 오판하고, 3일 이상은 이미 신뢰가 상한 뒤다. 값은 T51의 상수 1곳에 격리해 변경 비용을 최소화한다(설정 화면은 만들지 않음) | Tasks | Active |
+| 61 | **(v2.4, 사용자 결정) Chrome 확장을 2계층 구조로 전면 재편한다.** **층 1 = 범용 선택 오버레이**(사이트 무관, 신규 MVP 행 #32, AC-052·053·054, T55~T58) / **층 2 = 사이트별 역삽입**(기존 #16·#27·#31의 축소된 역할 — DOM 선택자 + 삽입 로직만). 기존 3개 행은 **삭제하지 않고 역할을 재정의**했다. 전송 버튼 자동 클릭 금지(AC-040 / Decision #5)는 **불변** | 사용자 결정이며 채택 여부는 재논의 대상이 아니다. 근거 4가지: ① **커버리지** — 어댑터 3종이 아니라 브라우저 안의 모든 웹 협업툴을 층 1만으로 커버한다(Differentiation 7 지형도: 일본 1위 Teams 웹, Chatwork, 중국 Feishu 웹 등). ② **컷 안전성** — 층 2가 전부 컷되어도 제품이 죽지 않는다(#62). ③ **차별화** — "플랫폼 독립 중재 레이어"를 말이 아니라 구조로 실증하며 KEY 3·Border 04와 직접 연결된다. Slack AI는 Slack 안에서만, Tonero는 명시된 사이트 목록에서만 동작한다(measured). ④ **UX** — 복사·붙여넣기를 요구하는 기존 경로가 나쁘다는 사용자 지적. 층 1은 "쓰던 자리에서 드래그만 하면 된다". **작업량 판단**: 신규 태스크 4건은 전부 **P1**이며 **P0는 늘지 않는다**(#63 참조) | MVP Scope, Tasks, UX, Architecture | Active |
+| 62 | **(v2.4) 컷 순서를 2계층 전제에 맞게 갱신한다.** 갱신 후: **① P2 코드 태스크 전체 → ② 층 2 Slack(T47) → ③ 층 2 Gmail(T49) → ④ 층 2 GitHub(T29) → ⑤ 로그인 고도화 → ⑥ 실사용자 확장 여분.** **층 1(T55~T58)은 컷 대상이 아니다** — 이전에 GitHub 어댑터가 갖던 "컷 대상 아님" 위치를 층 1이 넘겨받는다. **Planning Decision #42·#59 원문은 수정하지 않으며(append-only) 본 항목이 갱신한다(대체 아님)** | **전제가 바뀌었기 때문이다.** #42·#59는 "어떤 사이트 어댑터를 버리면 그 플랫폼 사용자를 잃는다"를 전제로 순서를 정했다. 2계층에서는 **층 2를 버려도 그 사이트에서 층 1이 남아 커버가 유지**되고, 잃는 것은 "삽입 편의"뿐이다. 층 2 내부의 상대 순서는 기존 판단을 그대로 계승한다 — Slack이 먼저인 근거는 #59(KEY 3의 실제 채널은 이메일) + Differentiation 7(일본에서 Slack은 두 조사 모두 7%대, Teams가 1위, measured)이고, GitHub이 마지막인 근거는 #42가 이미 GitHub을 가장 보호받는 어댑터로 판단했고 DOM이 상대적으로 안정적이라는 점(OQ#7)이다. **단서**: Gmail DOM 난이도는 여전히 미검증(추정)이며 T49 스파이크 결과에 따라 ③④ 순서를 재검토한다(#59 단서 승계) | All | Active |
+| 63 | **(v2.4) 층 1의 기본 결과 전달 경로는 "클립보드 복사"이며, 이는 Planning Decision #37("전송"의 정의)을 대체하지 않고 확장한다.** 정리: 웹앱 = 모의 전송 / 층 2 있는 사이트 = DOM 삽입 / **층 2 없는 사이트 = 클립보드 복사**. 세 경로 모두 **전송 버튼 자동 클릭 금지**이며 사용자가 직접 보낸다. **층 1 신설로 P0 작업량은 늘지 않는다** — T55~T58은 모두 P1이고, 코어 엔진은 T15 인터페이스를 그대로 쓰므로 P0(T5~T16) 태스크의 범위가 바뀌지 않는다 | 클립보드는 "붙여넣기가 나쁘다"는 지적과 상충해 보이지만, 나빴던 것은 **도구를 찾아가 원문을 복사해 넣고 결과를 다시 복사해 오는 왕복**이다. 층 1은 그 왕복 중 **입력 측을 제거**하고(선택만 하면 됨) 출력 측 1회 붙여넣기만 남긴다. 층 2가 있으면 그 1회도 사라진다. 자동 클릭까지 하면 Decision #5(human-in-the-loop) 위반이므로 어떤 층에서도 하지 않는다 | UX, Architecture, Tasks | Active |
+| 64 | **(v2.4) 층 1이 요구하는 광범위 권한(`all_urls` 수준)을 리스크로 등재하고, 프라이버시 고지를 MVP 요구사항으로 둔다(AC-054, T58).** **웹스토어 심사 난이도 상승은 MVP 기간 내 차단 요인이 아니다** — 정식 등록을 하지 않기로 이미 확정되어 있기 때문이다(Planning Decision #4, 개발자 모드 로드). **조건부 관계**: 정식 등록 방침으로 바뀌는 순간 이 항목은 차단 요인으로 전환되며, #4의 "마감 재산정 선행" 조건이 그대로 발동한다 | 층 1은 **모든 사이트에서 사용자가 선택한 텍스트를 읽을 수 있는** 구조다. 심사 리스크는 배포 방식에 종속되므로 조건부로 기술해야 하고, **프라이버시 고지는 배포 방식과 무관하게 필요**하다(개발자 모드로 팀·심사위원이 설치하는 경우에도 무엇이 전송되는지 알 권리가 있다). 고지가 구현되지 않은 보호 조치를 있는 것처럼 말하지 않도록 AC-054 ③에 조건을 걸었다 | Architecture, UX, 배포 | Active |
+| 65 | **(v2.4, 사용자 결정) "받은 메시지 해석"을 폐기하지 않고 P3 조건부 항목(MVP Scope #33, AC-055, T59·T60)으로 등재한다.** 발동 조건은 **2026-08-18 21:00 KST에 ① T5~T29 전부 done ② T55~T58 전부 done ③ P2 잔여 todo 6건 이하**가 모두 참일 때이며, **판정은 docs/Tasks.md Status 열만으로 수행하고 재논의하지 않는다.** 중단 조건: 2026-08-19 12:00 KST까지 done이 아니면 즉시 중단·원복. **Planning Decision #21은 뒤집지 않는다** | 사용자 결정("지금은 보류, 시간이 남으면 추가"). 조건을 **날짜·Status 값으로만 판정 가능한 형태**로 고정한 이유는, "시간이 남으면"을 그대로 두면 8/18에 다시 사용자 판단을 요구하게 되고 그 시점은 재논의 비용이 가장 비싼 때이기 때문이다. **N=6 근거**: P2 코드 태스크 15건 중 9건 이상(60%)이 끝났다는 것을 "여유"의 객관적 증거로 삼았다 — 층 1 재사용이라 비용이 낮다는 것은 **추정**이므로, 여유의 증거는 비용 추정이 아니라 **관측 가능한 진척**으로 잡아야 한다. **#21과 다른 이유**: #21이 반려한 것은 "원문 병기 전송"(전송물을 바꿔 수신자에게 대조 부담 전가 + 길이 2배)이고, #33은 전송물을 바꾸지 않고 수신자가 자기 브라우저에서 원할 때만 요청하는 접근이라 반려 사유가 성립하지 않는다 | MVP Scope, Tasks | Active |
+| 66 | **(v2.4) EU AI Act Article 5(1)(f)(직장·교육기관 내 감정 추론 금지)를 Risks에 등재한다. R4(#21 피드백 루프 — 답장 감정 분류, AC-025)는 유지**하되 "텍스트 기반이라 생체 데이터(biometric) 정의를 벗어난다"는 근거를 문서화한다. **"팀 마찰 리포트"(스트레치)는 EU 판매를 전제하지 않는다**(스코프 변경 없음 — 이미 MVP 제외). **좌석 구독 채택이 결과적으로 이 리스크를 회피했다**는 점을 Monetization에 기록한다. **발표에서 확정적 안전 주장 금지** — "텍스트 기반이며 biometric 정의를 벗어난다고 **판단**하나 법률 자문은 받지 않았다" 수준으로만 답한다(T37 Q&A) | 조문·발효일(2025-02-02)·적용 범위(EU 내 운영 고용주, 본사 소재지 무관)·과징금 상한(전 세계 연매출 7%)·의료/안전 예외, 그리고 **유럽집행위원회의 생체 데이터 한정 해석**은 오케스트레이터가 2026-08-04 웹 검색으로 확인했다(**measured**). 출처: fpf.org 블로그, legalblogs.wolterskluwer.com. **그러나 오케스트레이터는 변호사가 아니고 이는 회색지대다** — 적용 여부를 단정하면 CLAUDE.md의 "추측을 사실처럼 말하지 않는다"를 정면으로 위반한다. R4를 유지하는 근거는 (a) 입력이 텍스트이고 생체 데이터가 아니며, (b) 산출물이 관리자에게 노출되지 않고 발신자 본인의 피드백 루프에만 쓰이기 때문이다. 반대로 팀 마찰 리포트는 (b)가 성립하지 않아 해석 여지가 가장 좁다 | 발표, Risks, Monetization, Tasks | Active |
+| 67 | **(v2.4) 국가별 협업툴 지형도(일본·중국)를 Differentiation 7)에 시장 근거로 등재한다.** ① 일본 수치는 **두 조사를 항상 병기**하며 어느 쪽도 단독 인용하지 않는다. ② 이 지형도는 **Decision #59(Slack을 Gmail보다 먼저 컷)를 강화하는 보강 근거일 뿐 결정을 바꾸지 않는다.** ③ **중국 3사(DingTalk·WeCom·Feishu, 합계 92%)는 확장으로도 커버 불가**함을 정직하게 기록하고 발표에서 숨기지 않는다(T37 ⑧). ④ cited 2건("HK$100만 주문 상실", "Ding 알림 문화")은 **원출처 확인 전 발표 사용 금지** | 일본 Teams 67.8% / Slack 7.5%(renue.co.jp)와 Teams 17.25% / Slack 7.00%(boxil.jp, n=1,629), 중국 DingTalk 32.7% / WeCom 23.4% / Feishu 18.9%는 오케스트레이터가 2026-08-04에 직접 확인했다(**measured**). **두 일본 조사를 병기하는 이유**: 도입률(복수응답)과 주 사용 툴 조사는 측정 대상이 달라 수치가 크게 갈리며, 한쪽만 인용하면 다른 쪽 자료로 즉시 반박당한다. **결정을 뒤집지 않는 이유**: #59는 이미 확정된 사용자 결정이고, 새 근거가 같은 방향이므로 되돌릴 이유가 없다. **중국을 정직하게 쓰는 이유**: AC-034가 "미구현을 구현된 것처럼 보이지 않게"를 이미 요구하며, 92% 커버 불가를 숨기면 지형도 슬라이드 자체가 반박 재료가 된다 | 발표, Tasks | Active |
+| 68 | **(v2.4, 사용자 결정) 층 2 대상은 GitHub·Slack·Gmail 3종으로 확정하고 Microsoft Teams는 추가하지 않는다**(로드맵으로만 — Out of Scope 표). **Slack과 Gmail은 동순위**이며 Planning Decision #62의 "② Slack → ③ Gmail" 서열은 본 항목으로 **갱신**된다(#62 원문 미수정). 갱신 후 컷 순서: **① P2 전체 → ② 층 2 Slack·Gmail(동순위) → ③ 층 2 GitHub(T29) → ④ 로그인 고도화 → ⑤ 여분.** <br>**동순위 판정 규칙(재논의 없이 즉시 적용 — 사람이 다시 고르지 않는다)**: T47·T49의 **착수 첫 1시간 스파이크를 같은 날 연속으로** 수행하고 각각 3개 항목을 기록한다 — ⓐ 입력창 DOM 노드를 안정적 선택자로 특정 가능한가(Y/N), ⓑ 삽입한 텍스트를 사이트가 값으로 인식하는가(전송 버튼 활성화 등, Y/N), ⓒ ⓐⓑ 확인을 60분 내 완료했는가(Y/N). **판정: ① Y 개수가 많은 쪽을 먼저 구현한다. ② 동수면 ⓐⓑ 확인에 걸린 실측 분(分)이 짧은 쪽. ③ 그것도 같으면 Gmail 먼저**(tie-break 근거는 #59의 원래 논거 — KEY 3의 실제 채널은 이메일 — 를 동점 처리에만 계승). **컷 상황에서 하나만 남길 때도 같은 순서를 쓴다**(= 나중 구현으로 판정된 쪽이 먼저 컷). | Teams 미추가 근거: **Teams 웹은 DOM 난이도 최상으로 추정**되고, **층 1이 이미 커버**하므로 층 2를 만들어 얻는 것은 삽입 자동화뿐이다(투자 대비 회수 최저). 동순위 근거: 사용자 결정. **판정을 규칙으로 고정한 이유**: 서열을 없애면 "그때 가서 고르자"가 되고, 그 시점은 마감 직전이라 재논의 비용이 가장 비싸다. 판정 입력을 **스파이크의 Y/N + 실측 분**으로 한정해 주관 판단이 들어갈 자리를 없앴다 | Tasks, UX | Active |
+| 69 | **(v2.4, 사용자 지시) `docs/TestCases.md`(AC별 평가용 정답 세트)와 `docs/DemoScript.md`(발표 시연 대본)를 planner 소유 문서로 인수한다.** 두 파일의 `Owner`를 planner로 갱신하고, docs/Tasks.md의 **T11(회귀 검증셋) / T35(리허설) / T37(발표)** 에 명시적으로 연결한다 | 두 문서는 AGENTS.md 문서 소유표에 **등재되어 있지 않아** 지금까지 소유자가 없었다(각 파일 헤더가 "착수 전 소유자를 정할 것"을 명시). 소유자가 없으면 갱신 책임이 공중에 뜨고, 이 두 문서는 AC 판정 기준과 발표 진행을 담고 있어 표류 비용이 크다. **한계**: AGENTS.md는 사용자 소유 문서라 planner가 수정할 수 없으므로, **소유표 정식 등재는 사용자 조치가 필요**하다(보고서에 남김) | Tasks, 발표 | Active |
+| 70 | **(v2.4) 새 데모 시드의 diff 히스토리를 "사용자 단위 10건"으로 재구성한다** — 수신자별 카운팅을 도입하지 않는다(**Planning Decision #35 불변, OQ#18의 기각 결론 불변**). 3회 도달 패턴("완충 삽입" 3건)은 사용자 전역에서 3회이므로 프로필에 반영되고, 1회짜리 패턴(이모지 제거)은 미반영으로 남아 **노이즈 방지 로직 시연은 그대로 성립**한다. <br>**COMPARE-01(동일 원문 → 3인 다른 출력)은 C3가 아니라 #24 쌍방 규약(AC-037) 기반으로 재서술**한다 — 타나카·Michael은 **합의된 규약이 있고**, Sarah는 **규약 미합의(cold start)** 라서 "아직 학습된 내용이 없습니다"가 뜬다. 이는 발표 KEY 2("추론된 개인화가 아니라 합의된 개인화")의 실물 증거가 된다. **단 #24는 P2이므로 COMPARE-01은 "조건부 장면"으로 두고**, 컷되면 지정된 대체 장면으로 교체한다(DemoScript.md). **P1 승격 여부는 planner가 결정하지 않는다 → Open Question #24**(OQ#21과 함께 결정) | C3는 **사용자 전역 기본값**이므로 같은 원문이 수신자에 따라 달라질 근거가 없다 — 시드를 수신자별로 두면 문서가 스스로 모순된다(Differentiation 3-2 대조표가 이미 이 불일치를 폐기했다). 수신자 축 데이터의 **유일한 출처는 AC-037(#24)** 이다. 승격을 planner가 임의로 하지 않는 이유: Planning Decision #26이 "#24는 P2 유지, 승격 없음"으로 확정한 사항이고, 승격은 C3(T19~T21)와 M2 자원을 두고 경합시킨다. **파생 사실 하나를 명시한다 — 이제 #24의 컷은 발표 차별화(KEY 2)뿐 아니라 발표 데모 장면 하나까지 함께 잃게 만든다** | Tasks, 발표, UX | Active |
+| 71 | **(v2.4) 이모지 판정 데이터에서 국가 라벨을 제거한다.** 고정 룩업은 유지하되(안정성 확보), 키를 국가가 아니라 **"해석이 갈리는 이모지 + 후보 해석 나열"** 로 바꾸고 어느 해석이 맞는지 **단정하지 않는다**. 경고 발동 조건은 **#24 쌍방 규약·자기신고 프로필의 이모지 항목**이며, "이모지 OK"가 합의돼 있으면 경고하지 않는다(AC-056). **사용자가 제공한 국가별 매핑 10종은 국가 라벨을 제거한 형태로만 수록**하고 원형은 채택하지 않는다 | 원안("일본에서 🙏는 사과·간청", "일본에서 😂는 비즈니스 부적절")은 **국가 단위 일반화**이고, 고정 룩업으로 코드에 박으면 **근거 없는 일반화를 제품에 내장**하게 되어 Planning Decision #6(국가 스테레오타입 금지)과 Decision #50(언어 구조 프레이밍), Risks의 문화 프로파일링 행에 정면으로 걸린다. **동시에 "고정 데이터가 결과 안정성에 유리하다"는 지적은 타당하다** — LLM에 이모지 해석을 매번 추론시키면 재현되지 않는다. 두 요구를 모두 만족하는 지점이 **"모호성은 고정 데이터로, 해석 선택은 당사자 합의로"** 다. 이 형태는 KEY 2(합의된 개인화)와도 같은 논리다 | Tasks, 발표, Architecture | Active |
+| 72 | **(v2.4) 공휴일 하드코딩 대상에 일본 2026년 공휴일을 추가해 5개국(한국·일본·미국·영국·중국)으로 한다. 영국은 제거하지 않는다.** 일본 추가분은 **신규 AC-057**이 관장하며 **AC-048 문구는 수정하지 않는다** | 새 데모 시나리오가 한국·일본·미국 3사라 **일본이 빠져 있으면 시나리오상 공휴일 경고를 시연할 수 없다.** **영국을 제거하지 않는 이유**: AC-048은 이미 승인된 판정 조건이고, 대상국 목록을 고쳐 쓰는 것은 **승인된 AC의 조건 변경**에 해당한다. 제거해서 아끼는 것은 공휴일 수십 건의 데이터 입력뿐인 반면, 잃는 것은 승인 AC의 안정성과 기존 회귀 판정의 의미다. **비용 증가는 P2(T53)에 국한**되며 P0·P1을 건드리지 않는다 | Tasks | **Superseded by #74 (2026-08-04)** — 사용자가 "영국 제거 + 일본 추가(4개국 유지)"로 결정했다. 결정 원문은 이력 보존을 위해 남긴다 |
+| 73 | **(v2.4) 시연 순서를 C6 → C3(COMPARE-01) → C2 → C4 → C1로 바꾼다(임팩트 우선).** 여기에 **훅·층 1 오버레이·마무리 장면을 유지**해 전체 8장면으로 구성하고, `docs/DemoScript.md`를 v2.0으로 통째로 갱신한다. **총 시간은 어느 값도 확정하지 않고 "가정치"로 표기한다**(Open Question #8 — 주최 측 발표 시간 미확인). **절대 유지 장면**: C6(KEY 3 하이라이트) · C2 긴급도 보존 + 한국어 어미 3단 비교(KEY 1의 유일한 실연). **시간 부족 시 제거 순서**: ① C1 → ② COMPARE-01 → ③ C4 → ④ 층 1 | 새 순서는 **Planning Decision #47(C6를 데모 하이라이트로 격상)과 정합**하고, 가장 참신한 장면을 먼저 보여주는 것이 심사 집중도에 유리하다. **다만 제공된 순서를 그대로 쓰지 않고 층 1·한국어 어미 장면을 되살린 이유**: 층 1은 Decision #61의 차별화 근거(구조적 플랫폼 독립)이고 한국어 어미는 KEY 1의 유일한 실연이라, 둘이 빠지면 발표 KEY 1·KEY 3의 실물 증거가 사라진다. **총 시간을 확정하지 않는 이유**: 배정 시간이 확인되지 않은 상태에서 숫자를 확정하면 근거 없는 일정이 된다(Decision #34와 동일 원칙) | 발표, Tasks | **Superseded by #78 (2026-08-04)** — 사용자가 C3를 뒤로 보내는 순서(C6→C2→C4→C3→C1)로 결정했다. 절대 유지 장면·가정치 표기 원칙은 #78이 그대로 승계한다 |
+| 74 | **(v2.4, 사용자 결정 — #72를 대체) 공휴일 하드코딩 대상을 한국·미국·**일본**·중국 4개국으로 한다. 영국을 제거하고 일본을 넣는다**(국가 수 불변 = 작성 비용 증가 없음). **AC-048 원문은 수정하지 않고**(승인 AC 문구 보존) "영국 요구는 AC-057로 대체됨"이라는 **주석만** 덧붙이며, 운용 조건은 **AC-057**이 관장한다 | 사용자 결정. planner의 #72 권고(영국 유지 + 일본 추가 = 5개국)를 사용자가 뒤집었다. 근거: 데모 시나리오가 한국·일본·미국 3사이고 **영국은 시나리오·대본·시드 어디에도 등장하지 않는다.** 4→5개국은 데이터 입력이 늘지만 4개국 유지는 늘지 않는다. **AC 문구 처리 방식은 Planning Decision #53의 선례를 따른다**(AC-006을 고쳐 쓰지 않고 주석 + 별도 AC로 분리한 방식) — 승인된 AC의 문구를 재작성하면 기존 판정의 의미가 흔들리기 때문 | Tasks | Active |
+| 75 | **(v2.4, 사용자 결정 ①의 시드 배치 판정 — planner 재량분) diff 히스토리 10건은 10건 모두 `박지훈의 C3 전역 diff 히스토리`로 유지하고, #24 쌍방 규약으로 "옮기는" 항목은 0건으로 한다.** 대신 **타나카·Michael의 규약 2건을 별도 데이터로 새로 만든다**(옮기기가 아니라 파생). Sarah는 규약 없음(cold start). **Planning Decision #35(사용자 단위 카운팅)와 OQ#18의 기각 결론은 그대로 유효하며 수신자별 카운팅으로 되돌리지 않는다.** <br>**서술 금지 문구(발표·문서 공통)**: "타나카에게 3번 고쳐서 반영됐다" — **금지.** 3회는 **전역 카운트**다. 올바른 서술은 "이 패턴이 전체 발송에서 3번 나타나 반영됐다"이며, 세 건이 우연히 같은 상대에게 간 것은 **카운팅 근거가 아니다.** | **옮기지 않은 이유**: AC-012가 정의하는 diff는 "AI 제안문 vs 사용자 최종 발송문"의 **관찰 기록**이고, #24 규약은 **당사자가 합의해 입력한 값**이다 — 생성 주체가 다르므로 관찰 기록을 합의값으로 옮기면 두 데이터의 정의가 무너지고, KEY 2("추론 vs 합의")의 구분선 자체가 흐려진다. **파생이 오히려 이득인 지점**: 이렇게 두면 전역 프로필은 "완충 삽입"(전역 3회)을 학습하는데 Michael 규약은 "직설 허용=예"라서, **AC-037의 '충돌 시 규약 우선'이 데모에서 실제로 관측된다.** 즉 명세가 화면으로 증명된다. **컷 안전성**: 규약이 별도 데이터이므로 #24가 컷돼도 C3 시드 10건과 학습 전/후 데모는 그대로 살아남는다(사용자 결정 ①의 목적과 일치). ⚠️ 이 배치는 **planner 판단**이며, 사용자가 "옮기기"를 원하면 되돌릴 수 있다 | Tasks, 발표 | Active |
+| 76 | **(v2.4, 사용자 결정 ①-C) C3 전용 데모를 신설한다 — 발신자(박지훈) 1인의 "학습 전 / 학습 후" 2상태 비교.** 수신자를 바꾸지 않고 **같은 사람의 프로필 상태만** 바꿔 보여주므로 **Planning Decision #35(사용자 단위 카운팅)와 정확히 일치**하며 **P2 의존이 없다.** 시드·장면 준비는 T61(P1)에 포함하고, COMPARE-01(T62, P2)과 **분리**한다 | #24가 컷되면 KEY 2의 실물 증거가 통째로 사라지는 구조였다(Risks). C3 전용 데모는 **컷 안전한 KEY 2 근거**를 하나 확보한다. 아울러 **"수신자별 출력 차이의 명세상 근거는 셋뿐"** 이라는 사실을 문서에 고정한다 — **① 언어쌍(P0) ② 수신자 타임존 ③ #24 규약(P2)**. 그래서 타나카(일본어)와 Michael(영어)은 **언어쌍만으로 이미 갈리지만**, **Michael과 Sarah(둘 다 영어권)는 #24 없이는 갈리지 않는다.** 이 사실을 대본에 명시해 발표 중 "그건 그냥 번역 언어가 달라서 아닌가요"라는 반박에 대비한다 | 발표, Tasks, UX | Active |
+| 77 | **(v2.4, 사용자 결정 ②) 이모지 판정 데이터는 "국가별 의미" 열을 버리고 위험도 3단계 고정 룩업만 유지한다** — **높음: 🙏 ❤️ 💦 / 중간: 👍 😂 🔥 😅 / 낮음: 😊 ✅ 🆗**. 경고 문구는 **"이 이모지는 해석이 갈릴 수 있습니다 — 상대와 합의된 규칙이 없습니다"** 형태로 고정한다. AC-056을 이 형태로 갱신한다(같은 v2.4 배치 내 갱신) | **Decision #6·#50과의 정합**: "해석이 갈릴 수 있다"는 **검증 가능한 사실 진술**이며 국민성 서술이 아니다 — 국가·지역·국적을 언급하지 않고, 특정 해석이 옳다고 단정하지도 않는다. 반면 "일본에서 🙏는 사과"는 국가 단위 일반화라 #6 위반이다. **고정 룩업을 유지한 이유**: 이모지 위험도를 LLM에 매번 추론시키면 결과가 재현되지 않는다는 사용자 지적이 타당하다 — 안정성은 3단계 룩업으로 확보하고, "무엇이 옳은 해석인가"의 판단만 당사자 합의(#24)로 넘긴다. ⚠️ **3단계 위험도 배정 자체는 측정된 것이 아니라 판단(추정)** 이다 — 문서에 등급으로 표시하고 발표에서 "조사 결과"로 말하지 않는다 | Architecture, Tasks, 발표 | Active |
+| 78 | **(v2.4, 사용자 결정 ④ — #73을 대체) 시연 순서를 C6 → C2 → C4 → C3 → C1로 한다**(원안에서 **C3만 뒤로** 이동). 훅·층 1·마무리 장면은 그대로 유지하고 `docs/DemoScript.md`를 이 순서로 갱신한다. **총 시간은 "가정치" 표기를 유지한다**(Open Question #8 미해결) | 사용자 결정. 근거: **C3 장면은 #24 컷에 흔들릴 수 있으므로 흔들릴 수 있는 것을 뒤에 둔다** — 시간이 부족하면 뒤에서부터 잘리므로 앞의 확정 장면(C6·C2·C4)이 자연히 보호된다. **단 제거는 위치가 아니라 고정 목록을 따른다**(DemoScript.md) — 층 1은 위치상 마지막이지만 KEY 3의 구조적 근거라 C1·COMPARE-01·C4보다 나중에 제거한다. 절대 유지: **C6(KEY 3 하이라이트) · C2 + 한국어 어미(KEY 1의 유일한 실연)** | 발표, Tasks | Active |
+| 79 | **(v2.4, 사용자 결정 — Open Question #21·#24 동시 해소) #24 쌍방 규약은 P2를 유지하고 P1으로 승격하지 않는다**(Planning Decision #26 불변). **대신 P2 내부 유지 순위에서 T41·T42를 1순위로 올린다** — 갱신 후 순위: **① T41·T42 규약 → ②(직후) T62 COMPARE-01 → ③ T53·T54 공휴일 → ④ T39·T40 기한 협상 → ⑤ T50~T52 침묵 감지 → ⑥ 나머지.** **COMPARE-01은 조건부 장면으로 유지**하고, 컷 시 대체는 DemoScript.md에 고정된 목록을 따른다. **Planning Decision #52는 수정하지 않으며 본 항목이 그 순서를 갱신한다** | 사용자 결정(권고안 채택). P1 승격은 Decision #26을 뒤집고 C3(T19~T21)와 M2 자원을 다시 경합시키는 반면, **P2 내부 순서 조정은 #52가 이미 정한 범위 안**이라 확정 결정을 건드리지 않는다. T62를 T41·T42 바로 뒤에 붙이는 이유는 **규약이 살아남았는데 장면 준비가 안 돼 못 쓰는 상황을 막기 위함**이다(T62는 T41·T42 없이는 의미가 없다). 아울러 Decision #76(C3 전용 데모)이 컷 안전한 KEY 2 근거를 별도로 확보하므로, #24가 결국 컷되더라도 발표 축이 통째로 무너지지는 않는다 | Tasks, 발표 | Active |
 
 ## Assumptions
-- {{...}}
+- 심사·발표 환경에서 인터넷 접속이 가능하다(always-online 전제, 오프라인 동작 요구 없음).
+- 팀은 OpenAI API 계정과 Supabase 프로젝트를 생성할 권한을 가진다(크레딧 확보 여부는 Open Questions #3).
+- Supabase 무료 티어가 MVP 데이터 규모(수천 건)를 감당한다 — 미검증.
+- 데모 데이터는 팀이 직접 시드한다. 단 v2.0부터 **간단 로그인이 MVP에 포함**되므로(OQ#4) 계정은 시드가 아니라 실제 가입·로그인으로 생성된다.
+- 팀 4명(백엔드 2, 프론트 1, 디자인 1)이 2026-08-04~08-21 기간에 가용하다.
+- 한국어↔영어 LLM 품질이 별도 파인튜닝 없이 프롬프트 수준에서 충분하다 — 미검증(T5/T7/T10에서 조기 확인 필요).
+- **"글로벌 협업에서 불만·긴급성 표현이 어렵다"가 실제 페인포인트다 — 미검증.** 제품 전체가 이 가정 위에 서 있다. 검증 수단: T38 인터뷰 3~5명(P2). 검증 전까지 발표·문서에서 확인된 사실로 서술하지 않는다.
+- **(v2.2) LLM이 EN→KO 변환에서 종결어미 레벨(합쇼체/해요체)을 혼용한다 — 추정.** 실제 혼용 빈도는 아무도 측정하지 않았다. M1 첫날 KO↔EN 품질 스팟체크에서 함께 측정한다(docs/Tasks.md 착수 전 확인 항목).
+- **(v2.2) 결정 권한 표현의 차이("위에 보고 후 답변드리겠습니다" vs "I'll take care of it")가 실제 오해를 만든다 — 추정.** 오케스트레이터의 관찰이며 측정된 사실이 아니다. 검증 수단: T38 인터뷰 AC-035(d). 검증 전까지 발표에서 사실로 단정하지 않는다.
+- **(v2.2) 주요 4개국(한국·미국·영국·중국)의 2026년 공휴일을 하드코딩하면 데모·MVP 범위에 충분하다 — 추정.** 데이터 정확성은 팀이 공식 출처와 대조해 확인해야 한다(docs/Tasks.md 미검증 항목).
+- **(v2.2) Gmail 작성창의 DOM 삽입 난이도 — 미검증.** Gmail DOM은 복잡하고 변경이 잦은 편이라는 통설이 있으나 이번 세션에서 확인하지 않았다(추정). 실제 난이도는 T49 착수 후에야 알 수 있다.
+- **(v2.4) `mouseup` + `window.getSelection()` 기반 선택 오버레이가 주요 웹 협업툴에서 동작한다 — 미검증(추정).** SPA·iframe·Shadow DOM·CSP 때문에 선택 이벤트를 못 받거나 패널이 렌더링되지 않을 수 있다. "DeepL 번역 확장이 같은 패턴을 쓴다"는 것은 **사용자 진술(cited)** 이며 확인하지 않았다. 확인 수단: T55 착수 첫 1시간 스파이크(층 2 없는 사이트 2곳).
+- **(v2.4) 층 1이 층 2보다 싸다 — 추정.** 사이트별 DOM 대응이 사라지는 대신 좌표 계산·이벤트 충돌·스타일 격리(Shadow DOM 등)라는 새 비용이 생긴다. 실제 비용은 T55 스파이크 전에는 알 수 없다.
+- **(v2.4) EU AI Act Article 5(1)(f)의 금지가 텍스트 기반 추론에는 미치지 않는다 — 회색지대, 법률 자문 없음.** measured인 것은 조문·발효일·과징금 상한과 유럽집행위원회의 생체 데이터 한정 해석의 **존재**까지이며, 우리 제품에 대한 적용 결론은 **오케스트레이터의 판단(추정)** 이다. 발표·문서에서 "안전하다"고 단정하지 않는다.
+- **(v2.4) 중국 본토 네트워크에서 우리 웹앱·OpenAI API에 접근할 수 있는지 — 미검증.** 접근 불가라면 DingTalk·WeCom·Feishu(점유율 합계 92%, measured)는 층 1로도 커버되지 않는다. 확인 수단 없음(현지 검증 불가) — 발표에서는 "커버 못 한다"를 기본 서술로 쓴다.
+- 데모·시연 데이터에 사내 기밀이 포함되지 않으므로 외부 LLM API 전송이 이번 범위에서는 문제되지 않는다 — 실사용 단계에서는 성립하지 않는 가정(Risks의 GDPR 행 참조).
 
 ## Constraints
-- {{...}}
+- 마감 2026-08-21 (기준일 2026-08-04, 17일). 일정: 8/4~8/6 스펙 확정 → 8/7~8/11 Core 1차(C1·C2·C4) → 8/12~8/15 Core 2차(C3·C5·C6·C7)+프론트 연동 → 8/16~8/18 통합·권장기능 → 8/19~8/20 안정화·리허설 → 8/21 제출.
+- 팀 4명, 역할 고정: 백엔드 A(C1·C2·C5 + 프롬프트 설계), 백엔드 B(C3·C4·C6·C7 + 스토리지 스키마), 프론트(어댑터·UI), 디자인(비교 UX·온보딩 설문·발표 자료).
+- 코어 엔진과 플랫폼 어댑터를 분리하고, 표준 입력 인터페이스 `{ text, sender, recipient, context }`를 사용한다. 어댑터 개발 순서: 웹앱 → Chrome 확장.
+- 처리 플로우 고정: 작성 → C1 분류 → (CRITICAL이면 즉시) → C3 프로필 조회 → C5 주입 → C2 변환 → C4 역번역 검증 → (감정형이면 C6 옵션) → 사용자 승인 → 전송 + diff 저장.
+- OpenAI API 키는 반드시 백엔드 경유. 프론트엔드 노출 금지.
+- 저장소는 Supabase(프로필, diff 히스토리, 용어사전).
+- 기술 스택 팀 선호: Next.js(TypeScript) 통합 — **최종 결정은 architect 몫**.
+- `.env` 직접 접근은 훅(`.claude/hooks/block-env-access.js`)으로 차단됨. `OPENAI_API_KEY`, Supabase URL/키는 `.env.example`에 플레이스홀더로만 기재.
+- 상세 기술 설계(프레임워크 확정, DB 스키마, API 설계, 호스팅, 인증 방식)는 architect의 영역이며 본 문서에서 결정하지 않는다.
 
 ## Risks
 | Risk | Impact | Mitigation |
 |---|---|---|
-| {{...}} | {{...}} | {{...}} |
+| 톤 순화로 긴급성·핵심 요구가 희석됨 (PS-005) — 예: "프로덕션 3일째 다운" → "시간 되실 때 봐주세요". 순화 자체가 역효과를 내는 구조적 리스크 | 도구가 사고 원인이 됨. 발표 최대 공격 지점 | C2 보존 필터를 먼저 적용(보존 대상 추출 → 톤 변환), 굵게/요약 라인 표시, AC-006 10건 회귀 확인. CRITICAL은 톤 정제만 적용(AC-005) |
+| C1 긴급도 오분류 | CRITICAL을 LOW로 판정해 실제 장애 대응 지연 | override 버튼 + human-in-the-loop 승인. 판단 근거를 항상 노출해 사용자가 검증 가능하게 함 |
+| 문화 프로파일링이 스테레오타입 강화로 비판받음. 나아가 개인의 커뮤니케이션 성향을 저장·학습하는 것 자체가 **HR/법무 관점의 개인 프로파일링 이슈**(인사 평가 전용 우려, 근로자 동의 요건)로 번질 수 있음 | 제품 정당성이 무너지고, B2B 도입 시 법무 검토에서 막힘 | 국가 기반 규칙 미사용. 자기신고 + 본인 diff 패턴만 사용, 프로필 열람·수정·삭제 제공(AC-014). 프로필은 본인 소유이며 관리자에게 노출하지 않는다는 원칙을 발표에서 명시 |
+| 잘못된 패턴을 프로필에 학습 | 개인화가 오히려 품질을 떨어뜨림 | 동일 패턴 3회 이상에서만 반영 + 사용자가 프로필 수정·삭제 가능 |
+| 기능 과다로 마감 내 미완 | 제출 실패 | 8/18 컷라인(Planning Decision #1), P0 5기능 우선, C4부터 착수 |
+| Chrome 확장 플랫폼 이슈(권한·CSP·DOM 변경) | 시연 불가 | 웹앱을 기본 데모 경로로 유지(백업 필수). 확장은 P1 |
+| LLM 응답 지연·실패·비용 초과 | 시연 중 화면이 멈춤, 크레딧 소진 | 타임아웃·재시도·폴백 UI(AC-029), 데모 시나리오 응답 캐시 검토, 크레딧 한도 사전 확인 |
+| 역번역 오차를 "검증"으로 오해 | 과장 주장으로 신뢰 상실 | "1차 안전장치"로만 포지셔닝, 화면에 한계 문구 상시 표시(AC-002) |
+| 기존 번역기와의 차별점 설명 실패 | 심사에서 "번역기 아니냐"로 정리됨 | 차별점 2축 고정: (1) 관계 데이터 학습 기반 개인화, (2) 감정·긴급성 보존 구조화 |
+| 개인정보·내부정보 유출. **업무 메시지에는 사내 기밀이 포함되며 이를 외부 LLM API(OpenAI)로 전송하는 구조** — GDPR 등 데이터 국외 이전·처리 근거 문제로 직결 | 법적·윤리 리스크. B2B 도입의 최대 장벽(보안팀이 먼저 막음) | MVP: 합성 데이터만 사용(Planning Decision #11), 키는 백엔드 보관. 발표: "전송 데이터 최소화 / 학습 비활용 옵션 / 온프레미스·리전 격리"를 로드맵으로 제시하고, 현재는 미구현임을 과장 없이 명시 |
+| **레드오션** — 문화 맥락 톤 조정은 이미 **실제 출시된 제품**이 점유. Tonero(확장·6종 톤), checktone.app(Slack 발송 전 톤 분석), Slack AI(톤 재작성 + 결정사항 자동 기록) 모두 **(measured, 2026-08-04)**. Personos는 포지션만 확인(부분 검증) | "이미 있는 것 아닌가"로 정리되어 심사 점수 하락 | "세상에 없는 아이디어" 프레이밍 금지. "왜 우리 것이 다른가"로만 답한다(Differentiation 섹션 0)~5) 표 사용). 킬러 질문 3개의 답변 축을 사전 고정(Planning Decision #44) |
+| ~~(v2.1) KEY 2 서술과 C3 실제 명세의 불일치~~ → **해소 (v2.3, 2026-08-04)** | (해소 전 영향) 문서 대조 시 차별화 KEY 2가 근거 없는 주장이 됨 | **해소됨**: KEY 2를 "추론된 개인화 vs 합의된 개인화"로 재서술하고 근거를 #24(AC-037) + C3 조합으로 교체. 불일치 문구 2종("C3가 수신자별로 학습한다", "C3가 수신자의 수용 방식을 학습한다")은 **전면 폐기**. 정합 대조표는 Differentiation 3-2, 근거는 Planning Decision #58 |
+| **(v2.3) KEY 2의 수신자 축 근거(#24 쌍방 규약)가 P2** — 8/18 컷 대상이며, 컷되면 KEY 2는 발신자 전역 기본값(C3)만 남아 **Superhuman과 차별화되지 않는다**(measured) | 기능 1건의 컷이 **발표 차별화 축 1개를 무너뜨린다** | **Open Question #21**로 사용자 결정 대기(권고: P2 유지 + P2 내부 유지 순위를 1순위로 상향). 컷이 확정될 경우의 **대비책을 미리 고정**: KEY 2를 로드맵으로 강등하고 발표 축을 KEY 1·KEY 3으로 이동 |
+| **(v2.4) 발표 데모 장면 COMPARE-01(동일 원문 → 3인 다른 출력)이 P2 기능(#24 쌍방 규약)에 의존** — C3는 사용자 전역 기본값이라 3인이 달라질 근거가 되지 못한다(Differentiation 3-2에서 이미 확인된 사실) | **#24가 컷되면 발표 차별화 KEY 2와 데모 장면이 동시에 사라진다.** 시드 데이터(프로필 4인·규약)도 함께 무용해진다 | ① **COMPARE-01을 "조건부 장면"으로 설계**하고 대체 장면(장면 4 — 한국어 어미 3단 비교)을 DemoScript.md에 미리 고정한다(Planning Decision #70·#73). ② **(2026-08-04 해소)** OQ#21·#24 결정 — **P1 승격 없음, P2 내부 유지 순위 1순위로 상향**(Planning Decision #79). ③ 시드 구축 태스크를 **P1(T61, 규약 무관 부분)과 P2(T62, 규약 시드)로 분리**해, #24가 컷돼도 T61 산출물은 살아남게 한다. ④ **가장 큰 완충 — C3 전용 데모 신설**(Planning Decision #76): 발신자 1인의 "학습 전/후" 2상태 비교는 **#24 의존이 없어** 컷돼도 KEY 2의 실물 증거가 하나 남는다 |
+| **(v2.1) 오해 사전 경고가 P0 경로에 얹힘** — C2(T10·T11·T12)·C4는 모두 P0이므로 P0 작업량이 증가한다 | Core 1차(M1, 8/7~8/11) 지연 → 8/18 컷라인 압박 가중 | 신규 MVP 행·신규 태스크를 만들지 않고 기존 태스크의 출력 확장으로만 흡수(Planning Decision #49). 추가 LLM 호출 없이 기존 C2 호출 안에서 함께 산출하는 것을 권고(NFR 5초 체감·크레딧 제약 #29). **컷 대상 포함 여부는 Open Question #17** |
+| **기술 해자 부재** — LLM 톤 순화 프롬프트로 90% 해결됨 | "ChatGPT로 되는데요?" 질문에 무너짐 | 차별화를 제품화 요소(비교·승인 UX, diff 학습, 용어사전, 어댑터, 보존 필터)로 고정해 답변. 모델·프롬프트를 차별점으로 주장하지 않는다 |
+| **범위 확대 3건이 동시에 얹힘(v2.0)** — #27 실사용자 확장 고려 + #30 로그인 MVP 포함 + #33 어댑터 2종(GitHub·Slack). 셋 다 8/18 Core 컷라인 이전의 리소스를 소비 | Core(C1~C7) 완주 확률 저하 → 가장 비싼 실패(제출 불가) | **컷 순서를 사전 확정**(Planning Decision #42): ① P2 전체 → ② Slack 어댑터 → ③ 로그인 고도화 → ④ 실사용자 확장 여분. Core·GitHub 어댑터·웹앱 배포는 컷 대상 아님. 인증은 P1로 묶어 Core 1차(C1·C2·C4)를 침범하지 않게 함(Decision #43). 8/15·8/18 두 시점에 진척을 점검해 컷 여부를 판단 |
+| LLM 크레딧 소진·rate limit(잔액 미확인 상태) | 발표 중 전 기능 정지 | 캐싱·요청 상한·데모 응답 폴백을 P0 요구사항으로 승격(AC-041, T4·T16). 폴백 사용 중임을 화면에 표시해 결과를 오인하지 않게 함 |
+| **핵심 페인포인트 미검증** — "글로벌 협업 불만 표현이 어렵다"가 실제 지불 의사로 이어지는지 확인된 바 없음 | 잘 만든 제품이 아무도 원하지 않는 문제를 풀 수 있음 | 다국적 협업 경험자 3~5명 인터뷰(T38, P2). 검증 전까지 발표에서 이 전제를 "확인된 사실"로 말하지 않는다 |
+| 초기 개인화 정보 부족(콜드 스타트) | C3 효과가 데모에서 보이지 않음 | 온보딩 3~5문항으로 초기값 확보 + 데모용 diff 히스토리 시드 |
+| 백엔드 A/B의 I/O 스키마 불일치 | 통합 단계에서 재작업 | 스키마 합의를 **첫 태스크(T1)**로 고정 |
+| 발표 당일 배포 사고 | 시연 불가 | 발표 당일 배포 금지, 8/20까지 배포 동결 + 10분 내 롤백 가능 상태 유지 |
+| **(v2.2) Gmail 어댑터의 DOM 삽입 난이도 미검증** — Gmail 작성창은 구조가 복잡하고 변경이 잦다는 통설이 있으나 확인하지 않았다(추정). GitHub·Slack 대비 몇 배가 들지 알 수 없다 | 어댑터 3종 중 가장 비싼 것이 마지막에 드러나 M3 일정이 무너질 수 있음 | T49 착수 **첫 1시간을 스파이크로 고정**해 삽입 가능 여부만 먼저 확인하고, 불가 판정 시 즉시 중단해 GitHub·Slack에 자원을 되돌린다. 컷 순서상의 위치는 **Open Question #19**로 사용자 결정 대기 |
+| **(v2.2) 어댑터가 3종(GitHub·Slack·Gmail)으로 늘어 P1 프론트 작업량이 다시 증가** — 프론트 담당 1명 | Core 2차(M2)·통합(M3)이 프론트 병목으로 지연 | 어댑터 코드 구조를 T29에서 **대상 사이트별 DOM 선택자만 분리**하는 형태로 고정(T47·T49가 재사용). 컷 순서 결정 전까지 Gmail은 **잠정적으로 Slack 다음**에 둔다(Planning Decision #55, OQ#19) |
+| **(v2.2) 침묵 감지의 오탐** — 수동 마킹을 잊으면 답장을 받은 건도 "무응답"으로 계산되고, 상대국 연휴 중이면 정상 상황이 경고로 뜬다 | 사용자가 경고를 신뢰하지 않게 되어 기능이 무시됨 | 업무일 계산에서 주말 + AC-048 공휴일을 제외(오탐 감소), 경고는 **제안 형태로만** 표시하고 자동 발송하지 않음(AC-044 ④), 리마인드 승인 화면에서 "이미 답장 받음"으로 정정 가능 |
+| **(v2.4) 층 1의 권한 범위가 `all_urls` 수준으로 넓어짐** — 사용자가 선택한 텍스트를 **모든 사이트에서** 읽을 수 있는 구조가 된다 | 프라이버시 우려로 설치가 거부될 수 있고, Chrome 웹스토어 심사가 더 까다로워진다(추정) | **프라이버시 고지를 MVP 요구사항으로 고정**(AC-054, T58): 선택한 텍스트만 전송·페이지 전체를 읽지 않음·전송 대상 명시. manifest 권한을 최소 범위로 1회 검토하고 기록. **조건부 완화**: MVP는 웹스토어 정식 등록을 하지 않기로 이미 확정되어 있어(Planning Decision #4, 개발자 모드 로드) **심사 리스크는 마감 17일 안에서는 차단 요인이 아니다**. 단 정식 등록 방침으로 바뀌면 즉시 차단 요인으로 전환되며 #4의 마감 재산정 조건이 발동한다(Planning Decision #64) |
+| **(v2.4) 층 1이 대상 사이트에서 실제로 동작하지 않을 위험** — SPA·iframe·Shadow DOM·CSP로 선택 이벤트 수신 또는 패널 렌더가 실패할 수 있다(**미검증·추정**) | 층 1을 "컷 대상 아님"으로 둔 판단(Decision #62)의 전제가 무너지고, 어댑터 전략 전체를 다시 짜야 한다 | **T55 착수 첫 1시간을 스파이크로 고정** — 층 2가 없는 사이트 2곳에서 선택 이벤트 수신과 패널 렌더만 먼저 확인하고, 실패하면 **즉시 중단·보고**한다(T49 Gmail 스파이크와 동일한 방식). 실패 시 폴백은 "확장 팝업에 직접 붙여넣기"이며, 그 경우 Decision #61의 근거 ④(UX 개선)가 약해짐을 발표 문구에 반영한다 |
+| **(v2.4) 층 1 신설로 프론트(1명) 작업량이 순증** — T55~T58 4건이 M3 앞단에 추가된다 | M3(8/16~8/18) 병목 심화 → 8/18 컷라인 압박 가중 | **상쇄 수단이 같은 결정 안에 있다** — 층 2(T29·T47·T49) 3건이 전부 **컷 가능 항목으로 재분류**되었고(Decision #62), 각 태스크의 범위도 "DOM 선택자 + 삽입"으로 축소됐다(호출·패널은 층 1이 소유). 즉 **하한선은 층 1 4건이며 층 2는 시간이 남는 만큼만** 한다. P0는 늘지 않는다(Decision #63) |
+| **(v2.4) EU AI Act Article 5(1)(f) — 직장·교육기관 내 감정 추론 AI 금지.** 2025-02-02 발효, EU 내 운영 고용주에게 **본사 소재지와 무관하게** 적용, 위반 시 **전 세계 연매출 최대 7%** 과징금, 의료·안전 목적은 예외 (**measured** 2026-08-04 — fpf.org / legalblogs.wolterskluwer.com) | R4 답장 감정 분류(AC-025), C6의 [우려 수준] 메타 정보(AC-018), 스트레치 "팀 마찰 리포트"가 사정권에 든다. EU 고객 대상 상용화 시 법적 리스크 | **완화 요인(measured)**: 유럽집행위원회는 이 금지를 **생체 데이터(biometric) 기반 추론으로 한정 해석**했고 우리는 **텍스트에서 추론**하므로 금지 대상을 벗어날 가능성이 높다. **단 회색지대이며 법률 자문을 받지 않았다 — "안전하다"고 단정 금지.** 조치: ① **R4는 유지**하되 텍스트 기반 근거를 문서화(Decision #66), ② AC-018의 [우려 수준]은 **관리자에게 노출되지 않고 발신자 본인에게만** 보이는 현 설계를 유지(Risks 프로파일링 행과 동일 방어선), ③ **"팀 마찰 리포트"는 스트레치에서도 EU 판매를 전제하지 않는다**(Out of Scope 표), ④ T37 Q&A에 답변 축 추가(확정적 안전 주장 금지) |
+| **(v2.4) 중국 협업툴 3사(DingTalk 32.7%·WeCom 23.4%·Feishu 18.9%, 합계 92% — measured)를 브라우저 확장으로도 커버할 수 없다** | "글로벌 크로스보더"를 표방하면서 중국 시장이 통째로 빠진다 — 발표에서 지적당하면 지형도 슬라이드 자체가 역공 재료가 된다 | **먼저 말한다.** T37 ⑧에 "중국은 커버하지 못한다"를 명시 항목으로 넣고, 이유(네트워크 단절 — 미검증 / 데스크톱 전용 클라이언트 — 추정)를 등급과 함께 말한다. 커버 가능한 것처럼 보이게 하는 서술은 AC-034 위반이다. 로드맵에서도 중국은 "별도 검토 필요"로만 둔다 |
+| **(v2.2) 한국어 특화 축이 "문화 고정관념"으로 읽힐 위험** | Planning Decision #6·문화 프로파일링 리스크와 충돌해 발표에서 역공을 받음 | 프레이밍을 **언어 구조적 사실**로 고정(Planning Decision #50). 국가·국민성 서술 금지, 개인 프로필과 무관하게 **언어쌍 규칙**으로만 적용. 근거는 AC-045·046·047의 테스트 결과 수치로 제시 |
 
 ## Open Questions
-Every open question carries planner's recommendation — a bare question stalls the user, a recommendation lets them confirm in one word or redirect in one sentence. Foundational choices (target platform, target users and scale, delivery channel, connectivity requirement, monetization posture, first-release scope) always appear here rather than being silently defaulted; the user answers them at the PRD approval gate. A row's Status is `open` until the user decides, then `answered` with the outcome recorded in the Decision column.
 
 | # | Question | Recommendation | Reason | If decided otherwise | Status | Decision |
 |---|---|---|---|---|---|---|
-| 1 | {{unresolved requirement}} | {{planner's suggested answer}} | {{one line — why this is the recommendation}} | {{what changes downstream if the user picks differently}} | open | |
+| 1 | 대상 사용자 규모 — 심사·발표 시연 전용인가, 발표 후 실사용자를 받을 계획인가? | 심사·발표 시연 + 팀 내부 사용 수준으로 한정 | 17일 안에 실사용자 대응(인증·권한·데이터 보호)까지 넣으면 Core가 무너짐 | 실사용자를 받는다면 인증·데이터 격리·이용약관이 MVP에 추가되어 P1 기능 일부를 잘라야 함 | **resolved 2026-08-04** | **권고안 미채택** — 심사 데모 전용이 아니라 **실사용자 확장을 고려**한다. 향후 실배포 가능성을 전제로 설계하며, 그 직접적 귀결로 #4 인증이 MVP에 포함됨. 일정 압박은 Risks 신규 행 + Planning Decision #42 컷 순서로 관리 |
+| 2 | 웹앱 공개 URL을 위한 호스팅 계정/도메인을 팀이 이미 보유하고 있는가? | 보유한 무료 호스팅 계정 + 기본 제공 서브도메인으로 진행(커스텀 도메인 미구매) | 도메인 구매·DNS 전파는 리드타임이 있고 데모에 필수 요소가 아님 | 커스텀 도메인이 필요하면 8/6까지 구매·연결 태스크를 추가해야 함 | **resolved 2026-08-04** | **권고안 채택** — 무료 호스팅의 기본 제공 서브도메인 사용, 커스텀 도메인 미구매 |
+| 3 | OpenAI API 유료 크레딧이 확보되어 있는가? 팀 예산 한도는? | 8/6까지 크레딧 잔액과 상한을 확인하고, 데모 시나리오 응답을 캐시해 발표 중 호출을 최소화 | 무료/저잔액 상태에서 rate limit이나 잔액 소진이 발표 중에 터지면 복구 수단이 없음 | 크레딧이 부족하면 모델을 저비용 등급으로 낮추거나 캐시 기반 시연으로 전환해야 함(품질 영향) | **resolved 2026-08-04 (설계 방침만 확정, 잔액 수치는 여전히 미검증)** — 잔액을 확인하지 못했으므로 **"제한적"이라고 가정하고 설계**한다: 응답 캐싱 + 요청 횟수 제한 + 실패/소진 시 사전 준비된 데모 응답 폴백(T4·T16, AC-041). 실제 잔액 숫자는 Tasks.md 미검증 항목 표에 유지 |
+| 4 | 로그인/인증을 MVP에 포함하는가? | 미포함. 데모용 고정 사용자 2명(발신자·수신자)을 시드해 사용 | 2패널 시연에 계정 전환이 필요 없고, 인증 구현은 Core 일정을 잠식함 | 인증을 포함하면 T18(스토리지) 이후에 인증 태스크가 추가되고 P1 기능 중 하나를 P2로 내려야 함 | **resolved 2026-08-04** | **권고안 미채택** — **간단 로그인을 MVP에 포함**한다(#1 실사용자 확장 결정의 귀결). MVP Scope #26, AC-039, T45·T46. Supabase Auth 활용 여부는 **architect 판단**. 우선순위는 **P1**(근거: Planning Decision #43) |
+| 5 | 오프라인/불안정 연결 지원이 필요한가? | 불필요(always-online 전제) | LLM 호출이 전제인 제품이라 오프라인 동작은 의미가 없음 | 오프라인이 필요하면 로컬 캐시·큐잉 설계가 추가되어 아키텍처 전면 변경 | **resolved 2026-08-04** | **권고안 채택** — 오프라인 지원 불필요, 상시 온라인 전제 |
+| 6 | 수익 모델(팀 좌석당 구독, $8~12/seat) 제안을 승인하는가? | 승인 후 발표 슬라이드에만 반영, 구현 없음 | 발표 Q&A 대비용이며 MVP 구현에는 영향이 없음 | 다른 모델(프리미엄/사용량)을 택하면 발표 자료 문구만 바뀜 | **resolved 2026-08-04** | **권고안 채택** — 팀 좌석당 구독 $8~12/seat 승인. 발표 자료에만 반영하며 결제 구현 없음. Monetization 섹션 Status를 `user-approved`로 갱신 |
+| 7 | Chrome 확장의 1차 대상 툴을 하나만 고른다면 GitHub인가 Slack인가? | GitHub(PR 코멘트 입력창) | DOM이 상대적으로 안정적이고 로그인 없이 시연 가능한 공개 저장소를 쓸 수 있음 | Slack을 택하면 워크스페이스 준비와 DOM 변동 리스크가 커져 P1 완료 확률이 떨어짐 | **resolved 2026-08-04** | **권고안 미채택** — **GitHub와 Slack 둘 다** 지원. 어댑터 태스크를 T29(GitHub) / T47(Slack)로 분리하고 둘 다 P1 유지. **8/18 컷라인 도달 시 GitHub 우선 완주, Slack은 남는 시간에**(Tasks Rules + Planning Decision #42) |
+| 8 | 제출물 형식·심사 기준(발표 시간, 데모 영상 필수 여부, 코드 제출 범위)은? | 데모 영상은 8/20에 백업용으로 촬영해 두는 것을 기본으로 함 | 현장 네트워크·API 장애 시 유일한 복구 수단 | 영상이 필수 제출물이면 8/19~8/20 일정에 편집 태스크를 추가해야 함 | **open, pending external verification (팀이 해커톤 주최 측에 직접 확인)** | 미해결 — 주최 측 제출 규칙을 아직 확인하지 못했다. **planner가 추측으로 닫을 수 없는 외부 사실**이므로 open 유지. 잠정 조치: 백업 데모 영상 촬영(T48)을 준비 작업으로 남기되 **필수 여부는 미정**으로 표기하고, 편집·제출 태스크는 규칙 확인 후에만 추가한다 |
+| 9 | C3의 "동일 패턴 3회" 카운팅 범위는 전체 발송 기준인가, 수신자별 기준인가? | 전체 발송 기준(사용자 단위) | MVP 데이터량에서 수신자별로 나누면 3회에 도달하지 못해 기능이 시연되지 않음 | 수신자별이면 diff 저장 스키마에 recipient 축이 추가되고 데모 시드 데이터가 늘어남 | **resolved 2026-08-04** | **권고안 채택** — 사용자 단위(전체 발송 기준) 카운팅 |
+| 10 | 데모의 기본 언어 방향은 KO→EN인가, 양방향 동시 시연인가? | KO→EN을 주 시나리오로, EN→KO는 짧은 보조 사례 1건 | 시연 시간 대비 전달력이 높고 2패널 구성이 단순해짐 | 양방향 동시 시연이면 UX가 복잡해져 디자인 태스크가 늘어남 | **resolved 2026-08-04** | **권고안 채택** — 한→영 주 시나리오 + 영→한 보조 사례 1건 |
+| 11 | 웹앱에는 실제 전송 대상이 없는데, "C1 CRITICAL 즉시 발송"과 "승인 후 전송"에서 **전송**은 무엇을 의미하는가? (클립보드 복사 / 모의 전송 로그 / 확장에서만 실제 삽입) | 웹앱에서는 "모의 전송(수신자 패널에 도착 + 전송 로그 기록)", 확장에서는 "입력창 삽입"으로 정의 | 2패널 데모의 효과가 전송 결과를 눈으로 보여주는 데서 나옴 | 실제 메신저 전송을 요구하면 외부 연동이 MVP에 들어와 Core 일정이 붕괴됨 | **resolved 2026-08-04** | **권고안 확장 채택** — 웹앱은 모의 전송(수신자 패널 도착 + 로그). **Chrome 확장은 승인된 텍스트를 대상 사이트(GitHub/Slack) 입력창에 실제로 자동 삽입**한다(DOM 삽입까지이며 외부 이메일·웹훅 발송은 아님). **전송 버튼 자동 클릭은 금지**하고 사용자가 직접 클릭한다(AC-040, human-in-the-loop 원칙 유지) |
+| 12 | Manyfast KPI(수정안 채택률 80%↑, 정보 보존율 95%↑, 작성 시간 30%↓, 만족도 80점↑, 재수정률 20%↓)를 MVP의 측정 대상으로 삼는가? | 정보 보존율만 AC-006으로 측정하고, 나머지는 발표에서 "향후 측정 지표"로 제시 | 17일 안에 사용자 표본이 없어 채택률·만족도는 측정 불가이며, 측정 없이 수치를 주장하면 근거 없는 성공 보고가 됨 | 전부 측정하겠다면 사용자 테스트 세션과 계측 태스크가 추가로 필요 | **resolved 2026-08-04** | **권고안 채택** — 정보 보존율만 AC-006으로 측정, 나머지는 "향후 측정 지표"로만 제시 |
+| 13 | 페인포인트 인터뷰(T38, P2)를 실제로 수행하는가? 수행한다면 인터뷰 대상 3~5명을 누가 섭외하는가? | 디자인 담당이 8/7~8/12 사이 3명만 진행(20~30분 각). 코드 일정과 병렬이라 Core를 잠식하지 않음 | 검증 결과가 없으면 발표에서 문제 정의를 "가정"으로만 말해야 하고, 심사의 "이게 진짜 문제인가" 질문에 답할 근거가 없다 | 수행하지 않기로 하면 T38을 삭제하지 말고 Status를 `todo` 유지 + 발표 자료에서 문제 정의를 가정으로 명시해야 함 | **resolved 2026-08-04** | **권고안 채택** — 수행 확정. 디자인 담당, 2026-08-07~08-12, 3명 |
+| 14 | 실사용 단계의 데이터 처리(사내 기밀의 외부 LLM 전송, GDPR)에 대해 발표에서 어느 수준까지 답할 것인가? | "현재 미구현"임을 명확히 하고 로드맵(전송 최소화 / 학습 비활용 / 리전 격리) 3줄로만 답변 | 구현하지 않은 보호 조치를 있는 것처럼 말하면 근거 없는 주장이 되고, 아예 언급하지 않으면 B2B 관점 질문에 무너진다 | 실제 구현을 약속하려면 아키텍처 검토가 선행되어야 하며 MVP 일정에 들어갈 수 없음 | **resolved 2026-08-04** | **권고안 채택** — "현재 미구현" 명시 + 로드맵 3줄(전송 최소화 / 학습 비활용 / 리전 격리) |
+| 15 | 스트레치로 등재한 "협업 평가(팀워크 신용 등급)"를 발표 로드맵에 포함하는가? | 포함하되 **"행동 데이터 기반, 개인 평가 아님"**을 같은 슬라이드에 명시 | 관계 데이터 차별화 축을 가장 잘 보여주지만, 단서 없이 제시하면 "직원 감시 도구"로 읽혀 역효과가 난다 | 제외하면 차별화 설명이 약해지므로, 대신 "제3자의 검증"(C7 확장)을 로드맵 대표 항목으로 올려야 함 | **resolved 2026-08-04** | **권고안 채택** — 로드맵에 포함하되 같은 슬라이드에 "행동 데이터 기반, 개인 평가 아님" 병기 |
+| 16 | **"쌍방 커뮤니케이션 규약"(MVP #24)은 C3 자기신고 프로필과 병행인가, C3의 온보딩을 대체하는가?** 두 방식은 같은 입력(직설/완곡·이모지·격식도)을 서로 다른 주체(개인 vs 양측 합의)에게서 받으므로, 확정 없이 둘 다 만들면 사용자가 같은 질문에 두 번 답하게 된다. planner는 임의로 판단하지 않는다 | **병행** — 규약은 상대별(pair) 규칙, C3 프로필은 사용자 전역 기본값으로 두고 충돌 시 규약이 우선 | 두 데이터의 성격이 실제로 다르다(양측 합의 vs 개인 성향). 대체로 만들면 상대가 도구를 쓰지 않는 경우 개인화가 0이 되어 C3의 핵심 차별점이 사라진다 | **대체로 결정하면**: T19(온보딩 설문)를 규약 합의 화면으로 교체하고, C3는 diff 학습(T20)만 남으며, 쌍방 규약이 P1으로 승격되어 8/18 P2 컷라인에서 빠진다. 스토리지 스키마(T18)도 프로필 테이블 → pair 규약 테이블로 바뀐다 | **answered (resolved) 2026-08-04** | **병행으로 확정** — planner 권고안을 사용자가 그대로 승인. 규약 = 상대(pair)별 커스텀 규칙, C3 = 사용자 전역 기본값, **충돌 시 규약 우선**. C3의 diff 학습(T20)과 프로필 화면(T19·T21) 모두 그대로 유지하며, 대체 시나리오("T19를 규약 화면으로 교체")는 적용하지 않는다. 쌍방 규약(T41·T42)은 **P2 유지, 승격 없음**. 저장은 별도(원칙 수준만 기록, 실제 스키마는 architect) |
+| 17 | **(v2.1) 오해 사전 경고(AC-043)를 일정 압박 시 컷 대상에 포함하는가?** 이 기능은 사용자 결정에 따라 P0인 C2/C4의 출력 확장으로 들어갔다(Planning Decision #49). 즉 신규 행은 없지만 **P0 작업량은 실제로 늘었고**, 컷 순서(Planning Decision #42)에는 이 항목이 없다. planner는 확정된 컷 순서를 임의로 고쳐 쓰지 않는다 | **부분 컷**: ① T1의 `misreadRisks[]` 스키마 필드와 "근거 없으면 빈 배열" 규약은 **컷하지 않는다**, ② 생성 로직(T10)도 유지, ③ 압박 시 **T12의 전용 표시 UI만** 최소 형태(경고 개수 + 툴팁)로 축소한다. 추가 LLM 호출 없이 기존 C2 호출 안에서 함께 산출한다 | 스키마를 나중에 바꾸면 프론트·백엔드 통합 재작업이 발생한다(T1 규칙: 스키마 불일치가 재작업 최대 원인). 반대로 화면 표현은 마지막에 붙여도 비용이 낮다. 별도 LLM 호출을 추가하면 NFR "체감 5초"와 크레딧 제약(Planning Decision #29)을 동시에 위협한다 | **전면 컷을 택하면**: AC-043을 Out of Scope로 이동해야 하며(AC 번호는 재부여하지 않고 유지), MVP Scope #1·#3의 AC 참조에서 AC-043을 빼야 한다. **컷 없음을 택하면**: T12에 표시 UI가 P0로 고정되어 M1 일정이 그만큼 늘어난다 | **resolved 2026-08-04** | **권고안 채택 — "부분 컷"** 확정. 스키마(`misreadRisks[]`, T1)와 생성 로직(T10)·검증셋(T11)은 **컷 대상 아님**. 압박 시 **T12 표시 UI만** 축소하되, **축소 상태에서도 데이터는 생성·저장되어 UI만 다시 붙이면 복원 가능**해야 한다. Planning Decision **#57**로 기록(#42는 수정하지 않음) |
+| 18 | **(v2.1) 발표 KEY 2("Superhuman은 발신자 문체를, C3는 수신자의 수용 방식을 학습한다")를 현재 C3 명세가 뒷받침하지 못한다. 어떻게 정합을 맞출 것인가?** 현재 C3는 AC-011(발신자 자기신고 3~5문항) + AC-013·Planning Decision #35(동일 패턴 3회를 **사용자 단위**로 카운팅 — 수신자별 아님)로 정의되어 있어 **발신자 축**이다. 수신자 축 데이터는 현재 #24 쌍방 규약(P2, AC-037)에만 존재한다. planner는 사용자 승인 문구(KEY 2)를 임의로 바꾸지 않으므로 결정을 요청한다 | **(c)+(a) 재서술**: KEY 2의 근거를 "C3(발신자가 상대에 따라 실제로 어떻게 고쳐 왔는지의 수정 이력) **+** #24 쌍방 규약(수신자가 직접 합의한 수용 규칙)"의 **조합**으로 서술하고, 쌍방 규약이 컷되면 발표 축을 KEY 1으로 이동한다 | C3 카운팅을 수신자별로 바꾸는 선택지(b)는 이미 검토되어 기각된 경로다 — 수신자별로 나누면 MVP 데이터량에서 3회에 도달하지 못해 학습 기능 자체가 데모되지 않는다(Open Question #9 결정 근거). 승인된 KEY 2 문구는 유지하되 **근거를 실제 구현 위에 다시 세우는 것**이 가장 비용이 낮다 | **(b) 수신자별 카운팅으로 바꾸면**: Planning Decision #35를 Superseded 처리하고, T20 diff 스키마에 recipient 축 추가 + 데모 시드 데이터 증가 + AC-013 재작성이 필요하며, 3회 도달 실패로 데모가 성립하지 않을 위험이 크다. **아무것도 바꾸지 않으면**: KEY 2는 발표에서 근거 없는 주장이 되고, 문서 대조 시 반박된다(Risks 신규 행) | **resolved 2026-08-04** | **권고안 채택 — "근거를 조합으로 재서술"** 확정. KEY 2의 근거는 **#24 쌍방 규약(수신자 축, AC-037) + C3(발신자 전역 기본값)**의 조합이며, 각도를 **"추론된 개인화 vs 합의된 개인화"**로 바꿨다. **"C3가 수신자별로 학습한다"는 서술은 전면 폐기**. C3 카운팅을 수신자별로 바꾸는 안은 **기각**(Planning Decision #35 불변). 정합 대조 결과는 Differentiation **3-2 대조표**에 기록. Planning Decision **#58**. **파생 리스크(#24가 P2)는 Open Question #21로 분리** |
+| 19 | **(v2.2) 확정된 컷 순서(Planning Decision #42)에서 Gmail 어댑터를 어디에 둘 것인가?** #42는 ② 계층에 **Slack 어댑터**를 컷 대상으로 명시하고 있으나 Gmail은 그때 존재하지 않던 항목이다. #42는 사전 합의된 append-only 결정이므로 **planner가 임의로 고쳐 쓰지 않는다** | **Gmail을 Slack보다 위에 둔다**(= 일정 압박 시 **Slack을 먼저 버리고 Gmail을 지킨다**). 컷 순서 ②를 "Slack 어댑터", ③을 "Gmail 어댑터"로 하는 대신 **② Slack → ③ Gmail** 순서로 두고 기존 ③④는 한 칸씩 밀린다 | KEY 3(조직 간 마찰)의 실제 채널이 이메일이기 때문이다 — GitHub·Slack은 대개 사내 도구라 "조직 간"을 시연할 채널로는 약하다. 즉 **차별화 서사를 지키는 쪽이 Gmail**이다 | **Slack을 지키기로 하면**: Gmail이 ②로 내려가 사실상 가장 먼저 컷되고, 발표에서 KEY 3의 채널 근거는 GitHub·Slack(사내 도구)으로만 남는다. **어느 쪽이든 결정 시 Planning Decision을 새 행으로 추가**하며 #42는 수정하지 않는다. 추가 고려: **Gmail DOM 난이도가 미검증(추정)**이므로, 난이도가 높게 확인되면 이 결정을 다시 봐야 한다 | **resolved 2026-08-04** | **권고안 채택 — Gmail을 Slack보다 위**에 둔다. 일정 압박 시 **Slack(T47)을 먼저 포기하고 GitHub(T29) + Gmail(T49)를 지킨다.** 갱신 후 컷 순서: ① P2 전체 → ② Slack → ③ Gmail → ④ 로그인 고도화 → ⑤ 여분. Planning Decision **#59**로 기록하며 **#42 원문은 수정하지 않는다**(대체가 아니라 갱신). **단서**: Gmail DOM 난이도는 여전히 미검증(추정) — T49 첫 1시간 스파이크에서 "Slack보다 현저히 어렵다"로 나오면 이 순서를 재검토한다 |
+| 20 | **(v2.2) 침묵 감지(AC-044)의 "무응답 N일" 임계값을 얼마로 할 것인가?** planner가 임의로 정하지 않는다 | **업무일 2일**(주말·상대국 공휴일 제외). 사용자가 화면에서 조정할 수 있게 두지 말고 MVP에서는 고정값으로 시작 | 시차 왕복 1회에 12~24시간이 걸린다는 것이 PS-001의 전제이므로, 1일은 정상 왕복을 무응답으로 오판하고 3일 이상은 이미 신뢰가 상한 뒤가 된다. 설정 UI를 만들면 P2 기능의 비용이 커진다 | **다른 값을 택하면**: AC-044의 임계값 문구와 T51 로직 상수 1곳만 바뀐다(비용 거의 없음). **사용자 조정 가능으로 하면**: 설정 저장·화면이 추가되어 T52 범위가 커진다 | **resolved 2026-08-04** | **권고안 채택 — 업무일 2일**(주말 + #30 공휴일 데이터의 수신자 국가 휴일 제외). 값은 **T51의 상수 1곳에 격리**하며 설정 화면은 만들지 않는다. Planning Decision **#60** |
+| 21 | **(v2.3) 발표 KEY 2의 수신자 축 근거인 #24 쌍방 규약(T41·T42)이 P2라서 8/18 컷 대상이다. 컷 순서상 어디에 둘 것인가?** #24가 컷되면 KEY 2는 발신자 전역 기본값(C3)만 남고, 그것은 Superhuman과 차별화되지 않는다(measured). 즉 **기능 하나의 컷이 발표 차별화 축 하나를 무너뜨리는 구조**다. Planning Decision #26이 "#24는 P2 유지, 승격 없음"으로 확정한 사항이므로 planner가 임의로 올리지 않는다 | **P2는 유지하되, P2 내부 유지 순위에서 #24(T41·T42)를 1순위로 올린다** — Planning Decision #52의 순서를 `① T41·T42 쌍방 규약 → ② T53·T54 공휴일 → ③ T39·T40 기한 협상 → ④ T50~T52 침묵 감지 → ⑤ 나머지`로 갱신. 아울러 **컷될 경우의 발표 대비책**을 미리 고정한다: KEY 2를 로드맵으로 강등하고 발표 축을 KEY 1·KEY 3으로 옮긴다 | P1 승격은 Decision #26을 뒤집는 것이라 C3 일정(T19~T21)과의 경합을 다시 만든다. 반면 **P2 내부 순서 조정은 이미 #52가 정한 범위 안**이라 확정 결정을 건드리지 않고 발표 리스크만 줄인다. 대비책을 미리 정해 두면 컷 시점에 발표 구조를 급하게 다시 짜지 않아도 된다 | **P2 내부 순위를 올리지 않으면**: 8/18에 #24가 컷될 확률이 높고, 그 경우 발표에서 KEY 2를 말할 근거가 사라진다(KEY 1·KEY 3만 남음). **P1로 승격하면**: Planning Decision #26을 Superseded 처리해야 하고, C3(T19~T21)와 M2 자원을 두고 경합해 Core 2차 일정이 위협받는다 | **resolved 2026-08-04** | **권고안 채택** — **P2 유지, P1 승격 없음**(Decision #26 불변). **P2 내부 유지 순위에서 T41·T42를 1순위로 상향**하고 T62(COMPARE-01 장면)를 그 직후에 둔다. 갱신 순위: ① T41·T42 → ② T62 → ③ T53·T54 → ④ T39·T40 → ⑤ T50~T52 → ⑥ 나머지. 컷 시 대비책(KEY 2 로드맵 강등 + 대체 장면)은 DemoScript.md에 고정. Planning Decision **#79**(#52는 수정하지 않음). **추가 완충**: Decision #76의 C3 전용 데모가 **컷 안전한 KEY 2 근거**를 별도로 확보한다 |
+| 22 | **(v2.4) 발표 데모의 국가쌍을 무엇으로 할 것인가 — 한국↔일본인가, 한국↔중국인가?** 사용자가 두 후보를 제안했고 planner가 임의로 정하지 않는다. 현재 확정된 것은 **언어쌍(한↔영, Decision #9)과 언어 방향(한→영 주 + 영→한 보조, Decision #36)**뿐이며, **데모 서사의 국가쌍은 그것과 별개**다 | **한국↔일본** | ① **툴 이질성이 실재한다(measured)** — 일본 1위는 Teams이고 Slack은 두 조사 모두 7%대다(Differentiation 7). "상대 회사는 우리가 안 쓰는 툴을 쓴다"가 자료로 뒷받침되고, **층 1이 그 문제를 푸는 그림**이 바로 이어진다. ② **시차가 거의 없다** — 오히려 "시차가 없어도 문화 장벽은 있다"는 서사가 되어 제품이 시차 도구가 아님을 보인다. ③ 한국↔중국은 **네트워크 단절로 층 1조차 커버 못 한다(미검증)** 는 사실을 데모 한가운데서 자백하게 되어 리스크가 크다 | **한국↔중국을 택하면**: (a) 위 ③의 커버 불가 문제를 슬라이드에서 먼저 방어해야 하고, (b) 춘절 케이스는 이미 공휴일 데이터(#30, 중국 포함)에 있어 그대로 쓸 수 있다. **한국↔일본을 택하면 확인해야 할 것**: **#30 공휴일 데이터에 일본이 없다**(현재 한국·미국·영국·중국 4개국, AC-048). 데모에서 일본 공휴일 경고를 보여주려면 **T53에 일본 2026년 공휴일 추가**가 필요하다(P2 작업 증가 — 보여주지 않기로 하면 추가 불필요). 어느 쪽이든 **언어쌍(한↔영)은 바뀌지 않으며** 일본어·중국어 지원을 뜻하지 않는다 — 데모 인물의 소속 국가·툴 설정만 바뀐다. 확정 시 T34(시나리오)·T37(슬라이드) 문구를 조정한다. **(v2.4 갱신 — 전환 비용이 커졌다)** 사용자가 제공한 새 데모 데이터셋이 **전부 한국↔일본(+미국) 기준**으로 작성됐다: 시드 프로필 4인(아라소프트·Sakura Digital·Vertex Labs), 용어사전, DemoScript.md v2.0 8장면, T61 시드 태스크. **한국↔중국으로 바꾸면 이 자산을 다시 써야 한다.** 반대로 한국↔일본으로 확정하면 **T53에 일본 공휴일 추가**만 하면 되며 그 작업은 이미 반영했다(AC-057, Planning Decision #72). **데이터셋 제공을 승인으로 간주하지 않고 open을 유지**한다 — 사용자가 국가쌍을 명시적으로 확정한 적이 없기 때문. **(2026-08-04 재갱신) 전환 비용이 한 번 더 커졌다** — 사용자 결정 ③으로 **공휴일 대상국에서 영국이 빠지고 일본이 들어갔고**(AC-057), 시드 프로필·용어사전·DemoScript v2.1이 모두 한↔일(+미) 기준으로 확정됐다. **사실상 한↔일로 고정된 상태이며, 확정 문장 한 줄만 주시면 이 항목을 닫는다.** planner가 추론으로 닫지 않는 이유는 "명시적 결정 없이 확정 처리하지 않는다"는 원칙 때문이다 | **open (확인만 필요)** | — |
+| 24 | **(v2.4) 발표 데모 장면 COMPARE-01(동일 원문 → 타나카/Michael/Sarah 3인 다른 출력)이 P2 기능인 #24 쌍방 규약(T41·T42)에 의존한다. #24를 P1으로 승격할 것인가, 아니면 COMPARE-01을 조건부 장면으로 두고 컷 시 대체할 것인가?** 배경: C3는 **사용자 전역 기본값**이라(Planning Decision #35, Differentiation 3-2) 같은 원문이 수신자별로 달라질 근거가 되지 못한다 — 수신자 축 데이터의 유일한 출처가 AC-037(#24)이다. Planning Decision #26이 "#24는 P2 유지, 승격 없음"으로 확정한 사항이므로 **planner가 임의로 올리지 않는다.** **OQ#21과 같은 대상(#24)을 다루므로 함께 결정해야 한다** | **승격하지 않는다(P2 유지) + COMPARE-01을 조건부 장면으로 설계**한다. 대신 **OQ#21의 권고안(P2 내부 유지 순위에서 T41·T42를 1순위로 상향)을 함께 채택**해 생존 확률을 올리고, 컷될 경우의 대체 장면(장면 4 한국어 어미 3단 비교)을 DemoScript.md에 **미리 고정**한다 | P1 승격은 Decision #26을 Superseded 처리해야 하고 C3(T19~T21)와 M2 자원을 다시 경합시킨다 — **발표 장면 하나를 위해 Core 2차 일정을 흔드는 거래**다. 반면 P2 내부 순위 조정은 #52가 이미 정한 범위 안이라 확정 결정을 건드리지 않는다. 대체 장면을 미리 고정해 두면 8/18 컷 시점에 대본을 다시 짜지 않아도 된다 | **P1으로 승격하면**: Decision #26을 Superseded로 표시하고 T41·T42를 M2로 당겨야 하며, C3(T19~T21) 또는 C5(T22·T23)의 착수가 밀린다. **아무것도 하지 않으면(현 P2 순위 유지)**: 8/18에 #24가 컷될 확률이 높고, 그 경우 **KEY 2와 COMPARE-01을 동시에 잃는다.** **COMPARE-01을 완전히 포기하면**: 시드 프로필·규약 데이터(T62)가 무용해지고 "개인화"를 실물로 보여줄 장면이 발표에서 사라진다 | **resolved 2026-08-04** | **권고안 채택 + 확장(사용자 결정 ①)** — ① **P1 승격 없음**, COMPARE-01은 **#24 데모로 재라벨**된 **조건부 장면**으로 유지(Planning Decision #79). ② **동시에 C3 전용 데모를 신설**한다 — 발신자 1인의 "학습 전/학습 후" 2상태 비교로, **#24 의존이 없어 컷 안전**하다(Planning Decision #76). ③ 시드 diff 10건은 **전부 C3 전역 히스토리로 유지**하고 규약 2건은 별도 파생(Planning Decision #75). ④ **문서화 필수**: 수신자별 출력 차이의 명세상 근거는 **언어쌍(P0)·수신자 타임존·#24 규약(P2)** 셋뿐이며, **Michael과 Sarah(둘 다 영어권)는 #24 없이는 갈리지 않는다** — 이 사실을 대본에 명시해 발표 중 반박에 대비한다 |
+| 23 | **(v2.4) 층 1의 프라이버시 고지를 MVP에서 어느 수준까지 만들 것인가?** 확장이 모든 사이트에서 선택 텍스트를 읽을 수 있게 되므로 고지가 필요하다는 것은 확정(Decision #64, AC-054)이나, **동의 저장·철회 UI까지 만들지는 미정**이다 | **최초 실행 시 1회 고지 화면만** 만든다(읽고 닫기). 동의 여부를 저장하거나 철회 UI를 만들지 않는다 | MVP는 개발자 모드 로드로 팀·심사위원이 설치하는 범위이고(Decision #4), 이 단계에서 필요한 것은 **무엇이 전송되는지 알리는 것**이지 동의 이력 관리가 아니다. 동의 저장은 사용자별 저장소(T18)에 붙어야 해 P1 일정을 건드린다 | **동의 저장·철회까지 요구하면**: T58 범위가 커지고 T18(스토리지) 의존이 생겨 M2 이후로 밀린다. **고지를 아예 빼면**: AC-054를 Out of Scope로 옮겨야 하며(번호는 유지), 실사용자 확장 방침(Decision #27)과 충돌한다 | **open** | — |

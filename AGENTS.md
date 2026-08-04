@@ -71,7 +71,7 @@ Each agent acts only within its authority. An agent must never perform work outs
 
 | Agent | Input (consumes) | Output (produces) | May modify |
 |---|---|---|---|
-| planner | User request, docs/PRD.md, docs/Tasks.md, docs/DECISIONS.md (when relevant) | docs/PRD.md, docs/Tasks.md, Open Questions report | docs/PRD.md, docs/Tasks.md only |
+| planner | User request, docs/PRD.md, docs/Tasks.md, docs/TestCases.md, docs/DemoScript.md, docs/DECISIONS.md (when relevant) | docs/PRD.md, docs/Tasks.md, docs/TestCases.md, docs/DemoScript.md, Open Questions report | docs/PRD.md, docs/Tasks.md, docs/TestCases.md, docs/DemoScript.md only |
 | ux-design | docs/PRD.md, docs/DECISIONS.md | docs/UX.md (if the project has a UI; includes a Claude Design Prompts section for generating UI mockups externally), design report | docs/UX.md and docs/UX-archive.md (append-only) only |
 | architect | docs/PRD.md, docs/UX.md (if present), docs/CodingRules.md | docs/Architecture.md, docs/API.md (if required), docs/Database.md (if required), docs/DECISIONS.md entries, docs/adr/ records, design report | docs/Architecture.md, docs/API.md, docs/Database.md, docs/DECISIONS.md, docs/adr/ only |
 | implementer | docs/PRD.md, docs/Architecture.md, docs/CodingRules.md, docs/GitWorkflow.md, docs/Tasks.md, docs/API.md, docs/Database.md, docs/UX.md, docs/DefinitionOfDone.md | Source code, implementation report | Source code; the Status column of its own task row in docs/Tasks.md only (recommend other doc updates; never silently change them) |
@@ -90,6 +90,8 @@ Each agent acts only within its authority. An agent must never perform work outs
 | README.md | docs | Read-only |
 | docs/PRD.md | planner | Read-only. docs reports drift as an Update Request; only planner edits |
 | docs/Tasks.md | planner | Read-only, except implementer may update the Status column of its own task row |
+| docs/TestCases.md | planner | Read-only for case definitions — only planner adds/changes/removes cases. implementer and quality-assurance may append rows to the 실행 기록 table (recording a run is not editing a case). A case is never deleted to make a number look better; it is marked `제외` with a reason |
+| docs/DemoScript.md | planner | Read-only for scene definitions — only planner edits. Whoever runs a rehearsal may append rows to the 리허설 기록 table. Demo inputs are not authored here: docs/TestCases.md is their single source |
 | docs/UX.md | ux-design | Read-only. docs reports drift as an Update Request; only ux-design edits |
 | docs/UX-archive.md | ux-design (append-only) | Read-only. Overflow archive for old Deprecated UX entries; archived IDs stay reserved |
 | docs/Architecture.md | architect | Read-only. docs reports drift as an Update Request; only architect edits |
