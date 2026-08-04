@@ -70,3 +70,21 @@ export interface MediationData {
   2. **T10**: `deps.data.dictionary` 를 **구분자로 감싼 데이터 블록**으로 C2 프롬프트에 넣는다 — 지시문으로 취급하지 않는다(Security Abuse cases 12행). 이 책임은 `packages/core/src/prompts/` 에 있고 Route Handler에 있지 않다.
   3. **T28**: 사전 CRUD는 `deps.data.dictionary` 의 **소스 테이블만** 바꾼다 — core 시그니처를 건드리지 않는다.
   4. **리뷰 규칙**: `packages/core` 안에 `Promise` 를 반환하는 저장소성 인자가 새로 생긴 diff는 **반려**한다(예외: `LLMClient`). `MediationInput` 에 5번째 필드를 추가하는 diff도 반려하고 이 ADR의 판정표로 되돌린다.
+
+---
+
+## Addendum A — 동결 형태는 함수 **선언**이 아니라 함수 **타입 별칭**이다 (2026-08-04 정정)
+
+> ADR은 immutable 이므로 위 Decision 절의 코드 블록을 고치지 않고 여기서 정정한다. **결정 내용(인자 2개 · 조회 결과 주입 · 판정표)은 전부 그대로**이며, 바뀌는 것은 **그 시그니처를 `.ts` 에 적는 형태**뿐이다.
+
+- 위 :27 의 `export function run(input: MediationInput, deps: MediationDeps): Promise<MediationResult>;` 는 **본문 없는 함수 선언이라 컴파일되지 않는다** — measured: `error TS2391: Function implementation is missing or not immediately following the declaration`(T1 implementer 재현).
+- **실제 동결 형태**는 함수 타입 별칭 `MediationPipeline` 이다(`packages/core/src/pipeline.ts:133`). 그 판단 근거는 지금까지 **코드 주석에만** 있었는데, F1을 읽는 4명이 보는 것은 이 ADR과 `docs/Architecture.md` 다 — 그래서 양쪽에 옮긴다(`docs/Architecture.md` F1-b 코드 블록도 함께 정정됨).
+- **구현 형태는 하나뿐이다**: `export const run: MediationPipeline = async (input, deps) => { … }`. 🔴 평범한 `export async function run(...)` 은 별칭을 참조하지 않아 **인자 수가 어긋나도 빌드가 통과**한다(measured: 3-인자 버전 EXIT=0). `const` + 타입 주석 형태는 같은 시도가 `TS2322` 로 즉시 깨진다(measured).
+- 출처: reviewer 지적 M2(measured), 2026-08-04.
+
+## Addendum B — Follow-up 3의 태스크 번호 정정 (2026-08-04)
+
+- 위 Follow-up **3**은 *"**T28**: 사전 CRUD는 …"* 이라고 적었으나 **T28은 사전 CRUD가 아니다.** `docs/Tasks.md:58` 기준 **T28 = 전체 처리 플로우 오케스트레이션**(C1→C3→C5→C2→C4→C6 순서 고정, AC-032)이고, **용어사전 관리 UI는 T23**(`docs/Tasks.md:55`)이다.
+- **정정된 문장**: *"**T23**(용어사전 관리 UI)은 `deps.data.dictionary` 의 **소스 테이블만** 바꾼다 — core 시그니처를 건드리지 않는다."* T28에 대한 요구는 **파이프라인 구현이 `MediationPipeline` 별칭을 그대로 쓰는 것**(Addendum A)이다.
+- Context :19 의 *"소비 태스크: T10 · T28"* 역시 **T10(C5 주입) · T23(사전 CRUD) · T28(오케스트레이션)** 으로 읽는다.
+- 출처: reviewer 지적 m7(measured), 2026-08-04.

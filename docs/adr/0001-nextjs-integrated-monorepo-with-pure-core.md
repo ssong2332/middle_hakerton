@@ -52,3 +52,16 @@ packages/core    (순수 TypeScript — next/react/@supabase/openai import 금�
   2. **T2 직후**: Vercel 모노리포 빌드 1회 성공을 확인한다(추정 항목의 해소).
   3. **T1**: `contract.ts` 를 M0(08-04~06) 안에 머지한다. 이것이 늦으면 4명 전원이 멈춘다.
   4. **T15**: `import` 경로 검증 출력을 AC-028 근거로 첨부한다.
+
+---
+
+## Addendum A — 대상 버전을 Next.js 15 → **16** 으로 올린다 (2026-08-04, 사용자 결정)
+
+> ADR 본문은 **immutable** 이므로 위 Decision 절의 *"Next.js 15(App Router)"* 문구를 고치지 않고 여기에 덧붙인다. **결정의 구조는 그대로다** — 통합 1리포 · `packages/core` 분리 · ESLint 강제 · Option 비교 전부 유효하며, **바뀐 것은 프레임워크의 메이저 버전뿐**이다. 이 문서를 읽을 때는 본문의 "15"를 **"16"** 으로 읽는다.
+
+- **DECISIONS.md entry**: **#37** (#1·#31의 본문은 append-only 규칙에 따라 미수정)
+- **왜**: T2 스캐폴드 직후 `npm audit --omit=dev` 에서 **high severity 3건** — next 15가 번들한 **`postcss`·`sharp`** (measured, 오케스트레이터가 2026-08-04 직접 실행·재현). 해소 경로가 **`next@16` breaking 업그레이드뿐**이었고, *"15 유지 + 위험 수용"* vs *"16 업그레이드"* 중 **사용자가 16을 명시적으로 선택**했다.
+- **대상 버전**: `next@16` — 2026-08-04 기준 `latest` 는 **16.3.0**(measured, architect가 `registry.npmjs.org/next/latest` 직접 조회).
+- **현재 상태**: 🔴 **문서만 갱신됐다.** `apps/web/package.json:15` 는 여전히 `"next": "^15.5.22"`(measured). 설치·breaking change 대응은 **implementer**가 수행한다.
+- **미확인(추정)**: ① 업그레이드가 3건을 실제로 **0건**으로 만드는지 ② breaking change가 스캐폴드·Vercel 빌드에 걸리는지. **확인 수단**: 설치 후 `npm audit --omit=dev` 재실행 + `npm run build` + 첫 Vercel 배포 출력 첨부.
+- **추가 Follow-up**: Follow-up 2(*"Vercel 모노리포 빌드 1회 성공 확인"*)는 **16 기준으로 다시** 확인한다 — 15에서 통과했더라도 근거가 되지 않는다.
