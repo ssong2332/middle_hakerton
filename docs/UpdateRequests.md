@@ -1,4 +1,4 @@
-# Documentation Update Requests — {{project-name}}
+# Documentation Update Requests — 크로스보더 협업 중재 서비스
 
 Owner: docs (see AGENTS.md). Appended when docs finds a document it doesn't own has drifted from the implementation. docs never edits the target document directly — it logs the drift here so the owning agent can act on it, even across sessions.
 

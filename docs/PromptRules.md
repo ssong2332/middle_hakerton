@@ -1,4 +1,4 @@
-# Prompt Rules — {{project-name}}
+# Prompt Rules — 크로스보더 협업 중재 서비스
 
 Owner: User. How to invoke the eight agents. Contract details: AGENTS.md.
 

@@ -1,4 +1,4 @@
-# Definition of Done — {{project-name}}
+# Definition of Done — 크로스보더 협업 중재 서비스
 
 Owner: User. Gate checklist enforced by implementer (self-check) and quality-assurance (gate); Closure checklist completed at the docs step after GO.
 A task's Status may become `done` in docs/Tasks.md only when every Gate item passes AND quality-assurance has returned Release Recommendation: `GO`.

@@ -1,4 +1,4 @@
-# API — {{project-name}}
+# API — 크로스보더 협업 중재 서비스
 
 Owner: architect (see AGENTS.md). Others read-only.
 Created only when the project exposes an API (architect: "if required").

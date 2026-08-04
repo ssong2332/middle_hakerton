@@ -63,7 +63,7 @@ When introducing a new dependency, configuration option, environment variable, o
 ---
 
 ## Project Overview
-- Name: {{project-name}}
+- Name: 크로스보더 협업 중재 서비스
 - Goal: {{one line}}
 - Stack: {{fill in after docs/Architecture.md is approved}}
 

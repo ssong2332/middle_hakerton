@@ -1,4 +1,4 @@
-# Architecture — {{project-name}}
+# Architecture — 크로스보더 협업 중재 서비스
 
 Owner: architect (see AGENTS.md). Others read-only.
 Major decisions are logged in DECISIONS.md; details in adr/.
