@@ -1,4 +1,4 @@
-# Coding Rules — {{project-name}}
+# Coding Rules — 크로스보더 협업 중재 서비스
 
 Owner: User (architect may draft on request). All agents read-only.
 

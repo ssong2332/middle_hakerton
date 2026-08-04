@@ -1,4 +1,4 @@
-# Decision Log — {{project-name}}
+# Decision Log — 크로스보더 협업 중재 서비스
 
 Owner: architect (see AGENTS.md). One line per decision; anything with lasting structural impact gets a full ADR in adr/.
 Technical/architectural decisions only — planning-level decisions (scope exclusions, priority calls) live in docs/PRD.md's Planning Decisions section, owned by planner.

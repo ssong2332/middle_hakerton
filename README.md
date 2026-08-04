@@ -1,104 +1,98 @@
-# Claude Code Starter Kit
+# 크로스보더 협업 중재 서비스 (Cross-Border Collaboration Mediator)
 
-A production-ready Starter Kit for Claude Code projects: 8 specialized subagents, a documented agent contract, and a full project-documentation template set.
+> "번역기가 아니라, 국경 위에서 무너지는 신뢰를 잡아주는 중재자."
+> AI는 감정과 긴급성을 지우지 않는다. 형태만 바꿔서 상대가 알아볼 수 있게 만든다.
 
-## Features
-- ✅ 8 Specialized Subagents (planner, ux-design, architect, implementer, reviewer, quality-assurance, debugger, docs)
-- ✅ CLAUDE.md
-- ✅ AGENTS.md (Agent Contract: Authority, Input/Output, Ownership, Document Priority)
-- ✅ PRD Workflow
-- ✅ UX Workflow (user flows, screen specs, Claude Design prompts for visual mockups)
-- ✅ Architecture Workflow
-- ✅ Decision Log
-- ✅ ADR
-- ✅ Definition of Done (Gate + Closure checklists, test-first evidence required)
-- ✅ Systematic Debugging (root-cause-before-fix, diagnosis separated from repair)
-- ✅ Git Workflow
-- ✅ Prompt Rules
+시차·언어·문화·조직이라는 국경(border)을 넘는 업무 메시지에서 **감정과 긴급성을 지우지 않고 형태만 바꿔 전달**해, 협업 중 무너지는 신뢰를 붙잡아 주는 human-in-the-loop 중재 서비스입니다. 단순 번역이 아니라, 사람이 최종 확인·승인한 뒤에만 메시지가 나가는 것을 원칙으로 합니다.
 
-## Agent Model Assignments
+## 개발 진행 상태 (반드시 먼저 읽어주세요)
 
-Each agent's `model:` frontmatter reflects the reasoning load its role actually requires, not a default. `opus` is reserved for open-ended judgment where a weaker model tends to produce a confident wrong answer rather than an honest gap; `sonnet` covers roles that are template-driven or checklist-verifiable.
+🔴 **현재 이 저장소에는 실행 가능한 소스코드가 없습니다.** 기획(PRD)과 UX 설계 문서만 완료되어 있고, 구현은 아직 착수 전입니다.
 
-| Agent | Model | Why |
-|---|---|---|
-| planner | opus | Must generate genuinely distinct candidate solutions (Refined/Inventive/Unconventional) and a monetization strategy, not three phrasings of one idea — creative/strategic judgment that every downstream document is built on |
-| ux-design | sonnet | Work is template-driven (fixed User Flow/Screen Catalog shapes) and checklist-based (duplicate-ID and cross-reference consistency checks) |
-| architect | opus | Foundational, expensive-to-reverse technical decisions (language, framework, database, auth, hosting) plus security-checklist judgment that everything downstream is built on |
-| implementer | inherit | Follows the orchestrating session's current model — lets the user dial cost/quality per task by switching models before invoking it |
-| reviewer | opus | Contract requires re-executing claims rather than accepting them ("Reproduction is the default"), and catching subtle correctness/security issues a shallow pass would miss |
-| quality-assurance | opus | "Validate meaning, not just structure" requires judging whether generated output is factually correct and non-misleading, not just checklist/schema verification |
-| debugger | opus | Root-cause diagnosis is multi-step hypothesis testing (state → test → confirm/disconfirm), not lookup — a weak model tends to report a plausible-sounding wrong cause as fact |
-| docs | sonnet | Drift detection and README/CHANGELOG sync is rule-based comparison against existing documents |
-
-## Quick Start
-1. Use this repository as a GitHub Template.
-2. Clone your new repository.
-3. Open Claude Code.
-4. Ask:
-   ```
-   planner 에이전트로 요구사항 정리해줘
-   ```
-5. Once the PRD is approved, if the project has a user-facing UI:
-   ```
-   ux-design 에이전트로 UX 설계해줘
-   ```
-
-### Optional: pin a visual design language
-
-The agents specify *what* a screen does; they don't fix *how it looks*. For a UI project that should not ship generic-looking output, preload a visual-quality skill into implementer by adding one line to `.claude/agents/implementer.md`'s frontmatter:
-
-```yaml
-skills:
-  - frontend-design      # or another visual skill, e.g. nothing-design
-```
-
-The skill's full content loads at implementer startup, so it applies without implementer having to invoke anything. It governs visual execution only — `docs/UX.md` stays authoritative for states, validation, and accessibility. See the visual-quality rule in `docs/PromptRules.md` before using this alongside approved Claude Design mockups.
-
-### Optional: connect Figma
-
-Not every project uses Figma, and it needs an authenticated account, so it is never wired into this kit's shared agent templates — add it per-project, the same way as the visual-quality skill above. Add the Figma MCP tool to `.claude/agents/implementer.md`'s `tools:` frontmatter.
-
-**Read direction (design → code, the default use).** Once the user approves a Figma frame as a screen's visual reference, ux-design records the frame's URL in that screen's Screen Catalog entry in `docs/UX.md` (the Figma Frame field) — the same way an approved Claude Design mockup gets synced back into the spec. implementer then reads the URL from there rather than needing it re-pasted into every prompt, and pulls exact tokens, layout, and component structure instead of eyeballing a static mockup image. This changes *fidelity*, not *authority*: `docs/UX.md` remains the authoritative spec for states, validation, and accessibility, and a Figma frame may not introduce a UI decision `docs/UX.md` doesn't already specify. See docs/PromptRules.md's external-data-source rule before combining this with a visual-quality skill.
-
-**Optional write direction (code → Figma).** After a screen is implemented, implementer may push the built result back to Figma as an editable artifact for design review — on request only, never automatically, and only after the user explicitly confirms that specific push (it writes into a real, shared external account, the same standing as any other publish-style action). The pushed artifact is a downstream reference, not a new source of truth: if the design team edits it and wants a change, that feedback goes back through the normal mockup-deviation flow (an approved change gets synced into `docs/UX.md` by ux-design) rather than flowing straight from Figma into source code.
-
-> After cloning, replace this README with your own project's README (`## Overview` / `## Getting Started` / the Documentation table below are a good starting shape). Fill in the `{{placeholders}}` in `CLAUDE.md`. Do **not** carry over this kit's root `CHANGELOG.md` — your project starts from the blank `docs/CHANGELOG.md` instead. Full agent invocation guide: `docs/PromptRules.md`.
-
-## Configuration
-
-This project uses a `.env` file for local secrets and configuration, which is git-ignored and never committed.
-
-1. Copy the example file:
-   ```
-   cp .env.example .env
-   ```
-2. Fill in the values in `.env`:
-
-   | Variable | Purpose |
-   |---|---|
-   | `YOUR_API_KEY` | API key for external service integration |
-   | `YOUR_SECRET` | Application secret (session signing, encryption, etc.) |
-   | `DATABASE_URL` | Database connection string |
-
-3. When the architecture is defined and new environment variables are introduced, add them to `.env.example` (placeholder value only) and to this table.
-
-## Documentation
-| Document | Purpose |
+| 항목 | 상태 |
 |---|---|
-| [CLAUDE.md](CLAUDE.md) | Project rules: startup behavior, secrets management, prohibitions, report template |
-| [AGENTS.md](AGENTS.md) | Agent contract: I/O, ownership, priority |
-| [docs/PromptRules.md](docs/PromptRules.md) | How to invoke each agent |
-| [docs/PRD.md](docs/PRD.md) | Requirements and MVP scope |
-| [docs/UX.md](docs/UX.md) | User flows, screens, Claude Design prompts (UI projects only) |
-| [docs/UX-archive.md](docs/UX-archive.md) | Overflow archive for retired UX.md entries |
-| [docs/Architecture.md](docs/Architecture.md) | System design |
-| [docs/API.md](docs/API.md) | API surface (if the project exposes one) |
-| [docs/Database.md](docs/Database.md) | Schema (if the project has one) |
-| [docs/Tasks.md](docs/Tasks.md) | Implementation tasks and status |
-| [docs/CodingRules.md](docs/CodingRules.md) | Coding standards |
-| [docs/GitWorkflow.md](docs/GitWorkflow.md) | Branch/commit/PR rules |
-| [docs/DefinitionOfDone.md](docs/DefinitionOfDone.md) | Completion criteria (Gate + Closure) |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | Decision log (details in docs/adr/) |
-| [docs/CHANGELOG.md](docs/CHANGELOG.md) | Release history |
-| [docs/UpdateRequests.md](docs/UpdateRequests.md) | Cross-agent drift reports awaiting action |
+| PRD (docs/PRD.md) | 완료 (v3.2) |
+| UX 설계 (docs/UX.md) | 완료 (v6.0) |
+| Architecture (docs/Architecture.md) | 미착수 (architect 에이전트 미실행 — 템플릿 상태) |
+| 구현 태스크 (docs/Tasks.md) | 총 72건, **전부 `todo`**(2026-08-04 기준 실측) |
+| 목표 제출일 | 2026-08-21 |
+
+따라서 아래 "핵심 기능"은 **PRD·UX에 명세된 예정 기능**이며, 현재 동작하지 않습니다. 이 문서의 어떤 문장도 "이미 동작한다"는 뜻으로 읽혀서는 안 됩니다.
+
+## 해커톤 맥락
+
+- 트랙: **Borderless Teamwork with AI**
+- 주제: AI 기술로 국경을 넘는 협업을 가능하게 한다
+- 목표 제출일: **2026-08-21**
+
+## 해결하려는 문제 (Border 01~04)
+
+기존 협업 도구는 톤을 "다듬는(polish)" 데 그치지만, 이 제품은 마감일·수치·필수 액션처럼 **잃으면 안 되는 정보를 먼저 지키는 것(preserve)**을 목표로 합니다.
+
+| Border | 문제 | 대응 기능 |
+|---|---|---|
+| Border 01 — 시차 | "지금 당장"인 요청이 상대의 새벽/퇴근 후에 도착해 신뢰가 깎인다 | C1 긴급도 3단계 분류(근거+override) |
+| Border 02 — 언어 | 비모국어로 쓴 메시지가 의도와 다르게 읽히고, 발신자는 확인할 방법이 없다 | C4 백트랜슬레이션 미리보기 + C5 용어 사전 |
+| Border 03 — 문화 | 같은 문장이 한쪽에서는 명확함, 다른 쪽에서는 무례함으로 읽힌다 | C2 톤 변환 + C3 자기신고 프로필(diff 학습) |
+| Border 04 — 조직 | 하소연이 조직의 트래커에 들어가지 못하고 감정으로만 소비된다 | C6 하소연→태스크 티켓 변환 + C7 결정사항 자동 요약 |
+
+**부작용 방어 (PS-005 — 중재 자체가 만드는 부작용, 긴급성 희석)**: 톤을 부드럽게 만드는 과정에서 "내일까지 반드시"가 "가능하시면 확인 부탁드립니다"로 희석될 수 있습니다. 이를 막기 위해 마감일·수치·필수 액션 같은 보존 대상을 **먼저 추출해 고정한 뒤 톤만 변환**하고, 사람의 명시적 승인 없이는 아무것도 발송되지 않습니다(human-in-the-loop).
+
+## 핵심 기능 (P0/P1 중심, 예정 — 구현 전)
+
+| 기능 | 설명 | 해결하는 Border | 우선순위 |
+|---|---|---|---|
+| C1 긴급도 분류 | CRITICAL/NORMAL/LOW 판정 근거 표시 + 사용자 override | Border 01 | P0 |
+| C2 톤 변환 + 긴급도 보존 필터 | 톤만 바꾸고 마감·수치·액션은 보존, 오해 사전 경고 제공 | Border 03, PS-005 | P0 |
+| C4 백트랜슬레이션 미리보기 | 변환문을 원어로 되돌려 발신자가 스스로 검증(1차 안전장치, 완전한 검증은 아님) | Border 02 | P0 |
+| 2패널 비교 + 승인 후 전송 | 원문/변환문/변환 이유를 나란히 표시, 명시적 승인 없이는 미발송 | Border 01~04 전체 | P0 |
+| C3 자기신고 프로필 + diff 학습 | 국적이 아니라 본인 신고와 3회 이상 관찰된 수정 패턴만 근거로 개인화 | Border 03 | P1 |
+| C5 프로젝트 용어 사전 | 등록 용어·호칭은 의역·추측 없이 원문 유지 | Border 02 | P1 |
+| C6 하소연→태스크 티켓 변환 | [문제 정의]/[영향·리스크]/[요청 사항]/[우려 수준] 4섹션, 감정은 삭제하지 않고 보존 | Border 04 | P1 |
+| C7 결정사항 자동 요약 | 결정사항/담당자/기한 표, 근거 없는 항목은 "미정" | Border 04 | P1 |
+
+전체 기능 목록과 수용 기준(Acceptance Criteria)은 `docs/PRD.md`의 MVP Scope를 참고하세요.
+
+## 차별점
+
+이 제품은 "세상에 없는 아이디어"가 아닙니다. Tonero, checktone.app, Slack AI, Superhuman "Instant Reply" 등 유사한 목적의 제품이 이미 존재합니다(`docs/PRD.md` Differentiation & Market Reality 섹션에 실명 비교표가 있습니다). 모델·프롬프트 자체는 해자가 아니며, 차별점은 제품화 층위에 있습니다.
+
+- **KEY 1 — "톤 교정"이 아니라 "번역 손실 방지"**: 경쟁 제품 대부분은 다듬기(polish)를 팝니다. 이 제품은 무엇이 사라지면 안 되는지를 먼저 고정한 뒤 톤을 바꿉니다(preserve).
+- **KEY 2 — "추론으로 시작하고, 합의로 확정한다"**: 상대의 성향을 추론하되, 그 근거를 보여주고 사용자가 확정한 것만 규칙으로 저장합니다. 조용히 적용하지 않습니다.
+- **KEY 3 — 개인 간이 아니라 "조직 간" 마찰**: 감정으로 소비되는 하소연을 조직이 다룰 수 있는 티켓으로 바꾸는 데 초점을 둡니다.
+
+## 문서
+
+| 문서 | 내용 |
+|---|---|
+| [docs/PRD.md](docs/PRD.md) | 요구사항, 문제 정의, 경쟁 비교, MVP 범위, 수익 모델 |
+| [docs/UX.md](docs/UX.md) | 사용자 플로우, 화면 명세 |
+| [docs/Tasks.md](docs/Tasks.md) | 구현 태스크 목록과 진행 상태 |
+| [docs/TestCases.md](docs/TestCases.md) | 테스트 케이스 |
+| [docs/DemoScript.md](docs/DemoScript.md) | 발표 데모 대본 |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md) | 릴리스 이력 |
+
+## 설정
+
+이 프로젝트는 로컬 비밀값 관리를 위해 `.env` 파일을 사용합니다. `.env`는 git에 커밋되지 않으며, `.env.example`만 저장소에 포함됩니다.
+
+현재 `.env.example`에 정의된 항목(플레이스홀더만 표기, 실제 값 없음):
+
+| 변수 | 용도 |
+|---|---|
+| `YOUR_API_KEY` | 외부 서비스 연동용 API 키 |
+| `YOUR_SECRET` | 애플리케이션 시크릿(세션 서명, 암호화 등) |
+| `DATABASE_URL` | 데이터베이스 연결 문자열 |
+
+> 위 항목은 구현 착수 전 기본값입니다. PRD에 언급된 `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` 등은 백엔드 구현 태스크(T3) 완료 시 `.env.example`과 이 표에 반영될 예정이며, 아직 확정되지 않았습니다.
+
+실행 방법(설치·빌드·실행 커맨드)은 아직 존재하지 않습니다 — 소스코드가 없으므로 이 문서에서 임의로 지어내지 않습니다.
+
+## 기술 스택 (예정/후보 — 미확정)
+
+`docs/Architecture.md`가 아직 비어 있어(architect 에이전트 미실행) 기술 스택은 확정되지 않았습니다. 아래는 `docs/PRD.md`에서 언급된 후보이며, 확정된 결정이 아닙니다.
+
+- 웹앱: Next.js(TypeScript) — 후보
+- 데이터/인증: Supabase — 후보
+- AI 모델 호출: OpenAI API(백엔드 경유, 키 비노출) — 후보
+- 브라우저 확장: Chrome 확장(개발자 모드 로드) — 후보

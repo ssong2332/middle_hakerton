@@ -1,132 +1,1553 @@
-# UX — {{project-name}}
+# UX — 크로스보더 협업 중재 서비스 (Cross-Border Collaboration Mediator)
 
 Owner: ux-design (see AGENTS.md). Others read-only.
-Created only when the project has a user-facing UI (ux-design: "if required").
 Update this document in place — do not recreate it from scratch. Preserve existing sections unless explicitly superseded by a newer decision. The **UX Decision Log** is append-only — never rewrite or delete a past entry; append a new one if a decision changes.
 Flow IDs and Screen IDs are immutable once assigned — never renumber existing IDs, even if one becomes Deprecated. New flows/screens always get the next available ID.
 
 ## Overview
 | Item | Value |
 |---|---|
-| Document Version | {{e.g. 1.4}} |
-| Based on PRD Version | {{docs/PRD.md version/date this UX was designed against}} |
-| Last Updated | {{date}} |
+| Document Version | 6.0 |
+| Based on PRD Version | v3.0 (2026-08-04, incorporating Planning Decisions #101–#112) |
+| Last Updated | 2026-08-04 |
 
-{{one paragraph — what this UX covers}}
+**v6.0 summary** — This is a combined revalidation pass covering PRD v2.9 **and** v3.0 in one round (this document's own prior pass, Document Version 5.0, was against v2.8 — AC-075–AC-079/Decisions #101–#107 from v2.9 and AC-080–AC-083/Decisions #108–#112 from v3.0 are both being absorbed here for the first time). Both batches extend the "관측 → 제안 → 합의" pipeline (MVP Scope #34) that Document Version 5.0 first designed as UX-018's 4-stage screen; nothing from that design is discarded, and no screen or flow is deprecated this round. Changes:
+1. **Observation sources doubled: manual marking is now the primary path, GitHub the secondary one** (AC-080, Planning Decision #108). **UX-016 (Universal Selection Mediation Panel) gains a third mode** — alongside the existing default mediate mode and the conditional Interpret mode, users can now switch to **"상대가 쓴 것으로 표시" (Mark as counterpart's message)**: the same drag-select → floating-button → panel entry point (no new adapter, no site-identification code, AC-080①), with the panel asking only for a counterpart identifier (manual free-text, same no-directory precedent as the recipient field elsewhere — AC-080②, no sender-detection code exists). A new Flow (UF-020) documents this. The mode is folded into UX-016 rather than given a new Screen ID, for the same reason Interpret mode was (same panel, same entry mechanism, no independent purpose/entry/exit) — see UX Decision Log.
+2. **New Screen UX-019 (Observation Sample Management)**, new Flow UF-021 — unlike the mark-mode addition above, this **does** get a new Screen ID, because it has its own nav-menu entry point, its own purpose (inspecting/deleting what's been collected), and no dependency on being opened from inside another screen's result area (see UX Decision Log for why this case is different from #1). It shows, per counterpart, sample count/source breakdown/collection time and lets the user delete any sample — and it **never displays underlying quoted text**, only aggregate metadata (AC-081②④). This is this pass's privacy-defense screen: per PRD Decision #109, without a way to see and delete what's collected, the other three privacy defenses (selected-text-only, aggregate-only, browser-local processing) don't add up to a defensible position.
+3. **UX-011 (Pair Communication Protocol) now shows "누가 정한 규칙인가"** (AC-075) — a 4-state authorship/provenance badge (추론 초안 / 발신자가 확정 / 상대가 직접 작성 / 아직 정해지지 않음) that **directly reverses this document's own prior stance** ("this screen does not display provenance/source tagging," Document Version 5.0) — see UX Decision Log for the reversal entry; the old statement is not deleted, only superseded in place. **UX-011 also gains a per-axis mismatch confirmation banner** (AC-079, AC-083, new Flow UF-022) using the PRD's fixed, non-verdict copy ("합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?") — never "상대가 거짓으로 적었다" or any wording implying a judgment. Which axes can even trigger this banner now depends on sample **source**, not just sample **count** (AC-083): 이모지 is checked against both manual and GitHub samples; 직설 허용/호칭/마감 표현 are checked only against manual-marked samples (GitHub alone never triggers those three) — an axis with insufficient qualifying samples is silently skipped, never a partial/hedged warning.
+4. **UX-018's Stage 2 (관측)/Stage 3 (제안) now read combined indicators from both sources** (AC-080④), each still shown with its own per-source sample count, and Stage 2 gains a "표본 관리 보기" link to the new UX-019. Sample-threshold gating (AC-082) is now 4 constants (indicator-vs-suggestion × manual-vs-GitHub), not 2 — Stage 2/3's insufficient-sample states are unaffected in shape, only in which of the 4 constants they check.
+5. **Extension Privacy Notice (UX-017) is no longer a permanent "shown once, ever" screen** (AC-076) — this document's own prior Open Question #13 is now resolved exactly as this document's own suggested resolution proposed: the "already shown" flag is versioned to the notice's own content, and a version increase (e.g., because manual marking or an earlier capability shipped after a user already dismissed an older notice) triggers exactly one re-show. **What's stored is only the version number seen, never a consent/withdrawal record** (Planning Decision #81 is explicitly not reopened by this — see UX Decision Log and Business Rules). The notice's content also gains a disclosure item for manual marking (AC-081⑤): what gets added to a sample, when, and that it's processed in the browser.
+6. **Four of this document's own Open Questions are resolved this round, all by the PRD confirming this document's own suggested resolution outright**: #12 (AC-078 — the "상대방 정보 보강" link's visibility rule is confirmed as "hide only when there is literally no personalization data for that recipient — pair protocol AND enrichment fields all empty — never based on registered/member status alone," since a registered-but-onboarding-skipped member, AC-059, can still have zero usable data), #13 (AC-076, above), #14 (AC-075, above), #15 (AC-077, superseded/extended in place by AC-082's 4-constant structure — the two independently-named constants this document proposed are now four, following the same naming principle).
+7. **Cut-safety reconfirmed once more**: MVP Scope #34 is still P2/cut-eligible, and this round's Decision #112/#98-cross-reference makes explicit that if #34 is cut, **T64/T65/T68/T69/T70/T71/T72 disappear as one bundle** — meaning UX-018, UX-019, UX-016's mark-mode, and UX-011's mismatch banner (but not UX-011's authorship badge, see below) all disappear together, never partially. **UX-011's authorship badge (AC-075) is the one piece of this round's work that survives a #34 cut** — it doesn't depend on inference/observation at all, only on tracking who last wrote to the existing pair-protocol record (a capability #24/UX-011 already has independent of #34); with #34 absent, the badge simply never shows anything but ⓑ/ⓒ/ⓓ (ⓐ never occurs without an inference pipeline to produce it). UX-004's enrichment-link visibility rule (AC-078) also survives a #34 cut in the trivial sense that with UX-018 gone, the link itself is gone too (Absent-not-disabled controls) — the visibility *rule* just never gets exercised.
+
+**Prior-round summary (v5.0, retained for history)** — This was a revalidation pass triggered by two new user decisions that PRD v2.8 formalizes (previous pass was Document Version 4.0, against the then-current header v2.7, before Planning Decisions #94–#100 existed — the PRD header was bumped to v2.8 immediately after this pass began, and this document's own "Based on PRD Version" pointer is corrected to v2.8 accordingly; no design changed as a result of the pointer fix): **R4's reply-sentiment classification is removed** (Planning Decision #94, AC-070) and **the KEY 2 pitch is redefined around a newly-adopted collaboration-style inference capability** (Planning Decision #96/#97, AC-071–AC-074). No screen or flow is deprecated this round — both changes extend existing entries in place, consistent with this document's established preference (see the C3-demo, GitHub/Slack/Gmail-merge, and Recipient-candidate-detection precedents already in the UX Decision Log). Changes:
+1. **UX-013 (Response Feedback View) loses reply-sentiment classification, keeps response-time comparison only** (AC-070). Every "sentiment"/"감정 분류"/"감정 분포" reference tied to R4 across this document's Flow (UF-010), Screen Catalog (UX-013), Accessibility, and Claude Design Prompts sections is removed or rephrased this pass — the full list of edited locations is in this pass's report. **AC-025's original text is not edited** (only its sentiment-classification/sentiment-distribution requirement is superseded by AC-070; AC-025's response-time requirement remains fully in force and is what UX-013 now documents alone), matching the precedent already set for AC-006/AC-049, AC-048/AC-057, and AC-048④/AC-063.
+2. **UX-018 is redesigned from a 2-field enrichment lookup into a 4-stage screen**: 입력/조회 (unchanged, AC-065) → **관측** (AC-072, plus the previously-undocumented activity-timezone candidate from AC-071/Planning Decision #95, which PRD's own #34 batch already introduced before this pass but was missed in Document Version 4.0 — this gap is closed this pass) → **제안** (AC-073) → **합의** (AC-074). The Observation stage shows only counted, factual metrics with per-indicator sample sizes and **never a trait/personality statement**; the Suggestion stage proposes draft values for exactly #24's 4 existing pair-protocol axes (no new axis), each with cited evidence (which observed metric/value it came from) and a confidence-or-evidence-count indicator, and is withheld entirely ("표본 부족으로 제안하지 않음") below an unconfirmed sample threshold; the Agreement stage requires an explicit confirm click before anything is written to storage, states "확정 전에는 저장되지 않습니다" on-screen, and is superseded/discarded if the counterpart has directly authored the pair protocol in the meantime (AC-037/AC-074④, Planning Decision #26). This is documented as an in-place extension of the existing Flow UF-018 and Screen UX-018 — no new Flow/Screen ID, per this document's established precedent against creating near-duplicate surfaces for a capability that shares the same entry point, purpose, and exit as an already-defined screen.
+3. **UX-011 (Pair Communication Protocol) gets a small in-place update**: it now also belongs to UF-018 (since a confirmed inference writes into this exact same protocol record, never a parallel table) and cites AC-074 alongside AC-037; a Business Rule notes the confirm-time conflict check.
+4. **Deprecated-phrase sweep**: this document was checked for the retired KEY 2 phrasing ("우리는 상대의 성향을 추론하지 않습니다" / "수신자의 수용 방식을 학습한다" / "상대가 직접 합의한 규칙만 받아서 쓴다" and near-variants). **None of these phrases exist verbatim anywhere in this document** — this document never quoted pitch/marketing copy, only functional requirements — so there is nothing to supersede on that front beyond the sentiment-classification text (item 1) and the one Decision Log entry marked Superseded below (its body is preserved verbatim, append-only, per this document's own rule; only its Status changes).
+5. **Cut-safety reconfirmed for the expanded UX-018**: MVP Scope #34 is still P2/cut-eligible (Planning Decision #82⑤, unchanged by #96). With UX-018 absent, UX-004's "상대방 정보 보강" link is simply not rendered (Absent-not-disabled controls pattern) and mediation runs unaffected (AC-065①); UX-011's direct pair-protocol editing is entirely independent of UX-018 and unaffected by its presence or absence (Planning Decision #98's scenario ③/④ already covers the case where #24 survives without #34, or neither survives).
+6. **Open Questions #12 and #13 re-checked**: neither is resolved or invalidated by this round's changes — #12 (whether the enrichment link should hide for already-registered recipients) still applies to the same entry point, now leading to a larger screen; #13 (privacy-notice re-show on capability changes) is untouched since neither AC-070 nor AC-071–074 change what the Chrome extension (UX-016/UX-017) reads or discloses — this pass is entirely a web-app-side change (UX-013, UX-018, UX-011). **Two new Open Questions are opened this round (#14, #15)** — see Open Questions.
+
+**Prior-round summary (v4.0, retained for history)** — This was a revalidation pass against docs/PRD.md v2.7 (previous pass was against v2.6, Document Version 3.0). PRD v2.7 reflects 11 user decisions and adds AC-059–AC-069 / MVP Scope rows #34–#37. This pass is additive-and-corrective, not a restructure: no screen is deprecated this round. Changes:
+1. **Onboarding reversed from "forced, no skip" to "skippable"** (AC-059/Planning Decision #85) — UX-003 gets a Skip control, an empty/skipped profile is a valid state (never fabricated), UX-004/UX-016 show an explicit "개인화 미적용" indicator when personalization is off, and UX-009 gets a "온보딩 완료하기" resume path. The prior working assumption ("Onboarding Treated as Forced and Fully Required") is marked Superseded in the UX Decision Log, not deleted.
+2. **Password guidance corrected to "minimum 8 characters, no complexity rule"** (AC-060/Planning Decision #86) on UX-002; guidance text must never imply a complexity requirement that isn't enforced (same no-overstatement principle as AC-034).
+3. **C6 Ticket View (UX-007) empty sections now always show "없음" explicitly** — no section is ever omitted, confirmed as a hard requirement by AC-062 (was previously an ux-design working assumption pending Open Question #7).
+4. **Decision Authority field names are split and confirmed**: C6's ticket-level field stays `decisionAuthority` (single value, UX-007); C7's summary-table field is renamed `decisions[].authorityStatus` (per-row, UX-008) — both exist simultaneously (AC-064/Planning Decision #84). This resolves the schema-granularity tension flagged in Document Version 3.0's UX Decision Log and Open Questions #9. **All 7 occurrences of `decisionAuthority` in the prior version of this document were checked**; see this pass's report for the per-occurrence disposition.
+5. **Holiday no-data countries: fully hidden from the user, not just "no distinct state"** (AC-063/Planning Decision #90) — no label, grey badge, or empty box ever renders on UX-004/UX-015/UX-016 for a country absent from the KR/US/JP/CN dataset; the distinction lives only in internal state/test output. This is the opposite of the ordinary "no-fabrication" pattern (which shows an explicit label) and is now called out as its own Interaction Pattern to prevent implementer confusion.
+6. **UX-016 (Layer 1 panel) gets an explicit "recipient unspecified" personalization-off indicator** (AC-066) — the full select→mediate→approve→copy path completes with no recipient, never a fabricated one — plus a **5,000-character soft-cap counter** (AC-061, also added to UX-004) that never blocks input or mediation.
+7. **UX-016 extended with recipient-candidate detection/selection** (AC-067/AC-068, P2/cut-eligible) — auto-selection only with visible evidence + a clear/change control; no evidence → no selection. UX-017's privacy notice content is now explicitly conditional on whether this capability shipped (AC-068②③).
+8. **Two new screens**: UX-018 (Recipient Public Profile Enrichment, AC-065, P2) — a single pasted GitHub URL, two raw fields (`location`/`company`), user-confirmed timezone, source+timestamp always shown, no "profiled the recipient" language. Recipient-candidate selection (AC-067) was evaluated for a new screen but **folded into UX-016 instead** (see UX Decision Log) since it's the same panel context, consistent with this document's precedent against inventing near-duplicate surfaces.
+9. **UF-016 (Interpret mode) confirmed always-manual, never auto-suggested** (AC-069/Planning Decision #91) — matches this document's existing design; now cited explicitly and Open Question #11 is closed.
+10. **10 of this document's own Open Questions (#1–4, #6–11) are now answered** by PRD v2.7 decisions — see Open Questions section. Only 2 new, narrower questions are opened this round (#12, #13).
+
+**Prior-round summary (v3.0, retained for history)**: This was a revalidation pass against docs/PRD.md v2.6 (previous pass was against v2.3, Document Version 2.0). docs/PRD.md changed **materially** between v2.3 and v2.6: the Chrome extension was restructured into a **two-layer adapter model** (Planning Decision #61/#62) — **Layer 1 = a site-agnostic selection overlay** (new MVP Scope #32, AC-052–054) that works on any webpage via drag-select, and **Layer 2 = per-site DOM insertion only** (GitHub/Slack/Gmail, redefined MVP Scope #16/#27/#31) that no longer owns its own invocation button or overlay UI — that ownership moved to Layer 1. This is a screen-structure change, not just new fields, so every extension-related flow/screen was re-checked per the Workflow before anything new was added. **One screen (UX-014) is superseded and moved to Deprecated** as a direct result (see Deprecated section and UX Decision Log) — this is the first Deprecated entry in this document's history. Everything else from Document Version 2.0 remains valid and is extended in place.
+
+**This pass resolves the 7 items planner explicitly routed to ux-design** (docs/Tasks.md T56, T55/AC-052, T56/panel-reuse, T57/AC-053, T58/AC-054, AC-053③, T60/AC-055) plus the new/changed AC-056–058 mappings:
+1. **Second entry point into mediation** — the extension's Layer 1 overlay (new Screen UX-016) now sits alongside the web app (UX-004) as an independent way to reach the same core mediation call (T15/AC-028); this is a structural addition, not a UX-004 content change.
+2. **Drag-select → floating trigger button** — a new reusable Interaction Pattern ("Selection-triggered floating button") defines placement, viewport-edge clamping, dismissal-on-deselect, and the non-interference rule (AC-052⑤).
+3. **Panel reuse scope** — resolved with a proposal (see UX Decision Log "Layer 1 Panel Reuses the Extension-Overlay UI Contract"): UX-016 reuses UX-014's former compact-overlay *shape* (not the web app's two-panel layout), since it must render inside arbitrary third-party pages via a content script. Final feasibility is architect's to confirm.
+4. **Two-path result area** — always-present "Copy to clipboard" + conditionally-present "Insert into input field" (only when a Layer 2 module is registered for the current site) — designed on UX-016, with a new "Absent-not-disabled controls" Interaction Pattern so the missing Insert option never reads as broken (AC-053①②).
+5. **First-run privacy notice** — new Screen UX-017, scoped to a **notice-only** screen (no consent storage/withdrawal UI) because PRD Open Question #23 (privacy-notice scope) is still `open` — this document does not guess ahead of that decision.
+6. **Layer-2-cut state never looks broken** — same "Absent-not-disabled controls" pattern as item 4; when all Layer 2 modules are removed, UX-016's everyday ClipboardOnly state is simply what every uncovered site already looks like (AC-053③).
+7. **"해석" (Interpret) path for received messages** — added as a mode switch *inside* UX-016 (no new screen), via new conditional Flow UF-016; gated behind PRD's P3 activation conditions (MVP Scope #33, AC-055).
+
+**Additional AC-driven updates carried from prior rounds**: AC-056 (이모지 경고 재작성 — 위험도 3단계, 국가 라벨 없음) updates UX-004/UX-016's emoji-warning wording; AC-057 (공휴일 대상국 KR/US/**JP**/CN, GB dropped) updates the holiday dataset referenced by UX-004/UX-005/UX-015 (AC-048's original text is not edited, per Planning Decision #74 — UX.md follows the operational AC-057 list); AC-058 (C6 오탐 방지) tightens UX-004's "Convert to Task Ticket" link to an explicitly gated control (present/absent, never disabled) rather than an unconditional emotional-message affordance, also reflected on UX-007/UF-004.
+
+**C3-only "before/after learning" demo (Planning Decision #76) does not require a new screen.** This was evaluated and rejected as a new-screen candidate: the demo re-runs the same mediation flow (UX-004) for the same sender/recipient at two points in the sender's diff-history timeline, and separately checks the learned-vs-self-reported state already surfaced on Profile Management (UX-009). No new interaction, data view, or control is requested by docs/PRD.md beyond what UX-004 and UX-009 already render — inventing a comparison screen here would be scope creep under this document's own "don't invent features" rule.
+
+**Recipient-candidate detection/selection (AC-067) does not get its own new screen either (this pass).** It was evaluated as a candidate for a new Screen ID (planner's routing note called it "층 1 수신자 후보 선택 UI") but folded into UX-016 (Universal Selection Mediation Panel) instead — same panel context, same entry mechanism, and this document already has precedent (the C3-only demo above, and the GitHub/Slack/Gmail merge into one former UX-014) for not inventing a near-duplicate surface when an existing screen already owns the interaction. See UX Decision Log.
+
+This document now covers the web app (Next.js, primary demo path per Planning Decision #3) and the Chrome extension — now framed as **Layer 1 (site-agnostic overlay, UX-016) + Layer 2 (GitHub/Slack/Gmail insertion, contributing only to UX-016's conditional Insert control)**. **22 user flows and 18 active screens** (plus 1 Deprecated) are defined below, tracing to every MVP-scope acceptance criterion that has a coverable UI.
+
+**Acceptance criteria with no coverable UI** (backend, process, or logistics only — not forced into a screen, per the Consistency Check rule): AC-026 (deployed URL running the full flow — an infrastructure/QA verification, not a distinct screen; its user-visible surface is simply UX-001–UX-004 working end-to-end on the public URL), AC-027 (I/O schema documentation — a developer artifact), AC-028 (core engine/adapter separation — an architecture property, verified by import-path inspection, not a screen), AC-030/AC-031 (backend key handling and `.env.example`/README sync — no UI), AC-032 (fixed processing order — reflected as a Business Rule on UX-004 and verified via logs/tests, not a separate screen), AC-033 (synthetic demo data preparation — a content/QA task, not a screen), AC-034 (presentation materials — not part of the product UI), AC-035 (painpoint interview validation — a research activity, not a product feature), AC-045 (Korean euphemistic-urgency restoration, KO→EN: a translation-quality/prompt-rule guarantee verified by the T11 regression test set, not a distinct interactive control; its only user-visible surface is the same transformed-text/backtranslation area UX-004 already renders — no new widget), AC-049 (unambiguous date/number formatting: likewise a backend normalization rule verified by regression tests, visible only as ordinary text within UX-004's existing transformed-text display, no separate control). **All AC-059–AC-069 (v2.7's new range) have a coverable UI and are mapped below — none needed this exclusion list. Same for AC-070–AC-074 (v2.8's range): AC-070 maps to UX-013, AC-071–AC-074 map to UX-018. Same for AC-075–AC-083 (this pass's v2.9/v3.0 range): AC-075 maps to UX-011, AC-076 maps to UX-017, AC-077/AC-078 map to UX-018/UX-004 respectively, AC-079/AC-083 map to UX-011, AC-080/AC-081 map to UX-016/UX-019/UX-017, AC-082 maps to UX-018 (its source-specific threshold constants surface only as which of the existing "표본 부족으로 제안하지 않음"/silently-skipped-axis states fires, not a new control, but the constant it reads is now user-visible-behavior-relevant enough to list rather than exclude) — none needed this exclusion list either.**
+
+This project has a user-facing UI (two-panel web app + Chrome extension), so ux-design is applicable — this is not a CLI/library/headless-API project.
 
 ## User Flows
 Every flow must use this template — do not vary the shape.
 
-### {{Flow Name}} (Flow ID: {{UF-001}})
+### Sign Up & Log In (Flow ID: UF-001)
 | Item | Value |
 |---|---|
-| Actor | {{who}} |
-| Trigger | {{what starts this flow}} |
-| Related Acceptance Criteria | {{AC-# — docs/PRD.md MVP Scope row #}} |
-| Steps | {{1. ... 2. ... 3. ...}} |
-| Alternative Flow | {{branch, or "N/A"}} |
-| Failure Flow | {{what happens on failure}} |
-| Success Criteria | {{observable end state}} |
+| Actor | Any user (new or returning) |
+| Trigger | User opens the web app without an active session, or an active session expires |
+| Related Acceptance Criteria | AC-039 |
+| Steps | 1. User opens the web app. 2. If no valid session exists, the app redirects to Login (UX-001). 3. New user selects "Sign up" → Sign Up (UX-002); enters email + password + confirm password; submits. 4. Returning user enters email + password on Login; submits. 5. On success, a session is created and the user is redirected to the originally requested URL, or to the Two-Panel Mediation Workspace (UX-004) if none was requested. 6. First-time login (no profile record yet) redirects to Onboarding (UX-003, see UF-002) before reaching UX-004. 7. User may log out from the nav menu at any time, ending the session and returning to Login. |
+| Alternative Flow | Password reset is not specified in docs/PRD.md — out of scope for this MVP pass (see Open Questions). |
+| Failure Flow | Invalid credentials → inline error on Login, fields retained except password. Signup with an email already in use → inline error with a link to Login. |
+| Success Criteria | A valid session exists; each user's profile/pair-protocols/diff history/dictionary are scoped to that identity only, verifiable by cross-checking two accounts (AC-039). |
+
+### Onboarding — Communication Style Profile Setup (Flow ID: UF-002)
+| Item | Value |
+|---|---|
+| Actor | Newly registered user, first login only |
+| Trigger | First successful login/signup with no existing profile record |
+| Related Acceptance Criteria | AC-011, AC-046, AC-059 |
+| Steps | 1. User lands on Onboarding (UX-003) immediately after first login. 2. User answers 3–5 questions (directness vs. indirectness, emoji preference, formality level, and — v2.2/v2.3 addition — honorific level (합쇼체/해요체) for EN→KO output; if adding this would exceed 5 questions, an existing question is merged per T19, an implementation detail this document doesn't dictate). 3. User submits. 4. A profile record is created and immediately used as the personalization baseline for future conversions (C2/C4), including which honorific level EN→KO conversions default to (AC-046②). 5. User is redirected to the Two-Panel Mediation Workspace (UX-004). |
+| Alternative Flow | **(v2.7/AC-059) User clicks "건너뛰기" (Skip) instead of answering.** ① Skipping requires no answers and works from the moment the screen loads. ② The profile record is saved empty — no default/guessed values are filled in (AC-059②). ③ User is redirected to UX-004 exactly as after a completed submission, except UX-004/UX-016 now show an explicit "개인화 미적용" (personalization off) indicator and only run base conversion — no C3 personalization (AC-059③). ④ The user may return to this screen later from Profile (UX-009)'s "온보딩 완료하기" action to fill in the profile; doing so immediately enables personalization for subsequent conversions (AC-059④). Only a full skip (the entire questionnaire) exists — there is no partial/per-question skip. |
+| Failure Flow | Save fails (network/API) → error shown, answers retained in the form, retry available. This applies identically to a Skip action, which also persists a record (empty, flagged as skipped) and can fail the same way. |
+| Success Criteria | A profile record exists for the user (complete or explicitly empty/skipped) and is retrievable/editable later from UX-009; a skipped profile never contains fabricated values (AC-059②), and both the skipped-account and completed-account cases are independently verifiable (AC-059⑤). |
+
+### Compose & Mediate a Message — Web (Flow ID: UF-003)
+| Item | Value |
+|---|---|
+| Actor | Logged-in sender |
+| Trigger | User opens the Two-Panel Mediation Workspace (default landing screen) and starts writing a message to a recipient |
+| Related Acceptance Criteria | AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-015, AC-022, AC-029, AC-032, AC-041, AC-043, AC-046, AC-047, AC-056, AC-058, AC-059, AC-061, AC-078 (link-visibility rule, new v6.0), AC-024 (optional branch), AC-036 (optional branch), AC-057 (optional branch, supersedes AC-048's country list per Planning Decision #74) |
+| Steps | 1. User enters a recipient identifier and message text in the Sender panel — the text area shows a character counter once the text approaches 5,000 characters (advisory only; typing/mediation is never blocked past that point, AC-061). 2. User triggers mediation ("Run Mediation"). 3. System runs the fixed pipeline in order: C1 urgency classification → (if CRITICAL, skip scheduling/negotiation) → C3 profile lookup (skipped entirely if the sender's own profile is empty/skipped, AC-059③) → C5 terminology injection → C2 tone conversion with preservation filter (also producing `misreadRisks[]`, honorific-consistency `warnings[]`, and `holidayConflicts[]` in the same call) → C4 backtranslation. 4. Urgency badge (CRITICAL/NORMAL/LOW) and reasoning appear in the Sender panel; user may override the level. If the sender's profile is empty/skipped (AC-059), the panel also shows an explicit "개인화 미적용" indicator — base conversion still runs normally. 5. Recipient panel shows the transformed message (preserved items marked), the conversion reason, the backtranslation with its "1차 안전장치" limitation notice, and inline non-blocking warnings where applicable: emoji-risk (R1, AC-056 — fires only when a `높음`/`중간`-risk emoji is used AND no agreed protocol/profile value permits it; fixed copy "이 이모지는 해석이 갈릴 수 있습니다 — 상대와 합의된 규칙이 없습니다," never a country/nationality claim), honorific-level mixing (AC-046), unregistered-honorific (AC-047). 6. **Before approving**, the user can see any Misread Risk items (`misreadRisks[]` — quote / expected misreading / evidence per item; nothing renders if the array is empty, AC-043) and any holiday-conflict warning (`holidayConflicts[]`; nothing renders if empty **and nothing renders at all — not even a "no data" label — when the recipient's country simply has no entry in the holiday dataset, AC-063**) with a "기한 재협상" link into Response Deadline Negotiation (UX-005) when a conflict is flagged. 7. A "Convert to Task Ticket" link appears **only when the emotional-signal detector judges the message emotionally charged** (AC-058) — for low-signal input (e.g., a plain status-check question) the link does not render at all; it is never shown-but-disabled (branches to UF-004 when present; see the "Absent-not-disabled controls" Interaction Pattern). 8. If urgency is NORMAL/LOW, the user may optionally open Response Deadline Negotiation (UX-005) or Scheduled Send (UX-006); the user may also optionally open Recipient Public Profile Enrichment (UX-018, see UF-018) via a "상대방 정보 보강" link next to the recipient field, when the recipient isn't a registered account. 9. User reviews and explicitly clicks "Approve & Send." 10. System performs a mock send: the Recipient panel updates to a "Delivered" state with a timestamped log entry, and the approved-vs-AI-suggested diff is recorded. |
+| Alternative Flow | User overrides the urgency level (step 4) — the override carries through steps 5–10. User edits the transformed text directly before approving — the edited text becomes the diff baseline (AC-012). CRITICAL messages skip step 8 entirely and go straight to step 9 with tone-only refinement (AC-005). Misread Risk items and holiday-conflict warnings are advisory only and never block "Approve & Send" — the human decides even when warned, consistent with Planning Decision #5. |
+| Failure Flow | LLM call times out/fails at any pipeline step → fallback UI (progress indicator → failure banner with retry; draft text preserved, AC-029). If a pre-scripted fallback response is used instead (cache/credit exhaustion), a visible "폴백 응답 사용 중" indicator is shown (AC-041). |
+| Success Criteria | A mock-delivered message exists in the Recipient panel with an audit log entry; no send occurs without the explicit approval click in step 8 (AC-010). |
+
+### Convert Emotional Message to Task Ticket (Flow ID: UF-004)
+| Item | Value |
+|---|---|
+| Actor | Logged-in sender, mid-composition |
+| Trigger | User clicks "Convert to Task Ticket" from the Recipient panel of UX-004 |
+| Related Acceptance Criteria | AC-017, AC-018, AC-050, AC-058, AC-062, AC-064 |
+| Steps | 1. User clicks "Convert to Task Ticket" (only reachable when AC-058's emotional-signal gate showed the link on UX-004). 2. System restructures the message into 4 sections — [문제 정의] / [영향·리스크] / [요청 사항] / [우려 수준] — on the Ticket View (UX-007), **always rendering all 4 sections regardless of evidence; a section with nothing derivable shows an explicit "없음" rather than being omitted or left blank (AC-062, confirmed hard requirement)** — plus a **결정 권한 상태** (Decision Authority Status) meta field, stored as the ticket-level single-value `decisionAuthority` (확정/내부 승인 필요/검토 중/불명, distinct from UX-008's per-row field — AC-064), shown as `불명` with no evidence rather than left blank or guessed (AC-050①). 3. [우려 수준] shows the preserved emotional intensity as metadata (not deleted). 4. User reviews and may edit any section (the authority status field is read-only, since it is not one of the 4 user-editable sections — see this screen's Architect Handoff). 5. User returns to UX-004 with the ticket content as the message body to mediate/approve. |
+| Alternative Flow | N/A |
+| Failure Flow | Conversion API fails → error banner with retry; the original free-text message is preserved and the user can proceed with normal (non-ticket) mediation instead. |
+| Success Criteria | A 4-section structured ticket is visible with concern-level preserved; the user can proceed to approval. |
+
+### Summarize Thread Decisions & Detect Unresolved Items (Flow ID: UF-005)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user |
+| Trigger | User enters a multi-message thread and requests a decision summary |
+| Related Acceptance Criteria | AC-019, AC-020, AC-038, AC-050, AC-064 |
+| Steps | 1. User navigates to Decision Summary (UX-008) and inputs thread text. 2. User triggers summarization. 3. System returns a Decision / Owner / Deadline / **결정 권한 상태** table (the fourth column added v2.2/v2.3, AC-050) — the status value for each row is the per-decision field `decisions[].authorityStatus` (distinct from UX-007's ticket-level `decisionAuthority`; both field names exist simultaneously and share the same enum/judgment logic — AC-064, resolving the granularity tension previously logged as Open Question #9). 4. Fields with no evidence in the thread are shown as "미정" (Decision/Owner/Deadline) or "불명" (Decision Authority Status) — never invented. 5. System separately lists Unresolved warnings — agreement-like statements with a missing Owner and/or Deadline, each labeled with which field is missing. |
+| Alternative Flow | N/A |
+| Failure Flow | Summarization API fails → error banner + retry, input thread text preserved. |
+| Success Criteria | Table and warning list are both visible and consistent — no fabricated owners/deadlines. |
+
+### Manage Communication Profile (Flow ID: UF-006)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user |
+| Trigger | User navigates to Profile (UX-009) from the nav menu |
+| Related Acceptance Criteria | AC-012, AC-013, AC-014, AC-046 |
+| Steps | 1. User opens the Profile screen. 2. Screen lists current profile values (from onboarding + learned patterns) with a source indicator (self-reported vs. learned-from-diff), including the honorific-level (합쇼체/해요체) item added v2.2/v2.3 (AC-046②). 3. User may edit or delete any item. 4. Changes save immediately and apply to future conversions. |
+| Alternative Flow | N/A |
+| Failure Flow | Save fails → inline error, previous values retained, retry available. |
+| Success Criteria | Displayed profile matches what is actually used in the next mediation run; deleted items no longer influence output. |
+
+### Manage Project Terminology Dictionary (Flow ID: UF-007)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user |
+| Trigger | User navigates to Terminology Dictionary (UX-010) |
+| Related Acceptance Criteria | AC-015, AC-016, AC-047 |
+| Steps | 1. User opens the dictionary screen and sees the entry list (term → do-not-translate mapping, and — v2.2/v2.3 addition — person/honorific entries). 2. User adds an entry, first choosing an entry type: **용어 (Term)** or **사람/호칭 (Person)**. For a Term entry, user fills the term mapping as before. For a Person entry, user fills 3 fields: 실명 (real name) / 한국어 호칭 (Korean form of address) / 영어 호칭 (English form of address). 3. User may edit or delete any entry of either type. 4. Saved terms/honorifics are used in subsequent C5 injection during mediation (UF-003) — registered honorifics are used exactly as entered in both directions; unregistered people are never auto-assigned a guessed honorific (AC-047②/③). |
+| Alternative Flow | N/A |
+| Failure Flow | Duplicate term → inline validation error, add blocked until resolved. Save fails → inline error, retry. |
+| Success Criteria | A registered term appears unmodified (not paraphrased) in the next mediation output containing that term. |
+
+### Agree on Pair Communication Protocol (Flow ID: UF-008)
+| Item | Value |
+|---|---|
+| Actor | Two logged-in users (sender + a specific recipient) |
+| Trigger | Either user opens Pair Protocol (UX-011) for a specific counterpart |
+| Related Acceptance Criteria | AC-037, AC-075 (authorship display) |
+| Steps | 1. User selects/enters the counterpart's identifier and opens the pair protocol for that pair. 2. If none exists yet, the user sets values for 4 items: directness allowed / emoji use / form of address / deadline phrasing. 3. The counterpart opens the same screen (their own login) and reviews/edits the same 4 items. 4. Saved values apply as the agreed protocol for messages exchanged with that counterpart, overriding the sender's global C3 profile on conflicting fields. 5. **(new v6.0, AC-075)** Whenever either user views this screen, a badge shows one of 4 states for who most recently defined the current values — 추론 초안 / 발신자가 확정 / 상대가 직접 작성 / 아직 정해지지 않음— updated every time either party saves. |
+| Alternative Flow | See Flow UF-022 (new v6.0) for the case where this screen also shows a mismatch-confirmation banner because observed activity has diverged from a reported value on one or more axes — that is a distinct trigger (system-detected, not user-initiated) and is documented separately rather than as a branch of this flow. |
+| Failure Flow | Save fails → inline error, retry, values retained in the form. |
+| Success Criteria | A message to that counterpart uses the pair protocol values over the global profile wherever the two conflict (per AC-037's example); the authorship badge always reflects the actual last writer, verified with 2 cases (a counterpart-direct-edit case shows ⓒ; a sender-confirmed-inference case shows ⓑ, AC-075⑤). |
+
+### Get Meeting Time Suggestions (Flow ID: UF-009)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user |
+| Trigger | User opens Meeting Time Suggestion (UX-012) |
+| Related Acceptance Criteria | AC-023 |
+| Steps | 1. User enters own timezone + available hours, and the counterpart's timezone + available hours. 2. User requests suggestions. 3. System returns up to 3 overlapping candidate times. |
+| Alternative Flow | No overlap found → explicit empty state with explanation. |
+| Failure Flow | API fails → error + retry, inputs retained. |
+| Success Criteria | Up to 3 valid overlapping times are shown, or an explicit no-overlap message. |
+
+### Review Response Feedback (Response Time) (Flow ID: UF-010)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user |
+| Trigger | User opens Response Feedback (UX-013) |
+| Related Acceptance Criteria | AC-025 (response-time requirement only — see below), AC-070 |
+| Steps | 1. User opens the feedback screen. 2. Screen lists sent messages with recorded reply arrival time (elapsed). 3. Screen shows a before/after comparison of pre- vs. post-mediation average response time. **(v5.0/AC-070) No reply-sentiment classification or sentiment-distribution comparison is shown anywhere on this screen — that code path does not exist.** |
+| Alternative Flow | No replies recorded yet → empty state. |
+| Failure Flow | Data fails to load → error + retry. |
+| Success Criteria | Comparison reflects only messages with an actually-recorded reply — no fabricated data points; the screen never displays or implies a sentiment judgment about reply content (AC-070②③). |
+
+### Mediate & Insert via Chrome Extension — GitHub (Flow ID: UF-011)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user working inside a GitHub PR/issue comment box |
+| Trigger | **(v2.5/v2.6 update)** User drags to select text — typically their own draft already typed into GitHub's comment field, though any page text works — and clicks the Layer 1 floating trigger button that appears next to the selection. GitHub no longer has its own separately-injected "Mediate" button or overlay: invocation and panel display now belong to Layer 1 (Planning Decision #61/#62 — see UX Decision Log "Layer 2 Adapters Lose Their Own Invocation UI"; UX-014, which previously owned this, is Deprecated and replaced by UX-016). |
+| Related Acceptance Criteria | AC-021, AC-040, AC-052, AC-053 |
+| Steps | 1. User writes/selects a draft in GitHub's native comment input field (or any other page text). 2. User selects the text and clicks the Layer 1 floating trigger button (see the "Selection-triggered floating button" Interaction Pattern). 3. Universal Selection Mediation Panel (UX-016) opens, pre-filled with the selected text, showing the same classify → convert → backtranslate output as UF-003. 4. User reviews, may override urgency or edit text, and runs mediation to a successful result. 5. Because GitHub is a registered Layer 2 site, an "Insert into input field" option is shown alongside the always-present "Copy to clipboard" (AC-053①②). 6. User clicks Insert — approved text is written into GitHub's comment input field via DOM insertion (targeting the field the selection came from). 7. Panel closes; the user must manually click GitHub's own submit control — the extension never does this. |
+| Alternative Flow | User clicks "Copy to clipboard" instead (always available, even on GitHub) and pastes manually. User cancels the panel → input field unchanged, original draft preserved. |
+| Failure Flow | DOM insertion fails (host DOM change) → explicit error; "Copy to clipboard" remains available as the already-present fallback, so this is never a dead end (AC-053①). LLM failure → same fallback pattern as UF-003. |
+| Success Criteria | Approved text appears verbatim in GitHub's input field via Insert, or is available on the clipboard for manual paste; no submit/send action was triggered by the extension (AC-040). |
+
+### Mediate & Insert via Chrome Extension — Slack (Flow ID: UF-012)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user working inside a Slack message compose box |
+| Trigger | **(v2.5/v2.6 update)** Same Layer 1 selection-and-floating-button trigger as UF-011 — Slack no longer has its own injected "Mediate" control (Planning Decision #61/#62). |
+| Related Acceptance Criteria | AC-042, AC-040, AC-052, AC-053 |
+| Steps | Identical in shape to UF-011's updated steps 1–7; the target field is Slack's message compose box instead of GitHub's comment box, and Insert is offered because Slack is a registered Layer 2 site. |
+| Alternative Flow | Same as UF-011. |
+| Failure Flow | Same as UF-011, targeting Slack's DOM. |
+| Success Criteria | Same as UF-011, verified against Slack's own send control never being auto-clicked (AC-040, AC-042). |
+
+### Track Sent Messages, Mark Replies & Approve Reminders (Flow ID: UF-013)
+| Item | Value |
+|---|---|
+| Actor | Logged-in sender |
+| Trigger | User opens Sent Messages & Reminder Approval (UX-015) from the nav menu, typically to check on outstanding messages |
+| Related Acceptance Criteria | AC-044, AC-063 |
+| Steps | 1. User opens UX-015. 2. Screen lists all of the user's previously mock-sent messages with recipient, sent time, and elapsed business days (weekends + the recipient's country holidays from the AC-057 hardcoded dataset excluded — for a recipient country with no dataset entry, only weekends are excluded and nothing is shown to indicate the gap, per AC-063). 3. For each unmarked message past the 2-business-day threshold (Planning Decision #60), a reminder-suggestion badge appears on that row. 4. User marks "답장 받음" on any message that has actually been replied to (outside the tool) — that row's reminder suggestion disappears and the row shows a static replied state. 5. For a message still needing a nudge, user clicks "리마인드 검토," which generates a C2-toned reminder draft (a polite confirmation, never a demand). 6. User reviews, and may edit, the draft. 7. User clicks "Approve & Send" — the reminder is mock-sent (same send semantics as UF-003 step 10) and a log entry + diff record are created. |
+| Alternative Flow | User takes no action on a reminder suggestion — it remains visible on next visit until either replied is marked or the reminder is approved (no snooze/dismiss control is designed, since docs/PRD.md doesn't request one). |
+| Failure Flow | Reminder-text generation (C2 call) fails → inline error + retry on that row; no auto-send attempted, no reminder text shown. Mark-replied or approve-send network failure → inline error, that row's state reverts, retry available. |
+| Success Criteria | A message's replied status accurately reflects only the user's manual marking (AC-044①/⑤); no reminder is ever sent without the explicit approval click in step 7 (AC-010, AC-044④); reminder wording reads as a confirmation, not a demand (verified upstream by T51's 3 test cases). |
+
+### Mediate & Insert via Chrome Extension — Gmail (Flow ID: UF-014)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user composing an email in Gmail's web compose window |
+| Trigger | **(v2.5/v2.6 update)** Same Layer 1 selection-and-floating-button trigger as UF-011 — Gmail no longer has its own injected "Mediate" control (Planning Decision #61/#62). |
+| Related Acceptance Criteria | AC-051, AC-040, AC-052, AC-053 |
+| Steps | Identical in shape to UF-011's updated steps 1–7; the target field is Gmail's compose body instead of GitHub's comment box, Insert is offered because Gmail is a registered Layer 2 site, and the recipient is derived from Gmail's "To:" field where readable, or manually entered otherwise (same context-derivation pattern now documented on UX-016). |
+| Alternative Flow | Same as UF-011. |
+| Failure Flow | Same as UF-011, targeting Gmail's DOM. Gmail's compose DOM is reputed to be complex/frequently-changing (docs/PRD.md Assumptions, unverified) — the "copy to clipboard" fallback applies identically if DOM insertion fails. |
+| Success Criteria | Same as UF-011, verified against Gmail's own Send control never being auto-clicked (AC-040, AC-051). |
+
+### Mediate via Universal Selection Overlay — Layer 1 (Flow ID: UF-015)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user, anywhere in the browser (any webpage, not limited to GitHub/Slack/Gmail) |
+| Trigger | User drags to select any text on any webpage and releases the mouse (`mouseup`); a floating trigger button appears next to the selection. |
+| Related Acceptance Criteria | AC-052, AC-053, AC-010, AC-066, AC-061 |
+| Steps | 1. User selects text on any page (e.g., Microsoft Teams web, Notion, an internal wiki, or a Layer-2-registered site's own input field); the pre-filled text area shows a soft character-count indicator once it nears 5,000 characters (advisory only, AC-061). 2. A floating trigger button renders adjacent to the selection, without intercepting any page click/scroll/keyboard behavior before it's clicked (AC-052①⑤). 3. User clicks the button. 4. Universal Selection Mediation Panel (UX-016) opens, pre-filled with the selected text (AC-052②) — no manual paste needed. **No recipient is required at this point** — if none is specified or detected (see UF-019), the panel shows an explicit "개인화 미적용" indicator and runs base conversion only; it never fabricates a recipient to fill the gap (AC-066). 5. User reviews/edits the text and runs mediation; the classify → convert → backtranslate result appears, identical in shape to UF-003. 6. User reviews and, when satisfied, either clicks "Copy to clipboard" (always available, AC-053①) or, if the current site has a registered Layer 2 module, clicks "Insert into input field" (AC-053②). 7. If the user deselects the text before clicking the button, the button disappears (AC-052④). |
+| Alternative Flow | User cancels/closes the panel without copying or inserting — no data leaves the panel. User clicks Insert on a Layer-2 site but insertion fails — falls back to Copy (already present, not a dead end). |
+| Failure Flow | LLM call fails → same fallback/error pattern as UF-003 (retry, pre-filled text preserved). DOM insertion fails (Layer 2 site) → explicit error, Copy remains available. |
+| Success Criteria | The full path (select → panel → mediate → approve → copy) works with **zero site-identification branching** in the base flow (AC-052③, verified on at least 3 sites with no Layer 2 module); no text is copied/inserted without explicit user action (AC-010); the path completes end-to-end with no recipient specified, with the personalization-off indicator shown and no recipient fabricated (AC-066). |
+
+### Interpret a Received Message via Selection Overlay (Flow ID: UF-016, Conditional — P3)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user reading a message someone else sent them, anywhere in the browser |
+| Trigger | User selects text they received (not their own draft) and clicks the same Layer 1 floating trigger button as UF-015. |
+| Related Acceptance Criteria | AC-055, AC-069 |
+| Steps | 1. User selects received message text and opens the Universal Selection Mediation Panel (UX-016) — same entry mechanism as UF-015, no separate button or screen. 2. Inside the panel, user chooses the "해석 (Interpret)" path instead of the default mediate/convert path — **this is always an explicit click; no code path auto-suggests, banners, pre-selects, or pre-executes Interpret, including when the selected text looks like a received message (AC-069①②③, confirmed by PRD Planning Decision #91 — matches this document's existing design, now formally cited)** (AC-055①). 3. System returns (a) the likely intended request/expectation, (b) the quoted evidence span it's based on, and (c) possible misreading points — all labeled "해석 (추정)," never stated as a certainty (AC-055③). 4. If there is no textual evidence to base an interpretation on, the panel shows an explicit "판단 근거 부족" result instead of inventing one (AC-055②, same no-fabrication principle as AC-020/AC-043). |
+| Alternative Flow | User cancels/closes the panel — no data changes on either side. |
+| Failure Flow | Interpretation API fails → same error/retry pattern as UF-015's mediation call. |
+| Success Criteria | The interpretation never alters what was actually sent (Planning Decision #21 unchanged — this is a read-only, on-demand explanation in the reader's own browser) and no new recipient-facing screen was created to show it (AC-055④). |
+| **Activation note** | This flow is **P3/conditional** (docs/PRD.md MVP Scope #33) — it only ships if the activation conditions in docs/Tasks.md (T5–T29 and T55–T58 all `done`, P2 remaining ≤ 6 `todo`, as of 2026-08-18 21:00 KST) are met, and is reverted if T59/T60 aren't `done` by 2026-08-19 12:00 KST. This document specifies the UI contract now so implementer has it ready either way; it does not assert the feature will ship. |
+
+### First-Run Extension Privacy Notice (Flow ID: UF-017)
+| Item | Value |
+|---|---|
+| Actor | Any user, the very first time the extension runs after install |
+| Trigger | Extension's first activation in the browser (before any Layer 1 selection/panel interaction has occurred) |
+| Related Acceptance Criteria | AC-054, AC-068 (conditional item) |
+| Steps | 1. On first run, the extension shows the Privacy Notice (UX-017) once. 2. User reads the notice — what is sent (only the text the user selected, never the full page), where it goes (our backend, which proxies OpenAI — AC-030), that the extension holds a permission to operate on any site, **and — only in a build where recipient-candidate detection shipped (AC-067/T66) — that the extension also reads part of the current page in-browser to find a recipient candidate, without transmitting or storing it (AC-068②)**. 3. User closes/acknowledges the notice. 4. Notice does not reappear on subsequent runs (session/local flag only — no consent record is stored server-side; confirmed as the permanent scope by PRD Planning Decision #81/Open Question #23 resolved). |
+| Alternative Flow | N/A |
+| Failure Flow | N/A — this is a static, local, read-only notice with no network call. |
+| Success Criteria | The notice is shown before any Layer 1 mediation/interpret call can occur on first run, and states only protections that are actually implemented (AC-054③ — no overstatement). |
+
+### Enrich Recipient Info & Infer Collaboration Style via Public Profile URL (Flow ID: UF-018)
+| Item | Value |
+|---|---|
+| Actor | Logged-in sender |
+| Trigger | User clicks "상대방 정보 보강" (Enrich recipient info) next to the recipient identifier field on UX-004, typically for a recipient who is not (or may not be) a registered account, or with whom no pair protocol (UX-011) yet exists |
+| Related Acceptance Criteria | AC-065, AC-071, AC-072, AC-073, AC-074, AC-080 (Stage 2/3 now read combined-source indicators), AC-082 (Stage 2/3 gating now checks source-specific sample floors) |
+| Steps | **Stage 1 — 입력/조회 (unchanged from the prior round, AC-065):** 1. User opens Recipient Public Profile Enrichment (UX-018) for the currently-entered recipient identifier. 2. User pastes **one** public GitHub profile URL into a single input field — nothing is searched, crawled, or auto-suggested (AC-065②). 3. User submits ("조회"). 4. System fetches that account's public profile and activity **once** and extracts only (a) the raw `location`/`company` strings, if present (AC-065③), and (b) the timestamp distribution of public activity (commits/issues/PRs) needed for Stage 2 (AC-072②) — the content of that activity (commit messages, issue/PR bodies) is never read into a stored field, only counted (AC-072②). 5. Screen shows the raw `location`/`company` strings (or "미등록" per field if absent/unfetchable), plus the pasted source URL and the fetch timestamp (AC-065⑥). 6. If `location` yields a recognizable timezone, candidate timezone(s) are listed; separately, if activity timestamps are available, a **"공개 활동 시간대" (public activity time-of-day) candidate** is computed (AC-071①) — **withheld and shown as "미등록" if the activity sample is under the sample threshold** (jointly tentative-30, unconfirmed pending T64, AC-071②). Neither candidate is applied yet. 7. User optionally selects and confirms the location-based timezone candidate and/or the activity-based candidate independently (AC-065④/AC-071③ — both are separately optional, neither auto-applied). **Stage 2 — 관측 (new, AC-072; from v6.0 onward, combined across both observation paths, AC-080④):** 8. Alongside the timezone candidates, the screen displays 4 counted indicators — comment length distribution (average sentence count), emoji usage frequency, response-delay distribution, and the activity time-of-day distribution from step 6 — computed from **this fetched GitHub activity combined with any manually-marked samples (UF-020) collected for the same recipient**, **each shown as a plain factual statement with its own sample count, broken down by source** (e.g., "코멘트 평균 2.1문장 (48건 중 — 수동 표시 30 · GitHub 18)"), **never a trait/personality/style statement** (AC-072④). This stage requires no separate action — it renders as soon as Stage 1's fetch succeeds (or immediately, if manual samples already exist for this recipient even without a GitHub fetch). A "표본 관리 보기" link opens Observation Sample Management (UX-019) for this recipient, where individual samples can be reviewed and deleted (AC-081④). **Stage 3 — 제안 (new, AC-073):** 9. User explicitly clicks "협업 스타일 제안 보기" — this is a deliberate, separate action from fetching (it is not auto-generated), so the user always sees what was observed before anything is proposed from it. 10a. **If the pair protocol for this recipient (UX-011) has already been directly authored by the counterpart**, no draft is generated — the screen shows that fact instead and links to UX-011 (AC-037/AC-074④; no wasted suggestion for an already-settled pair). 10b. **Otherwise**, if the observed sample meets the applicable (tentative, T64/T71-pending) threshold — one of AC-082's 4 source-specific constants, not a single shared number — the system proposes a draft value for each of #24's 4 existing pair-protocol axes (직설 허용 / 이모지 사용 / 호칭 / 마감 표현 — no new axis, AC-073②), each with the specific observed metric/value it's based on and a confidence-or-evidence-count indicator (AC-073③④). 10c. If the sample is under threshold, the screen shows "표본 부족으로 제안하지 않음" instead of a draft — no axis is filled with a guess (AC-073⑤). **Stage 4 — 합의 (new, AC-074):** 11. (Only reachable when Stage 3 produced a draft, 10b.) User reviews and may edit any of the 4 draft axis values — same input controls UX-011 uses for the same 4 fields. A persistent on-screen statement reads "이것은 제안이며 확정 전에는 저장되지 않습니다" (AC-074⑤). 12. User clicks "확정하고 규약에 저장." **Before writing, the system re-checks whether the counterpart has directly authored the protocol since Stage 3 was shown** — if so, the confirm is rejected, nothing is written, and the counterpart's protocol values apply instead (AC-074④, race-condition guard). If not, the confirmed values are written into the **same pair-protocol record UX-011 reads/writes** (AC-074①, not a parallel table) and are visible only on this sender's own screens — never transmitted to or stored on the counterpart's account (AC-074③). 13. User returns to UX-004 (or follows an optional "규약 보기" link to UX-011). |
+| Alternative Flow | User closes the screen at any point without confirming — nothing beyond Stage 1's `location`/`company`/timezone-candidate save (if the user explicitly saved that much) is ever persisted; base mediation for that recipient is completely unaffected either way (AC-065①). User replaces a previously-saved URL with a new one — the new fetch overwrites the old values and any not-yet-confirmed observation/suggestion state (never merges/accumulates from multiple URLs). User edits a draft axis value in Stage 4 before confirming — the edited value, not the AI's original suggestion, is what gets saved (same human-in-the-loop precedence as every other AI-generated text in this document). |
+| Failure Flow | Fetch fails (Stage 1: invalid URL, network error, rate limit) → inline error naming the failure; `location`/`company` show "미등록"; source URL/attempt timestamp still recorded; user may retry or paste a different URL — no value ever guessed to fill the gap. Suggestion generation fails (Stage 3, LLM/backend call) → inline error + retry; no draft shown; this is distinct from the legitimate "표본 부족으로 제안하지 않음" empty result, which is not an error. Confirm fails (Stage 4: network error, or the race-condition conflict in step 12) → inline message identifying which case occurred (transient failure vs. counterpart-authored-in-the-meantime); nothing is written to the pair-protocol record either way; the drafted values remain visible for the user to retry (transient case) or are replaced by the counterpart's actual protocol values (conflict case). |
+| Success Criteria | `location`/`company`/timezone candidates behave exactly as documented for the prior round (AC-065④⑤⑥, AC-071②③); Stage 2's 4 indicators are always factual-only, verified by a copy check finding zero trait/personality-language occurrences (AC-072④); Stage 3 never fills an axis without a cited observed value, and shows zero fabricated axes when under the sample threshold (AC-073③⑤, verified with ≥1 under-threshold case); **zero protocol/inference records exist in storage between a draft being shown and the user's explicit confirm click** (AC-074②, verified by a storage query); a confirmed value never reaches the counterpart's own account or screen (AC-074③); when the counterpart has authored the protocol directly, their values apply and the sender's inference is discarded, verified with 1 conflict case (AC-074④, AC-037). |
+
+### Detect & Select Recipient Candidate on Layer 1 Panel (Flow ID: UF-019, P2 — cut-eligible)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user, inside the Universal Selection Mediation Panel (UX-016) |
+| Trigger | Panel opens (UF-015) on a page where page context may identify a specific counterpart (e.g., a DM thread, a "To:" field, a PR/issue's participant list) |
+| Related Acceptance Criteria | AC-067, AC-068 |
+| Steps | 1. Panel reads page context, in the browser only, for a possible recipient (no network call). 2. If the evidence is strong enough for one confident match, the panel **auto-selects** that candidate and shows what evidence justified it, plus a "변경/해제" control (AC-067②). 3. If evidence yields multiple plausible candidates with no single confident pick, the panel lists them for the user to choose from — **none pre-selected**. 4. If there is no usable evidence, the panel selects nothing at all — the base unspecified-recipient path applies unchanged (AC-067③, AC-066). 5. User may accept an auto-selection, pick from a list, clear the selection, or type a recipient manually (same field UX-004 uses). 6. Whatever recipient ends up chosen (if any) feeds the same personalization pipeline UF-003/UF-015 already use. |
+| Alternative Flow | User overrides an auto-selected candidate at any point before running mediation — the override takes precedence and nothing is re-guessed. |
+| Failure Flow | N/A as an API failure — this is a local, best-effort read with a defined no-match outcome, not a network call; if page-context parsing can't determine anything, the panel falls back to the no-candidate case (same as step 4), never an error state. |
+| Success Criteria | Auto-selection only ever happens with visible evidence and a one-click clear/change control (AC-067②); with no evidence, zero auto-selections occur across ≥2 no-evidence cases (AC-067③); page data read for this purpose never leaves the browser — verified via network payload inspection (AC-068①); with this capability absent or cut, UF-015/AC-066's path still completes end-to-end unchanged (AC-067④). |
+| **Activation note** | This is an ordinary **P2, cut-eligible** feature under docs/PRD.md's 8/18 cutline (Planning Decision #83) — it is not part of the P3 activation-condition mechanism that gates UF-016/Interpret; it may simply not ship, and nothing else in this document depends on it shipping. |
+
+### Mark Selected Text as Counterpart's Message via Selection Overlay (Flow ID: UF-020, new v6.0)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user, anywhere in the browser, reading a specific counterpart's message |
+| Trigger | User drags to select text they believe a specific counterpart wrote (in Slack web, Teams web, Notion, GitHub, or any other page) and opens the Universal Selection Mediation Panel (UX-016) via the same floating trigger button as UF-015, then switches to "상대가 쓴 것으로 표시" mode instead of the default mediate mode. |
+| Related Acceptance Criteria | AC-080, AC-081 |
+| Steps | 1. User selects text on any page — no site needs a Layer 2 module for this to work, and it works identically on at least 2 sites with no Layer 2 module registered (e.g., Slack web, Teams web, or Notion — AC-080①). 2. User clicks the floating trigger button; UX-016 opens pre-filled with the selected text, same as UF-015. 3. User switches to "상대가 쓴 것으로 표시" mode — an explicit mode choice, never automatic or pre-selected (same never-auto-triggered principle already established for Interpret mode, AC-069). 4. User enters the counterpart's identifier in a manual free-text field (same no-directory/no-auto-detection pattern as every other recipient field in this document — the system never guesses or infers who wrote the selected text; AC-080②, "발신자 판별 코드가 존재하지 않는다"). 5. User clicks "표본에 추가." 6. The browser computes only aggregate indicator deltas from the selected text locally (e.g., sentence count, emoji count) — the selected text itself is never transmitted to any backend (AC-081①③). 7. Only the aggregate values, a "수동 표시" source tag, and a timestamp are sent to storage and combined with that counterpart's existing samples, under the same indicator definitions the GitHub path (UF-018) already uses (AC-080④). 8. Panel shows a brief success confirmation with the counterpart's updated total sample count and a "표본 관리 보기" link into Observation Sample Management (UX-019). |
+| Alternative Flow | User repeats steps 1–5 for another message in the same session without closing the panel — the panel stays open after a successful mark (unlike the Insert path, which auto-closes), supporting marking several messages in one sitting. User switches back to the default mediate mode or closes the panel before clicking "표본에 추가" — nothing is added. |
+| Failure Flow | Save fails (network/backend error) → inline error + retry; the selected text and the entered counterpart identifier are both retained so the user never has to reselect or retype. |
+| Success Criteria | A sample is added to exactly the specified counterpart's observation record, tagged "수동 표시," with zero raw text in the stored record (verified by a storage-field check, AC-081②) — and it is immediately visible in UX-019's list for that counterpart. |
+
+### Manage Observation Samples — View & Delete (Flow ID: UF-021, new v6.0)
+| Item | Value |
+|---|---|
+| Actor | Logged-in sender who has previously collected observation samples (manual marks and/or GitHub-derived) for one or more counterparts |
+| Trigger | User navigates to "관측 표본" from the nav menu, or follows a "표본 관리 보기" link from UX-016's mark-mode success confirmation (UF-020) or a "표본 관리" link from UX-018's Stage 2 (관측). |
+| Related Acceptance Criteria | AC-081④, AC-080⑤ |
+| Steps | 1. User opens Observation Sample Management (UX-019). 2. Screen lists every counterpart who has at least one sample, each row showing a total count plus a source breakdown (e.g., "12건 (수동 표시 8 · GitHub 4)," AC-080⑤). 3. User selects a counterpart. 4. Screen lists that counterpart's individual samples — each showing only its source tag and collection timestamp, **never the underlying quoted text** (AC-081②). 5. User deletes any sample; the count updates immediately. 6. The deleted sample no longer contributes to that counterpart's aggregate indicators — verified by UX-018's Stage 2 reflecting the reduced count and sample set the next time it's viewed (AC-081④). |
+| Alternative Flow | No counterparts have any samples yet → an explicit empty state, no drill-down offered. |
+| Failure Flow | List load fails → error + retry. Delete fails → inline error on that specific row; the sample is not removed, retry available. |
+| Success Criteria | The user can always see who they have samples for, how many, from which source, and can remove any individual sample — verified with at least 1 deletion whose effect is confirmed reflected in a later observation/suggestion view (AC-081④). |
+
+### Review & Resolve an Observation-vs-Protocol Mismatch (Flow ID: UF-022, new v6.0)
+| Item | Value |
+|---|---|
+| Actor | Logged-in user viewing the Pair Communication Protocol (UX-011) for a counterpart whose reported protocol values and observed activity have diverged on at least one axis |
+| Trigger | User opens UX-011 for a counterpart pair where the backend has flagged at least one axis as a mismatch between the agreed protocol value and observed activity (#34's "단계 4," AC-079). |
+| Related Acceptance Criteria | AC-079, AC-083 |
+| Steps | 1. User opens Pair Communication Protocol (UX-011) for the flagged counterpart (via the nav menu, a "규약 보기" link from UX-018, or a link surfaced elsewhere in this document that already routes to UX-011). 2. For each mismatched axis that has enough qualifying samples to be checked (**이모지** is checked against both manual and GitHub samples; **직설 허용/호칭/마감 표현** are checked only against manual-marked samples, per AC-083①), a banner appears directly above that axis's control, using the fixed, non-verdict copy **"합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?"** — never wording that implies the counterpart lied or was wrong. 3. User may click "확인" on a banner to see a short, aggregate-only comparison line (e.g., "규약: 이모지 사용 안 함 · 관측: 최근 표본에서 사용 빈도 높음(12건 중 5건)") — never a quoted excerpt (same AC-081② no-raw-text principle extended to this comparison). 4. User may then edit that axis's value directly on this same screen (the field is already editable — no separate confirm dialog) and Save, or dismiss the banner ("나중에") without changing anything. 5. The system never edits the protocol value on its own — there is no automatic-update code path (AC-079⑤). |
+| Alternative Flow | An axis lacks enough qualifying samples of the right source to be checked at all → no banner for that axis, silently (AC-083②, "부분 경고 허용, 억지 경고 금지" — this is not a distinct visible state, it is simply the absence of a banner). User saves an edited value → that axis's banner clears; if a future observation cycle still finds a mismatch, a banner can reappear, which is expected behavior, not a defect. |
+| Failure Flow | Save (on the edited axis value) fails → same inline error/retry pattern as UX-011's existing Save action; the banner remains until the user retries or dismisses. |
+| Success Criteria | A banner appears only for an axis that is (a) actually mismatched and (b) has qualifying samples per AC-083's source rule — verified with 3 cases: a clear mismatch with sufficient manual samples (banner shown), a GitHub-only counterpart (only the emoji axis is ever eligible to show a banner, the other 3 never do), and an axis below its qualifying-sample floor (no banner, AC-083④). No protocol value ever changes without the user's own edit-and-Save action (AC-079⑤). |
 
 ## Screen Catalog
 Every screen must use this template — do not vary the shape.
 
-### {{Screen Name}} (Screen ID: {{UX-001}})
+### Login Screen (Screen ID: UX-001)
 | Item | Value |
 |---|---|
-| Belongs to Flow(s) | {{Flow ID(s), e.g. UF-001}} |
-| Acceptance Criteria | {{AC-# this screen satisfies}} |
-| Purpose | {{...}} |
-| User Goal | {{what the user is trying to accomplish here}} |
-| Entry | {{where the user arrives from}} |
-| Exit | {{where the user goes on success}} |
-| Primary Actions | {{...}} |
-| Secondary Actions | {{...}} |
-| States | Loading: {{...}} / Empty: {{...}} / Error: {{...}} / Success: {{...}} |
-| Validation | {{input validation rules, or "N/A"}} |
-| Failure | {{error conditions specific to this screen — e.g. "camera permission denied"}} |
-| Accessibility | {{keyboard nav, contrast, screen reader notes, or "N/A"}} |
-| Figma Frame | {{URL of the Figma frame the user approved as this screen's visual reference, or "N/A — no Figma reference"}} |
+| Belongs to Flow(s) | UF-001 |
+| Acceptance Criteria | AC-039 |
+| Purpose | Authenticate a returning user. |
+| User Goal | Get into the tool quickly with my own account. |
+| Entry | Direct URL to any protected route while unauthenticated; "Log in" link from Sign Up. |
+| Exit | On success → originally requested URL or UX-004 (default). "Sign up" link → UX-002. |
+| Primary Actions | Enter email + password; Submit ("Log in"). |
+| Secondary Actions | Navigate to Sign Up. |
+| States | Loading: submit button shows a spinner and disables to prevent double-submit / Empty: form blank on first load / Error: invalid-credentials banner above the form / Success: brief confirmation, then redirect. |
+| Validation | Email required, must match basic email format. Password required. Submit enabled only when both fields are non-empty and email passes format check. Format error shown inline under the email field, clears as soon as the field is edited. Invalid-credentials error (server-side) shown as a form-level banner, clears on next submit attempt or field edit. |
+| Failure | Invalid credentials → banner "이메일 또는 비밀번호가 올바르지 않습니다"; user may retry or go to Sign Up. Network/server error → banner with a "다시 시도" retry button, form values retained. |
+| Accessibility | Full keyboard operability (Tab order: email → password → submit → sign-up link); Enter submits; labels programmatically associated with inputs; error banner uses `role="alert"`; error conveyed with icon + text + border, not color alone. |
+| Figma Frame | N/A — no Figma reference |
 
 **Architect Handoff**
 | Item | Value |
 |---|---|
-| Priority | {{Critical / High / Medium / Low}} |
-| Business Rules | {{rules architect/implementer must enforce — e.g. "password must be at least 8 characters"}} |
-| Data Required | {{data this screen reads/writes}} |
-| Data Operations | {{which of Read / Create / Update / Delete apply}} |
-| External Dependencies | {{services/APIs this screen calls}} |
-| Permissions | {{OS/app permissions needed, or "None"}} |
-| Navigation Targets | {{screens this screen can navigate to}} |
-| Events Emitted | {{events this screen fires — e.g. "image_captured"}} |
-| Expected Outputs | {{what this screen produces for the next step}} |
-| Assumptions | {{what architect can assume true when designing this — e.g. "user is already authenticated", "product exists", "network available"}} |
+| Priority | Critical |
+| Business Rules | A session must exist before any protected screen loads. Password rules are enforced at signup (UX-002); login only checks existing credentials. |
+| Data Required | email, password (input only, never displayed after submit) |
+| Data Operations | Read (validate credentials against the stored user record) |
+| External Dependencies | Auth provider (implementation choice is architect's per Planning Decision #30, e.g. Supabase Auth) |
+| Permissions | None (this screen exists to establish permissions) |
+| Navigation Targets | UX-004 (default post-login), UX-003 (if first login / no profile yet), UX-002 (Sign Up), or the originally requested protected URL |
+| Events Emitted | `login_succeeded`, `login_failed` |
+| Expected Outputs | An authenticated session/token for subsequent screens |
+| Assumptions | Network available; auth service reachable |
 
-## Deprecated
-When a screen or flow is no longer supported by the latest docs/PRD.md: never delete it — move its entry here, mark it Deprecated, and explain why. This section is the design history; it does not need to satisfy the Consistency Check below.
-When this section exceeds ~10 entries, ux-design moves the oldest entries whose IDs are no longer referenced anywhere to docs/UX-archive.md (append-only). Archived IDs stay reserved — never reused.
-
-### {{Flow/Screen Name}} ({{Flow ID / Screen ID}})
+### Sign Up Screen (Screen ID: UX-002)
 | Item | Value |
 |---|---|
-| Type | {{Flow / Screen}} |
-| Deprecated Since | {{date or docs/PRD.md version}} |
-| Reason | {{why this is no longer valid}} |
+| Belongs to Flow(s) | UF-001 |
+| Acceptance Criteria | AC-039, AC-060 |
+| Purpose | Create a new account. |
+| User Goal | Get my own account so my data is private to me. |
+| Entry | "Sign up" link from UX-001; direct URL /signup. |
+| Exit | On success → UX-003 (onboarding, since no profile exists yet). |
+| Primary Actions | Enter email, password, confirm password; Submit ("Sign up"). |
+| Secondary Actions | Navigate to Login. |
+| States | Loading / Empty / Error / Success — same pattern as UX-001. |
+| Validation | Email required + format check. **Password required, minimum 8 characters (AC-060①/②) — no additional complexity rule (uppercase/number/special character) is enforced or implied (AC-060③).** Helper text under the password field reads exactly "최소 8자" and must never describe a complexity requirement that doesn't exist (same no-overstatement principle as AC-034/AC-054③) — confirmed by PRD v2.7 (previously this document's own Open Question #1). Confirm password must match Password (mismatch shown inline under the confirm field, clears on edit). Duplicate email → server-side banner "이미 가입된 이메일입니다" with a Login link. Submit enabled only when all three fields pass client-side checks. |
+| Failure | Duplicate email → banner + Login link. Password 7 characters or fewer → inline error under the password field stating the reason (e.g., "비밀번호는 8자 이상이어야 합니다"), clears once corrected (AC-060①). Network/server error → retry banner; email retained, password fields cleared for security. |
+| Accessibility | Same keyboard/labels/alert pattern as UX-001; password fields have a visible show/hide toggle with an accessible label. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Critical |
+| Business Rules | **Password policy: minimum 8 characters, no additional complexity rule (AC-060, PRD Planning Decision #86) — confirmed, no longer an open question.** If the chosen auth provider enforces its own stricter policy, only confirm that policy satisfies the 8-character minimum; do not build a duplicate complexity check on top of it (T45). One account per email. |
+| Data Required | email, password |
+| Data Operations | Create (user record) |
+| External Dependencies | Auth provider |
+| Permissions | None |
+| Navigation Targets | UX-003 (onboarding) on success; UX-001 (Login) via link |
+| Events Emitted | `signup_succeeded`, `signup_failed` |
+| Expected Outputs | New user record + authenticated session |
+| Assumptions | Network available; auth service reachable |
+
+### Onboarding Profile Questionnaire (Screen ID: UX-003)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-002 |
+| Acceptance Criteria | AC-011, AC-046, AC-059 |
+| Purpose | Capture initial self-reported communication style so C2/C4 personalization has a baseline from message 1 — or let the user explicitly opt out of that baseline for now. |
+| User Goal | Tell the tool how I communicate so it doesn't start from zero — or skip this and get to the tool right away. |
+| Entry | Automatic redirect right after first successful login/signup with no existing profile record (or with an unresolved onboarding decision — see Information Architecture). |
+| Exit | On submit → UX-004, profile populated. **On Skip → UX-004, profile saved empty (AC-059②), with UX-004/UX-016 subsequently showing a "개인화 미적용" indicator.** |
+| Primary Actions | Answer 3–5 questions (directness preference, emoji preference, formality level, and — v2.2/v2.3 addition — honorific level (합쇼체/해요체) as the default for EN→KO conversions, AC-046②); Submit. |
+| Secondary Actions | **"건너뛰기" (Skip) — confirmed by PRD v2.7/AC-059 (this document's own prior working assumption of "no skip" is superseded, see UX Decision Log). Skip requires no answers and is available immediately on load; it does not ask the user to confirm individual questions first — it is all-or-nothing (there is no per-question skip).** |
+| States | Loading: submit (or skip) disabled + spinner while saving / Empty: unanswered form on load / Error: save-failed banner, answers (or the skip choice) retained, retry available / Success: brief confirmation then redirect. |
+| Validation | If the user does not skip, all displayed questions are required — confirmed as the only path other than a full skip (AC-059 makes this binary: complete all questions, or skip all of them; there is no partial-answer submission). Submit (complete path) stays disabled until every question has an answer; an unanswered-question indicator appears next to that question and clears the moment it's answered. Skip has no field requirements and is always available. |
+| Failure | Save fails (complete path) → banner "저장하지 못했습니다, 다시 시도해주세요" with retry; answers retained. Save fails (skip path) → same banner/retry pattern; the skip choice is retained so the user doesn't have to re-click Skip. |
+| Accessibility | Each question is a fieldset with a legend; choice groups are keyboard-navigable with arrow keys; submit and Skip both reachable via Tab; error banner uses `role="alert"`. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | High |
+| Business Rules | Exactly one profile record per user, created here — populated if completed, or explicitly empty if skipped (never filled with default/guessed values, AC-059②). Only a full skip exists; there is no partial/per-question skip. Later editable/completable only via UX-009 ("온보딩 완료하기" resume action, added this pass) or by revisiting this screen's flow. A skipped profile must be distinguishable from "not yet visited" so downstream screens (UX-004, UX-016, UX-009) can render the personalization-off indicator correctly (AC-059③) — the exact storage mechanism (e.g., an explicit flag vs. an empty-but-present record) is architect's choice. |
+| Data Required | 3–5 question responses (directness, emoji preference, formality, and honorific level (합쇼체/해요체) — exact question copy is not decided here; if honorific level would push the total past 5, T19 merges it into an existing question, an implementation detail not dictated here); OR none, if the user skips |
+| Data Operations | Create (profile record — complete, or empty/flagged-skipped per AC-059②) |
+| External Dependencies | None (no LLM call on this screen) |
+| Permissions | Requires authenticated session |
+| Navigation Targets | UX-004 |
+| Events Emitted | `onboarding_completed`, `onboarding_skipped` |
+| Expected Outputs | Profile record (complete or empty/skipped) used as default input to C2/C4 personalization in UF-003; an empty/skipped profile causes UF-003/UF-015 to show the personalization-off indicator instead of silently applying defaults |
+| Assumptions | User is authenticated; this is the user's first login (no existing profile), or the user has not yet made an onboarding decision (complete/skip) — see Information Architecture for the direct-URL/redirect behavior this implies |
+
+### Two-Panel Mediation Workspace (Screen ID: UX-004)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-003 (primary), UF-004 (entry point to ticket conversion), UF-018 (entry point to recipient enrichment) |
+| Acceptance Criteria | AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010, AC-015, AC-022, AC-029, AC-032, AC-041, AC-043, AC-046, AC-047, AC-056, AC-057, AC-058, AC-059, AC-061, AC-063, AC-078 |
+| Purpose | Let a sender write a message, see how AI would classify/transform/backtranslate it, and approve or override before anything is "sent." |
+| User Goal | Send a message that reads correctly to my counterpart without losing urgency or meaning. |
+| Entry | Default landing screen after login/onboarding; nav menu "Mediate" tab. |
+| Exit | Stays on screen after send (Recipient panel shows Delivered state); user may navigate away via the nav menu at any time. |
+| Primary Actions | Enter recipient identifier; enter message text; Run Mediation; Override urgency level; Approve & Send. |
+| Secondary Actions | Edit transformed text before approving; open Response Deadline Negotiation (UX-005) via the "Set response deadline" button OR directly from a Holiday Conflict warning (pre-fills the flagged deadline, AC-057, formerly AC-048③); open Scheduled Send (UX-006, NORMAL/LOW only); open Convert to Task Ticket (UX-007 — present only when AC-058's emotional-signal gate fires, absent otherwise, never disabled); open Recipient Public Profile Enrichment (UX-018) via a "상대방 정보 보강" link next to the recipient field — **shown only when there is zero personalization data for this recipient: no pair protocol (UX-011) AND no enrichment data (`location`/`company`/activity time-of-day) on file; hidden the instant any one of those exists, regardless of whether the recipient is a registered member (AC-078, resolving this document's own former Open Question #12 — registration status alone is explicitly not the test, since an onboarding-skipped member, AC-059, can be registered with a fully empty profile and still needs this link)**; dismiss the emoji-risk warning. |
+| States | Loading: "Run Mediation" shows an in-progress indicator across classify→convert→backtranslate steps (must not look frozen, AC-029) / Empty: Recipient panel shows a placeholder before first run / Error: failure banner with retry, draft text untouched (AC-029) / **PersonalizationOff: shown whenever the sender's own profile is empty/skipped (AC-059③) — an explicit inline indicator states "개인화 미적용" and that only base conversion is applied; this is never silent** / Warning: inline, non-blocking alerts drawn from `warnings[]` — emoji-risk (R1, AC-056: fires only for a `높음`/`중간`-risk emoji **and** no agreed protocol/profile value permitting it; fixed copy "이 이모지는 해석이 갈릴 수 있습니다 — 상대와 합의된 규칙이 없습니다"; the underlying risk-tier data carries no country/region/nationality field and the UI never states "어느 나라에서 이렇게 읽힌다"), honorific-level mixing (AC-046③), unregistered-honorific (AC-047②) — each labeled by type, never a single unlabeled "warning" blob / MisreadRisk: shown **before approval** whenever `misreadRisks[]` is non-empty (AC-043③); nothing renders if the array is empty (AC-043②, no hallucination). Two allowed presentation tiers (Planning Decision #57, see UX Decision Log): **Full** — each item shows quote / expected misreading / evidence as three separate labeled parts, expandable list; **Reduced** — a compact "오해 위험 N건" count badge with a keyboard-accessible tooltip carrying the same three-part text per item. Which tier is live is an implementer/schedule choice, not a per-user setting; underlying data generation (T1/T10/T11) is unaffected either way / HolidayConflict: shown whenever `holidayConflicts[]` is non-empty — "이 마감일은 상대 국가 연휴 N일차입니다" with a "기한 재협상" link into UX-005 (AC-057②/③, formerly AC-048②/③); **nothing renders at all — no label, no grey/muted badge, no empty box — when the array is empty for either reason: no conflict found, or the recipient's country has no entry in the holiday dataset at all (operational dataset KR/US/JP/CN, AC-057). The two "empty" cases are visually identical to the user; the distinction exists only in internal state/test output (AC-063①②, confirmed — this document's own Open Questions #8 is now answered; see the "No-data country suppression" Interaction Pattern, which is deliberately the opposite of the ordinary no-fabrication label pattern)** / TicketLinkVisible: the "Convert to Task Ticket" link renders only when the emotional-signal detector fires (AC-058①); TicketLinkAbsent: for low-signal input the link is simply not in the layout — never a disabled/greyed link (AC-058②, see "Absent-not-disabled controls" Interaction Pattern) / ReadyToApprove: full comparison visible, Approve & Send enabled / Delivered: Recipient panel switches to a timestamped log entry, inputs lock for that message / Fallback: visible "폴백 응답 사용 중" indicator when a cached/pre-scripted response is shown instead of a live result (AC-041). |
+| Validation | Recipient identifier required (email format). Message text required. **A visible character-count indicator appears once the text nears 5,000 characters — advisory only, confirmed as a firm requirement (not a recommendation) by AC-061: input beyond 5,000 characters is never truncated or blocked, and "Run Mediation" stays available past that point (verified with a 6,000-character regression case).** "Run Mediation" enabled only when recipient and message text are both valid/non-empty; format error shown inline under the recipient field, clears on edit. "Approve & Send" enabled only after a successful mediation run exists for the current text (disabled during Loading/Error) so an unreviewed message can never be sent. Misread Risk items and holiday-conflict warnings are advisory only — their presence or absence never enables/disables "Approve & Send" (AC-043's requirement is visibility before approval, not a gate). |
+| Failure | LLM call times out/fails at any pipeline step → banner "처리에 실패했습니다" with "다시 시도"; message text is never cleared; if a prior successful transformation exists, approval of that last-good version remains possible, otherwise Approve & Send stays disabled. |
+| Accessibility | Screen-reader reading order is Sender panel then Recipient panel regardless of visual column position. Urgency badge includes a text label, not color alone. Preserved items are marked bold AND labeled "(보존됨)," not bold alone. A live region announces mediation completion/failure, including when new Misread Risk or holiday-conflict warnings appear. Each Misread Risk item's three parts (quote/misreading/evidence) are exposed as separate labeled text for screen readers even in the Reduced tier's tooltip — tooltip content is reachable via keyboard focus, not hover-only. All controls keyboard-reachable in top-to-bottom, left-to-right order. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Critical |
+| Business Rules | Processing order is fixed: C1 → (CRITICAL: skip to tone-only + immediate send) → C3 profile lookup (**skipped entirely if the sender's profile is empty/skipped, AC-059③ — never substituted with guessed defaults**) → C5 terminology injection → C2 tone conversion with preservation filter (also producing `misreadRisks[]`, `warnings[]`, `holidayConflicts[]` in the same call, no extra LLM round trip — Planning Decision #49) → C4 backtranslation → (if emotional: offer C6 ticket link) → user approval → mock send + diff record (AC-032). No code path may send without explicit approval (AC-010, Planning Decision #5). CRITICAL messages receive tone refinement only, never scheduling/negotiation (AC-005). Preserved items must never be silently dropped (AC-006/007). Applied honorific level = pair protocol (if one exists for that recipient) overrides the sender's C3 profile "존댓말 레벨" on conflict (Planning Decision #26, AC-046②) — not applicable if the sender's profile is empty/skipped. An unregistered person's honorific is never invented — original form preserved + a "호칭 미등록" `warnings[]` entry (AC-047②); a Korean rank/title is never auto-translated into an English honorific with no registered mapping (AC-047③, "Manager Kim" pattern explicitly forbidden). The Misread Risk display may be reduced to its compact tier under schedule pressure without altering data generation/storage (Planning Decision #57) — reducing the display is not permitted to reduce what's generated or saved. Emoji-risk data is a fixed 3-tier lookup (높음/중간/낮음) with no country/region field (AC-056①); the warning fires only when a 높음/중간 emoji is used and the recipient pair has no protocol/profile value permitting it (AC-056②), and the warning copy is fixed text, never a country-specific claim (AC-056③). The holiday dataset backing HolidayConflict is KR/US/JP/CN (AC-057); AC-048's original GB-inclusive text is not edited (Planning Decision #74) — this screen implements the operational AC-057 list. **A country with no dataset entry renders nothing to the user at all — not even a "no data" label (confirmed hard requirement, AC-063, Planning Decision #90); this is deliberately different from every other no-evidence case in this document, which shows an explicit label instead of hiding.** The Convert-to-Task-Ticket link's presence is gated by the emotional-signal detector (AC-058) — implementer/QA must verify both a present-case (emotional input) and an absent-case (low-signal input); it must never appear for every message nor be permanently absent. **The 5,000-character soft cap is advisory-only — no code path may truncate input or block "Run Mediation"/"Approve & Send" based on length alone (AC-061②).** **The "상대방 정보 보강" link's visibility is a single boolean check: pair protocol AND enrichment record both empty/absent for this recipient → show; either one populated → hide (AC-078②) — never a membership/registration check.** |
+| Data Required | sender (current user), recipient identifier, message text, urgency override (optional), pair protocol for that recipient (if exists — also read to decide the enrichment-link's visibility, AC-078), sender's global profile (including honorific level — may be empty/skipped, AC-059), any recipient enrichment data from UX-018 (optional, if the user added it — also read for the same visibility check), project terminology dictionary (including person/honorific entries), prior diff history (personalization input only, not shown raw here), static holiday dataset (KR/US/**JP**/CN, 2026, hardcoded — Planning Decision #52, country list updated to AC-057/Planning Decision #74), emoji risk-tier lookup (높음/중간/낮음, no country field — AC-056①) |
+| Data Operations | Read (profile, pair protocol, recipient enrichment record if any, dictionary, holiday dataset, emoji risk-tier lookup); Create (diff record, mock-send log entry on approval) |
+| External Dependencies | Backend-proxied OpenAI calls for C1/C2/C4 (C5 injected into the C2 prompt); response cache + per-session rate limit (AC-041); static holiday dataset (no external API — Planning Decision #52); static emoji risk-tier lookup (no LLM inference — Planning Decision #77) |
+| Permissions | Requires authenticated session |
+| Navigation Targets | UX-005, UX-006, UX-007, UX-018; UX-009/UX-010/UX-011/UX-013/UX-015 via nav menu |
+| Events Emitted | `mediation_requested`, `urgency_overridden`, `message_approved_sent`, `fallback_response_shown`, `holiday_conflict_deadline_negotiation_opened` |
+| Expected Outputs | A diff record (AI suggestion vs. final approved text) for C3 learning; a mock-send log entry for the Recipient panel and UF-010's feedback view |
+| Assumptions | User is authenticated; network/backend available; the recipient identifier does not need to resolve to a registered account for mediation to run, but pair-protocol personalization only applies if it does (see Open Questions); the message text contains an identifiable deadline for holiday-conflict checking — if none is present, `holidayConflicts[]` is simply empty, not an error |
+
+### Response Deadline Negotiation Modal (Screen ID: UX-005)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-003 |
+| Acceptance Criteria | AC-036, AC-057 (supersedes AC-048's country list per Planning Decision #74) |
+| Purpose | Let the sender state a needed deadline and see whether it's realistic given the recipient's working hours (and their holidays), with a counter-offer if not. |
+| User Goal | Set a deadline the recipient can actually meet, without guessing their time zone or holiday calendar by hand. |
+| Entry | "Set response deadline" button on UX-004 (NORMAL/LOW messages only), OR the "기한 재협상" link on UX-004's Holiday Conflict warning (pre-fills the needed-by field with the flagged deadline, AC-057, formerly AC-048③). |
+| Exit | "Use this deadline" / "Accept counter-offer" → closes modal, chosen deadline attached to the message on UX-004. "Cancel" → closes modal, no deadline attached. |
+| Primary Actions | Enter needed-by date/time; Submit for feasibility check; Accept counter-offer OR keep original deadline. |
+| Secondary Actions | Cancel. |
+| States | Loading: feasibility check in progress / Empty: no deadline entered yet / Error: feasibility check failed / Result-Feasible: confirmation shown, "Use this deadline" enabled / Result-Infeasible: at least one counter-offered deadline shown alongside the original; user must actively pick one, nothing auto-changes (AC-036). |
+| Validation | Deadline required, must be a future date/time. Submit enabled only when a valid future date/time is entered; invalid/past date shown inline under the field, clears on correction. |
+| Failure | Feasibility check API fails → error banner with retry, input retained; user may cancel and proceed without a deadline. |
+| Accessibility | Modal traps focus while open; Escape closes it (= Cancel), focus returns to the triggering button. Date/time picker has a keyboard-accessible text-entry alternative, not pointer-only. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Low (P2 feature) |
+| Business Rules | The system may only propose a counter-offer, never auto-change the sender's deadline (AC-036). Requires the recipient's timezone + working hours — the same data model as R2 (T39 depends on T31's model). Counter-offer candidate dates must exclude dates that fall within the recipient's country holidays per the AC-057 hardcoded dataset (KR/US/JP/CN — T39) — a counter-offer is not "realistic" if it lands on a holiday. |
+| Data Required | sender's needed-by input; recipient's timezone + working hours; static holiday dataset (KR/US/JP/CN, for counter-offer exclusion) |
+| Data Operations | Read (recipient working-hours data, if available; holiday dataset) |
+| External Dependencies | Backend feasibility-calculation service (deterministic time-window math, no LLM call) |
+| Permissions | Requires authenticated session |
+| Navigation Targets | Returns to UX-004 |
+| Events Emitted | `deadline_feasibility_checked`, `deadline_confirmed` |
+| Expected Outputs | A confirmed deadline value attached to the current message |
+| Assumptions | Recipient's working-hours data exists or is entered manually (see Open Questions — data source unresolved, also flagged in docs/Tasks.md's own unverified-items list) |
+
+### Scheduled Send Modal (Screen ID: UX-006)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-003 |
+| Acceptance Criteria | AC-024 |
+| Purpose | Let the sender queue a NORMAL/LOW message for the recipient's local morning instead of sending immediately. |
+| User Goal | Avoid waking up or interrupting my counterpart outside their working hours. |
+| Entry | "Schedule for their morning" button on UX-004 (NORMAL/LOW only — never shown for CRITICAL, AC-005/024). |
+| Exit | "Confirm schedule" → closes modal, message marked scheduled on UX-004 (Recipient panel shows "예약됨" until the scheduled time). "Cancel" → closes modal, no schedule applied. |
+| Primary Actions | View suggested local-morning time slot; Confirm; adjust the exact time within the recipient's morning window if offered. |
+| Secondary Actions | Cancel. |
+| States | Loading: computing recipient's local morning window / Result: suggested time shown / Error: could not compute (e.g., missing recipient timezone) / Confirmed: scheduling saved. |
+| Validation | A recipient timezone must be available (from profile or manual entry) before a slot is suggested; if missing, the screen shows an inline explanation plus a manual-entry recovery path instead of a broken suggestion. |
+| Failure | Missing recipient timezone → explanatory empty state + manual entry fallback. Backend save fails → error banner + retry. |
+| Accessibility | Same modal focus-trap/Escape pattern as UX-005; time shown in both sender's and recipient's local time as text, not via a timezone abbreviation alone. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Low (P2 feature) |
+| Business Rules | Never offered/applied to CRITICAL messages (AC-005 takes precedence). |
+| Data Required | recipient timezone, recipient's local-morning window definition |
+| Data Operations | Read (recipient timezone); Update (message's send-time/status) |
+| External Dependencies | None beyond backend scheduling logic (no LLM call) |
+| Permissions | Requires authenticated session |
+| Navigation Targets | Returns to UX-004 |
+| Events Emitted | `send_scheduled` |
+| Expected Outputs | A scheduled-send timestamp attached to the message; UX-004's Recipient panel reflects "예약됨" until that time |
+| Assumptions | A background job/scheduler exists to trigger the mock-delivery at the scheduled time (architect's mechanism to design) |
+
+### Vent-to-Ticket View (Screen ID: UX-007)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-004 |
+| Acceptance Criteria | AC-017, AC-018, AC-050, AC-058, AC-062, AC-064 |
+| Purpose | Turn an emotionally-charged message into a structured, actionable ticket without deleting the emotional signal. |
+| User Goal | Get my complaint taken seriously as a real issue, not lost in a wall of text. |
+| Entry | "Convert to Task Ticket" link on UX-004's Recipient panel — reachable only when the emotional-signal detector fired (AC-058①); for a low-signal message the link never appears, so this screen is simply unreachable rather than reachable-but-blocked (AC-058②). |
+| Exit | "Use this ticket" → returns to UX-004 with the ticket content as the message to approve/send. "Back to message" → returns to UX-004 with the original free-text message unchanged. |
+| Primary Actions | View/edit the 4 sections ([문제 정의] / [영향·리스크] / [요청 사항] / [우려 수준]); Use this ticket. |
+| Secondary Actions | Back to message (discard ticket, keep free text). |
+| States | Loading: conversion in progress / Error: conversion failed, retry, original message untouched / Result: **all 4 sections are always rendered, regardless of whether the source text has evidence for each one** — each independently editable, and a section with nothing derivable shows an explicit "없음" rather than being omitted or left blank (AC-062, confirmed hard requirement — no section is ever silently skipped) — plus a read-only **결정 권한 상태** (Decision Authority Status) field, backed by the ticket-level single-value `decisionAuthority` (확정/내부 승인 필요/검토 중/불명, AC-064①) — shown alongside its evidence sentence when determined, or explicitly labeled "불명" (never left blank) when the original text has no evidence for it (AC-050①/②). |
+| Validation | No new required fields beyond what the AI populates. **A section with genuinely no derivable content always shows an explicit "없음" — this is now a confirmed hard requirement (AC-062), not a working assumption; this document's own Open Questions #7 is answered.** |
+| Failure | Conversion API fails → error banner + retry; the user can always fall back to sending the original free-text message via "Back to message." |
+| Accessibility | Each of the 4 sections is a labeled region (heading + content) for screen-reader navigation, present even when its content is "없음." [우려 수준] level shown as both a text label (e.g., "높음") and a visual indicator, not color alone. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Medium (P1 feature) |
+| Business Rules | Emotional intensity must be preserved as metadata, never deleted (AC-018). **All 4 sections are always present in the response payload — an "없음" string for a section with no evidence, never a missing key or empty string with no label (AC-062).** Decision Authority Status is never inferred without textual evidence — absent evidence renders `불명`, matching the no-fabrication principle already applied to AC-020 (Planning Decision #54 — this feature's premise is an unverified hypothesis, not a confirmed fact; do not present the status as more certain than the text supports). **The field name for this screen's Decision Authority value is the ticket-level single-value `decisionAuthority` — distinct from UX-008's per-row `decisions[].authorityStatus`. The two names are intentionally different and both exist simultaneously; neither replaces the other (AC-064①③, PRD Planning Decision #84 — resolves the schema-granularity tension previously logged as Open Questions #9, now answered).** |
+| Data Required | original message text |
+| Data Operations | Read (original text); no persistent write until the user proceeds to approve/send from UX-004 |
+| External Dependencies | Backend C6 structuring API (LLM-backed, also produces the ticket-level single-value `decisionAuthority` + evidence in the same call — AC-064①; distinct from C7's per-row `decisions[].authorityStatus` on UX-008, never merged or reused as the same field name) |
+| Permissions | Requires authenticated session |
+| Navigation Targets | UX-004 |
+| Events Emitted | `ticket_conversion_requested`, `ticket_used`, `ticket_discarded` |
+| Expected Outputs | Structured 4-section text (all 4 sections always populated, "없음" where evidence is absent — AC-062) plus a Decision Authority Status value (`decisionAuthority`) that replaces free text as the message body if "Use this ticket" is chosen |
+| Assumptions | The "emotional" trigger detection happens on UX-004 before this screen is reachable. **`decisionAuthority` is confirmed as a single value per ticket (AC-064①) — this document's own prior Open Questions #9 uncertainty is resolved; see UX Decision Log "Decision Authority Field Names Split."** |
+
+### Decision Summary & Unresolved Detector View (Screen ID: UX-008)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-005 |
+| Acceptance Criteria | AC-019, AC-020, AC-038, AC-050, AC-064 |
+| Purpose | Turn a thread into a decisions table and flag agreements missing an owner or deadline. |
+| User Goal | Know what was actually decided and what's still hanging, without re-reading the whole thread. |
+| Entry | "Summarize thread" nav item. |
+| Exit | Stays on screen after results (reference screen, not a step toward sending); nav menu to leave. |
+| Primary Actions | Paste/enter thread text; Generate summary. |
+| Secondary Actions | Re-run with edited thread text. |
+| States | Loading: summarization in progress / Empty: no thread entered yet / Error: summarization failed, retry, input retained / Result: **Decision / Owner / Deadline / 결정 권한 상태** table (4th column added v2.2/v2.3, AC-050; its value is the per-row field `decisions[].authorityStatus`, AC-064②) + separate Unresolved warnings list. |
+| Validation | Thread text required (non-empty) before "Generate summary" is enabled; no format restriction specified in docs/PRD.md. |
+| Failure | Summarization API fails → error banner + retry, thread text retained. Any Decision/Owner/Deadline cell with no thread evidence renders as "미정" (AC-020); any 결정 권한 상태 cell (`authorityStatus`) with no thread evidence renders as "불명" (AC-050①, AC-064⑤) — both visually distinct from a failed-call error state, never silently blank. |
+| Accessibility | Table uses proper header-cell semantics for screen readers. Each Unresolved warning states in text which field is missing (담당자/기한), not via icon alone. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Medium (P1 for the decision summary, AC-019/020, AC-050; P2 for the Unresolved Detector, AC-038 — matches docs/PRD.md MVP Scope rows 14 and 25) |
+| Business Rules | Never fabricate an owner or deadline not evidenced in the thread text (AC-020). Never fabricate a 결정 권한 상태 not evidenced in the text — render "불명" instead (AC-050①, same no-fabrication principle). The Unresolved Detector only runs on/after a completed C7 summary (T26 must complete before T43, per docs/Tasks.md). **Decision Authority Status is a per-decision-row value here, and the field name is confirmed as `decisions[].authorityStatus` — distinct from UX-007's ticket-level `decisionAuthority`; both field names exist simultaneously and share the same enum/judgment logic (AC-064, PRD Planning Decision #84). This resolves the schema-granularity tension previously logged in the UX Decision Log ("Decision Authority Status Granularity Differs by Screen") and Open Questions #9, both now Superseded/answered — architect no longer needs to choose one shape, both are required.** This feature's underlying premise is an unverified hypothesis (Planning Decision #54) — never present it in the UI as a confirmed fact. |
+| Data Required | thread text input |
+| Data Operations | Read only (no persistent thread storage implied by docs/PRD.md) |
+| External Dependencies | Backend C7 summarization API (reused C6 structuring logic, also producing per-row `decisions[].authorityStatus` + evidence within the `decisions[]` array, AC-064②) + Unresolved Detector logic layered on the C7 result |
+| Permissions | Requires authenticated session |
+| Navigation Targets | None forward (reference screen); nav menu to leave |
+| Events Emitted | `thread_summarized`, `unresolved_items_detected` |
+| Expected Outputs | Decision table (including `decisions[].authorityStatus` per row) + Unresolved warning list for the user to act on manually |
+| Assumptions | Thread text is pasted manually by the user; no live integration pulls thread history automatically |
+
+### Profile Management Screen (Screen ID: UX-009)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-006 |
+| Acceptance Criteria | AC-014 (screen); AC-012/AC-013 are backend behaviors this screen surfaces; AC-046 (honorific-level item, added v2.2/v2.3); AC-059 (skipped/empty profile + resume path, added v2.7) |
+| Purpose | Let a user see and control what the tool has learned about their communication style — or complete onboarding later if they skipped it. |
+| User Goal | Check that the tool's assumptions about me are correct, and fix them if not — or fill in my style now if I skipped it before. |
+| Entry | Nav menu "Profile." |
+| Exit | Stays on screen; nav menu to leave. "온보딩 완료하기" (Complete onboarding) → UX-003. |
+| Primary Actions | View profile items; Edit an item; Delete an item. |
+| Secondary Actions | **"온보딩 완료하기" (Complete onboarding) — shown only when the profile is empty/skipped (AC-059④); routes to UX-003 so the user can fill it in, taking effect on the very next mediation run.** |
+| States | Loading: skeleton while profile loads / **SkippedProfile: shown when the profile is empty because onboarding was skipped (AC-059②) — an explicit "온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다" message plus the "온보딩 완료하기" action, distinct from the ordinary no-learned-items case below** / Empty: "아직 학습된 항목이 없습니다" (edge case — self-report exists but no diff pattern has reached 3 repeats yet) / Error: load failed, retry / Success: full list shown (directness, emoji preference, formality, honorific level (합쇼체/해요체)), each item tagged "자기신고" (onboarding) or "학습됨" (3x diff pattern, AC-013) — the honorific-level item is always "자기신고" since it isn't a diff-learned field. |
+| Validation | Edits use the same choice-based input as onboarding. Saving an empty edit is blocked — a value must be selected. |
+| Failure | Save/delete fails → inline error on that item's row, value unchanged until retry succeeds. |
+| Accessibility | List items keyboard-operable (edit/delete reachable via Tab, not hover-only). Delete requires an explicit confirmation step (see Interaction Patterns), announced via `role="alert"`. The SkippedProfile message and "온보딩 완료하기" action are exposed as text, not icon/color alone. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Medium (P1 feature) |
+| Business Rules | Only items with 3+ observed repeats become "학습됨" entries (AC-013). Items are user-owned and never shown to other users, including managers (Planning Decision #6). **A skipped/empty profile is a valid, distinguishable state (not an error) — this screen must be able to tell "onboarding skipped" apart from "onboarding completed but nothing learned yet," per whatever storage mechanism UX-003/architect chose (AC-059③).** |
+| Data Required | profile record (self-reported + learned fields, or empty/skipped-flagged); diff history (read-only reference for the 3x threshold, not itself displayed) |
+| Data Operations | Read, Update, Delete |
+| External Dependencies | None beyond the profile/diff storage layer |
+| Permissions | Requires authenticated session; a user can only see/edit their own profile (AC-039) |
+| Navigation Targets | UX-003 (Complete onboarding, when profile is empty/skipped); nav menu to leave |
+| Events Emitted | `profile_item_edited`, `profile_item_deleted`, `onboarding_resume_clicked` |
+| Expected Outputs | Updated profile used by the next UF-003 run |
+| Assumptions | User is authenticated; profile record exists (created at onboarding, UF-002 — complete or empty/skipped per AC-059) |
+
+### Terminology Dictionary Management Screen (Screen ID: UX-010)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-007 |
+| Acceptance Criteria | AC-015, AC-016, AC-047 |
+| Purpose | Maintain a project's do-not-translate term list and person/honorific mappings. |
+| User Goal | Stop the tool from mistranslating our team's jargon and misjudging who gets which honorific. |
+| Entry | Nav menu "Terminology." |
+| Exit | Stays on screen; nav menu to leave. |
+| Primary Actions | Choose entry type (**용어** Term / **사람·호칭** Person) when adding; for Term: enter the term mapping; for Person: enter 실명 (real name) / 한국어 호칭 (Korean form of address) / 영어 호칭 (English form of address); Edit an entry; Delete an entry. |
+| Secondary Actions | None (no search/filter — not requested in docs/PRD.md; list expected to stay small per Non-functional Expectations). |
+| States | Loading: skeleton / Empty: "등록된 용어가 없습니다. 첫 용어를 추가하세요" / Error: load/save failed, retry / Success: list of entries, each visibly tagged by type (용어 / 사람·호칭) so the two kinds aren't visually conflated. |
+| Validation | Term entries: term field required, non-empty; duplicate term (case-insensitive) blocked with inline error "이미 등록된 용어입니다," clears on edit. Person entries: 실명 required, non-empty; at least one of 한국어 호칭/영어 호칭 required (both may be filled, but a person entry with neither is meaningless — see Open Questions if docs/PRD.md's intent differs); duplicate 실명 blocked with inline error "이미 등록된 인물입니다," clears on edit. Add/Save enabled only when the active entry type's required fields are valid and non-duplicate. |
+| Failure | Save/delete fails → inline error on the row/form, retry available, entered value retained. |
+| Accessibility | Entry-type choice and add/edit form fully keyboard operable; list uses semantic list markup with the type tag exposed as text (not icon/color alone); delete requires confirmation. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Medium (P1 feature) |
+| Business Rules | Registered terms must appear unmodified in C2 output (AC-015) — enforced by the C5 injection step in UF-003's pipeline, not by this screen directly. Registered honorifics (person entries) are used exactly as entered in both translation directions (AC-047①). An unregistered person's honorific is never guessed — original form preserved + a "호칭 미등록" warning surfaces on UX-004 (AC-047②). A Korean rank/title is never auto-translated into an English honorific when no mapping is registered (AC-047③) — this screen is the only way to register one. |
+| Data Required | term list (term string, optional note/definition); person list (실명, 한국어 호칭, 영어 호칭) |
+| Data Operations | Create, Read, Update, Delete (both entry types) |
+| External Dependencies | None (this screen doesn't call the LLM; it manages data consumed by UF-003's C2/C5 step) |
+| Permissions | Requires authenticated session; scope is project-level per docs/PRD.md's "팀 자산으로 축적" framing — whether "project" maps to a team/workspace concept is an architect decision (see Open Questions) |
+| Navigation Targets | None forward; nav menu to leave |
+| Events Emitted | `term_added`, `term_edited`, `term_deleted`, `person_entry_added`, `person_entry_edited`, `person_entry_deleted` |
+| Expected Outputs | Updated term/person list consumed by the next UF-003 run |
+| Assumptions | "Project" scope exists as a concept the architect will define; until then, one dictionary per authenticated user's project context is assumed; the entry-type distinction (Term vs. Person) is a single unified list with a type field, not two separate screens/tables — an implementer/architect data-modeling choice this document doesn't dictate beyond requiring both types to coexist in one management screen |
+
+### Pair Communication Protocol Screen (Screen ID: UX-011)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-008, UF-018 (Stage 4/합의's confirm action writes into this same record — see UX-018), UF-022 (new v6.0, mismatch review) |
+| Acceptance Criteria | AC-037, AC-074 (conflict-resolution side of AC-074④ only — Stages 1–3 of AC-071–073 belong entirely to UX-018), AC-075 (new v6.0), AC-079, AC-083 (new v6.0) |
+| Purpose | Let two specific users agree on 4 communication-style items that apply only to messages between them, overriding the global profile on conflict — and (new v6.0) show who most recently defined those values, and prompt a confirmation when observed activity has drifted from what's on record. |
+| User Goal | Set explicit ground rules with this one counterpart instead of relying on my own default style guess — and know whether these rules still match how things actually seem to be going. |
+| Entry | Nav menu "Pair Protocols" → select/enter a counterpart; "Set protocol with this recipient" link from UX-004; or a "규약 보기" link from UX-018 after a suggestion was discarded due to conflict, or after a confirm succeeded. |
+| Exit | Stays on screen after save; nav menu to leave, or "Back to message" if entered from UX-004. |
+| Primary Actions | Select/enter counterpart identifier; Set/edit the 4 items (directness allowed / emoji use / form of address / deadline phrasing); Save. |
+| Secondary Actions | **(new v6.0)** On a mismatched axis: "확인" (expand the aggregate-only comparison line) or "나중에" (dismiss the banner without editing). No invite/notify mechanism (see Open Questions). |
+| States | Loading: skeleton while any existing protocol loads / Empty: no protocol yet for this counterpart, form shows defaults / Error: load/save failed, retry / Success: saved values shown, editable again at any time. **AuthorshipShown (new v6.0, AC-075④, supersedes this screen's own prior stance that it "does not display provenance/source tagging" — see UX Decision Log): a badge near the top of the screen always shows one of exactly 4 values — "추론 초안" / "발신자가 확정" / "상대가 직접 작성" / "아직 정해지지 않음" — reflecting who most recently wrote the current values.** **MismatchBanner (new v6.0, AC-079/AC-083): a banner directly above a specific axis's control, shown only for that axis, with the fixed copy "합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?" — never a verdict/blame wording. Zero, one, or up to all 4 axes can show this simultaneously, each independent.** MismatchExpanded: the aggregate-only comparison line is shown ("규약: … · 관측: …," never a quoted excerpt). MismatchDismissed: banner cleared for this session/until the next observation cycle re-flags it, no value changed. |
+| Validation | Counterpart identifier required, valid email format. All 4 protocol items required before Save is enabled (see Open Questions — not explicitly required by AC-037, applied here since a partial protocol is not meaningful for AC-037's conflict-resolution logic). Inline errors clear on correction. **A mismatch banner never blocks or gates Save — it is advisory only, exactly like Misread Risk/holiday-conflict warnings elsewhere in this document (AC-079③). Saving an axis whose banner is showing clears that banner (optimistic — the user has now explicitly reviewed/re-affirmed the value); a banner can reappear later if a subsequent observation cycle still finds a mismatch, which is expected, not a bug.** |
+| Failure | Save fails → inline error, retry, form values retained. Mismatch-check data fails to load → the banner area simply doesn't render (identical treatment to "no mismatch found" — this is advisory data, not required for the screen's core Read/Save purpose, so its absence is never an error state of its own). |
+| Accessibility | Each of the 4 items is a labeled, keyboard-operable choice control. Save confirmation uses icon + text, not color alone. **The authorship badge and any mismatch banner are exposed as text, never by badge color/icon alone (same principle as every other status indicator in this document).** |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Low (P2 feature) for the base protocol screen and UF-008. **The authorship badge (AC-075) is not tied to MVP Scope #34 and survives a #34 cut** — it only needs to know who last wrote the existing pair-protocol record, a capability #24/UX-011 already requires independent of any inference pipeline (with #34 absent, the badge simply never shows ⓐ, since nothing ever produces an inference draft to confirm). **The mismatch banner (AC-079/AC-083) is tied to #34 and disappears with it** (same P2 cut-eligibility, bundled with T64/T70/T71). |
+| Business Rules | On conflict with the global C3 profile, the pair protocol value wins (AC-037, Planning Decision #26). Stored separately from the C3 profile table (Planning Decision #26). **(v5.0) UX-018's Stage 4 confirm action is simply another writer of this exact same record — architect must not create a second/parallel table for inference-derived values (same "one shared storage concept" precedent already applied to UX-013/UX-015, see UX Decision Log).** **(v6.0/AC-075, resolves this document's own former Open Question #14) The record now must track, as one of exactly 4 states, who last wrote it — ⓐ 추론 초안으로 생성 / ⓑ 발신자가 확정 / ⓒ 상대가 직접 작성·수정 / ⓓ 아직 아무도 손대지 않음— and the AC-074④ conflict check reads this value directly, never comparing timestamps (AC-075③). ⚠️ Note for architect: because AC-074② requires that nothing from an unconfirmed inference draft is persisted, state ⓐ can only ever be observed as a genuinely-persisted, user-visible value in the narrow case where a draft exists but hasn't yet reached a Stage 4 confirm within the same record's life — the exact column/type/history semantics of when, if ever, a *persisted read* shows ⓐ (versus the record simply staying ⓓ until a Stage 4 confirm writes ⓑ directly) is explicitly architect's call per AC-075's own closing note ("컬럼명·타입·정규화·이력 보관 여부는 architect 몫"); this document only fixes that all 4 labels must be renderable when the state occurs.** **(v6.0/AC-079/AC-083) The mismatch banner's per-axis eligibility is a read from whatever backend signal T70 produces (mismatched: boolean or absent, per axis) — this screen does not compute the comparison itself, only renders it. The comparison line shown on "확인" must never include raw/quoted sample text — only the same aggregate-only vocabulary Stage 2 of UX-018 already uses (AC-081② extended to this context). Editing and saving a flagged axis on this screen sets the authorship state to whichever party made that save (ⓑ if the sender, ⓒ if the counterpart) — same authorship-write path as any other Save on this screen, not a separate mechanism.** |
+| Data Required | pair protocol record (keyed by the two user identities), counterpart identifier, **the record's current authorship state (ⓐ/ⓑ/ⓒ/ⓓ, AC-075)**, **per-axis mismatch flags + an aggregate-only comparison string for each flagged axis (read-only, produced by T70, AC-079/AC-083)** |
+| Data Operations | Create, Read, Update (protocol values + authorship state together on every save); Read (per-axis mismatch flags, from the T70-produced signal) |
+| External Dependencies | None beyond storage; injected into the C2 prompt during UF-003 (same injection point as C5, per docs/Tasks.md T42); **the mismatch-flag data source is T70's observation-vs-protocol comparison (P2, bundled with MVP Scope #34)** |
+| Permissions | Requires authenticated session; both users in the pair can view/edit the same record (AC-037) |
+| Navigation Targets | UX-004 (if entered from there); UX-018 has no forward link back into this screen beyond the optional "규약 보기"; **UX-019 is not linked from here (mismatch comparisons are aggregate-only already, so there's no need to route to the sample-level detail screen from this context)** |
+| Events Emitted | `pair_protocol_saved`, **`pair_protocol_mismatch_acknowledged`, `pair_protocol_mismatch_dismissed` (new v6.0)** |
+| Expected Outputs | A pair-scoped override set consumed by the next UF-003 run between these two users |
+| Assumptions | The counterpart is a registered user (see Open Questions — unresolved whether the counterpart must already have an account and whether they're notified when a protocol is proposed) |
+
+### Meeting Time Suggestion Screen (Screen ID: UX-012)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-009 |
+| Acceptance Criteria | AC-023 |
+| Purpose | Find overlapping working hours between two people. |
+| User Goal | Pick a meeting time without doing timezone math myself. |
+| Entry | Nav menu "Meeting Times." |
+| Exit | Stays on screen with results; nav menu to leave. |
+| Primary Actions | Enter own timezone + available hours; enter counterpart's timezone + available hours; Get suggestions. |
+| Secondary Actions | None. |
+| States | Loading: computing overlap / Empty: no inputs yet / Error: computation failed, retry / Result-Found: up to 3 candidate times / Result-NoOverlap: explicit empty state explaining no overlapping window was found. |
+| Validation | Both timezones and both available-hours ranges required before "Get suggestions" is enabled. Invalid range (end before start) blocked with inline error, clears on correction. |
+| Failure | Computation fails → error banner + retry, inputs retained. |
+| Accessibility | Time inputs keyboard-operable with accessible labels; results in semantic list markup; "no overlap" stated as text, not implied by an empty area alone. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Low (P2 feature) |
+| Business Rules | Up to 3 candidates returned when overlap exists (AC-023). |
+| Data Required | sender timezone/hours, recipient timezone/hours |
+| Data Operations | Read (if saved profile-level working hours exist); otherwise manual entry only for this session — persisting working hours to profile is an architect decision (see Open Questions) |
+| External Dependencies | None (deterministic time-window computation, no LLM call) |
+| Permissions | Requires authenticated session |
+| Navigation Targets | None forward; nav menu to leave |
+| Events Emitted | `meeting_times_requested` |
+| Expected Outputs | Up to 3 candidate meeting times |
+| Assumptions | Working-hours data is entered manually each time or read from a saved profile field (architect to decide) |
+
+### Response Feedback View (Screen ID: UX-013)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-010 |
+| Acceptance Criteria | AC-025 (response-time requirement only), AC-070 |
+| Purpose | Show whether mediation is actually improving response time, using only real recorded replies. **(v5.0) This screen never classifies or displays reply sentiment/tone — that requirement was removed (AC-070); see the Business Rules row for why.** |
+| User Goal | See evidence that this tool is helping, not just trust a claim. |
+| Entry | Nav menu "Feedback." |
+| Exit | Stays on screen; nav menu to leave. |
+| Primary Actions | View list of sent messages with recorded reply time; view before/after response-time comparison summary. |
+| Secondary Actions | None (no filter/date-range control — not requested in docs/PRD.md). |
+| States | Loading: skeleton / Empty: "아직 기록된 답장이 없습니다" / Error: load failed, retry / Success: list + response-time comparison summary shown. |
+| Validation | N/A — read-only screen, no user input. |
+| Failure | Data fails to load → error banner + retry. |
+| Accessibility | Comparison values (e.g., average response time before/after) stated as text numbers, not by chart color alone. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Low (P2 feature) |
+| Business Rules | Only messages with an actually-recorded reply are counted (AC-025) — no imputed/estimated data points. **(v5.0/AC-070) No code path classifies reply-message sentiment (positive/neutral/negative) and no sentiment-distribution comparison exists anywhere in this screen's data or display — removed because the MVP's send is a mock-send with no real reply body to classify (Planning Decision #94); the reply-arrival-timestamp/response-time measurement this screen shows is unaffected and remains fully required (AC-025's response-time clause, AC-070①). The manual "답장 받음" marking (UX-015) remains the sole input to the timestamp this screen reads — no automated reply-detection code path exists (AC-070④, AC-044⑤ unchanged).** |
+| Data Required | sent-message log (with mock-send timestamp), recorded reply arrival timestamp. **No sentiment field exists in this screen's data (AC-070②).** |
+| Data Operations | Read only |
+| External Dependencies | Backend reply-tracking mechanism (the manual "답장 받음" marking on UX-015); how a "reply" is captured at all is not specified beyond that manual marking in docs/PRD.md (see Open Questions #5, already answered) |
+| Permissions | Requires authenticated session; user sees only their own sent-message history (AC-039) |
+| Navigation Targets | None forward; nav menu to leave |
+| Events Emitted | None (read-only) |
+| Expected Outputs | None (terminal reference screen) |
+| Assumptions | A reply-capture mechanism exists and populates the underlying data (the manual marking on UX-015) |
+
+### Sent Messages & Reminder Approval Screen (Screen ID: UX-015)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-013 |
+| Acceptance Criteria | AC-044, AC-063 |
+| Purpose | Let the sender see everything they've sent, mark replies received, and review/approve AI-drafted reminders for messages that have gone unanswered past the business-day threshold. |
+| User Goal | Know which of my messages haven't gotten a reply yet, and nudge the ones that need it without being pushy. |
+| Entry | Nav menu "발송 내역" (Sent). |
+| Exit | Stays on screen; nav menu to leave. |
+| Primary Actions | Mark a message "답장 받음"; Review a suggested reminder ("리마인드 검토"); Approve & Send the reminder. |
+| Secondary Actions | Edit the generated reminder text before approving (consistent with the app's standing human-in-the-loop editing pattern — see UX Decision Log). |
+| States | Loading: skeleton list while sent messages load / Empty: "발송한 메시지가 없습니다" (no messages mock-sent yet) / Error: load failed, retry / Row-BelowThreshold: recipient, sent time, elapsed business days shown, no reminder action yet / Row-ThresholdReached: "무응답 N일째" badge + "리마인드 검토" action appears once elapsed business days ≥ 2 (Planning Decision #60) and the message is unmarked / ReminderReview: the C2-generated draft is shown for review (and optional edit) with Approve & Send / ReminderSent: row shows a timestamped "리마인드 발송됨" log entry, mirroring UX-004's Delivered state / Replied-Marked: row shows a static "답장 받음" state, reminder action permanently hidden for that message. |
+| Validation | "답장 받음" requires no additional input — a single click marks it; there is no unmark control (no undo requested by docs/PRD.md, consistent with the Interaction Patterns' "Undo: not designed" rule). "Approve & Send" (reminder) enabled only once a reminder draft has successfully loaded for that row; disables immediately on click to prevent double-send. |
+| Failure | Reminder-text generation fails → inline error "리마인드 문구 생성 실패" on that row + retry; no reminder text shown; "Approve & Send" stays disabled until a successful draft exists. Mark-replied or approve-send network failure → inline error on that row, the row's state reverts to its last-known value, retry available. |
+| Accessibility | Rows are keyboard-operable list items (mark/review/approve reachable via Tab, not hover-only); each row's status (elapsed days, replied state, reminder availability) is exposed as text, never by color/badge-color alone; the reminder-review area is keyboard-dismissible and traps focus while open, consistent with this document's modal pattern. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Low (P2 feature, MVP Scope #29 — this entire screen falls under the P2 layer that Planning Decision #1/#42 cuts first under schedule pressure) |
+| Business Rules | Reply status is captured only via explicit manual "답장 받음" marking; no automated reply-detection code path exists (AC-044⑤, Planning Decision #51). Elapsed business days = calendar days minus weekends minus the recipient's country holidays from the AC-057 hardcoded dataset (KR/US/JP/CN, superseding AC-048's GB-inclusive country list per Planning Decision #74) (AC-044②); **if the recipient's country has no hardcoded entry, only weekends are excluded and this gap is never surfaced to the user in any form — no label, badge, or note (confirmed hard requirement, AC-063, this document's own Open Questions #8 is now answered).** The reminder threshold is a fixed constant = 2 business days (Planning Decision #60), isolated in a single backend constant; **this screen must not expose a settings/threshold-configuration control** — that was explicitly decided against. Reminder text is generated by the same C2 tone-conversion pipeline used elsewhere (T51), framed as a polite confirmation never a demand (verified upstream by 3 test cases); this screen only displays/edits/approves the result, it does not implement wording logic itself. No reminder is ever sent without an explicit approval click on this screen (AC-044④, Planning Decision #5). This screen's underlying sent-message log is the same storage the Response Feedback View (UX-013 / R4, AC-025) reads — Planning Decision #51 requires T33 to reuse T50's structure rather than a second table; do not design this as an independent data model (see UX Decision Log). |
+| Data Required | sent-message log entries (recipient identifier, recipient country/timezone, sent_at timestamp, replied boolean, replied_marked_at); static holiday dataset (KR/US/**JP**/CN, 2026, per AC-057); generated reminder text (on demand, per row) |
+| Data Operations | Read (sent-message log, holiday dataset); Update (mark replied=true + replied_marked_at); Create (reminder mock-send log entry + diff record on approval, mirroring UX-004's approval semantics) |
+| External Dependencies | Backend business-day calculator (deterministic, holiday dataset lookup, no LLM call); backend C2 tone-conversion call for reminder-text generation (LLM-backed, subject to the same cache/rate-limit/fallback behavior as AC-041) |
+| Permissions | Requires authenticated session; user sees only their own sent-message history (AC-039) |
+| Navigation Targets | UX-005 not applicable here; this screen has no forward navigation target — nav menu to leave |
+| Events Emitted | `reply_marked`, `reminder_reviewed`, `reminder_approved_sent` |
+| Expected Outputs | Updated replied status on the sent-message record; a new mock-send log entry + diff record when a reminder is approved and sent |
+| Assumptions | A sent-message log already exists, populated by UX-004's mock-send action (T50); the recipient's country/timezone is known at send time — this screen inherits the same unresolved dependency as Open Question #3 (recipient identification); the reminder draft edit control follows the same soft length guidance as UX-004 (no hard limit specified) |
+
+### Universal Selection Mediation Panel (Screen ID: UX-016)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-015 (primary), UF-016 (Interpret mode, conditional P3), UF-019 (recipient candidate detection/selection, conditional P2), UF-020 (new v6.0, Mark-as-counterpart's-message mode, conditional P2), UF-011, UF-012, UF-014 (GitHub/Slack/Gmail — Insert path only, when the site is a registered Layer 2 module) |
+| Acceptance Criteria | AC-052, AC-053, AC-010, AC-021, AC-040, AC-042, AC-051, AC-055 (conditional), AC-066, AC-061, AC-067 (conditional), AC-068 (conditional), AC-069, AC-080 (new v6.0, conditional), AC-081 (new v6.0, conditional) |
+| Purpose | Let a user mediate (or, conditionally, interpret, or — new v6.0 — mark as a specific counterpart's message for later observation) any selected web text right where they are, without leaving the page — always via clipboard copy, and via direct insertion when the current site supports it. |
+| User Goal | Get mediation help on whatever I'm reading or writing, wherever I am in the browser, without switching to another tab — or, when I'm reading a counterpart's message, quickly tag it as theirs so the tool can eventually learn from it, without me having to explain who wrote what. |
+| Entry | Clicking the Layer 1 floating trigger button that appears next to a text selection anywhere in the browser (see "Selection-triggered floating button" Interaction Pattern). The panel opens pre-filled with the selected text (AC-052②) — nothing is retyped or re-pasted by the user. |
+| Exit | "Copy to clipboard" → text copied, panel shows a brief confirmation and stays open so the user can paste manually wherever they choose (including back into the source field). "Insert into input field" (present only when the current site has a registered Layer 2 module) → panel closes, approved text written into the originating field via DOM insertion; the user still must click that site's own send control themselves. "Cancel/Close" → panel closes, nothing copied or inserted, original selection/field unchanged. |
+| Primary Actions | Run mediation on the pre-filled text; Override urgency; Edit transformed text; Copy to clipboard. |
+| Secondary Actions | Cancel/Close; Insert into input field (conditional — Layer 2 sites only, AC-053②); switch to "해석 (Interpret)" mode for received text (conditional P3, always a manual/explicit switch, never auto-suggested — AC-055①, AC-069); **switch to "상대가 쓴 것으로 표시" (Mark as counterpart's message) mode (new v6.0, conditional P2, always a manual/explicit switch, never auto-suggested — AC-080, same never-auto-triggered principle as Interpret mode); enter a counterpart identifier (manual free-text, same no-directory pattern as every other recipient field — AC-080②); click "표본에 추가" to confirm a mark;** select a recipient from a detected candidate list, or clear/change an auto-selected candidate (conditional P2, AC-067②③). |
+| States | Loading: same step-labeled pipeline concept as UX-004 / NotLoggedIn: prompt to log in via the web app first / **PersonalizationOff: shown whenever no recipient is specified or resolved — an explicit "개인화 미적용" indicator states that only base conversion applies; the full mediate→approve→copy path still completes normally, and no recipient is ever fabricated to fill the gap (AC-066②③④)** / Result: comparison shown — urgency badge, transformed text with preserved items marked, backtranslation with its "1차 안전장치" limitation notice, plus the same Misread Risk / emoji-risk (AC-056) / honorific / holiday-conflict (AC-057) warning areas UX-004 defines, rendered compactly — **holiday-conflict follows the identical AC-063 suppression rule as UX-004: a country with no dataset entry renders nothing, not even a "no data" label** / ClipboardOnly: the everyday state for any site with no registered Layer 2 module — only "Copy to clipboard" is present; there is no greyed-out or disabled "Insert" — it simply isn't in the layout (AC-053②, see "Absent-not-disabled controls" Interaction Pattern) / Layer2Available: "Insert into input field" additionally shown next to Copy, because the current site has a registered module / Copied: brief confirmation after Copy is clicked / Inserted: brief confirmation, panel auto-closes / InsertFailed: DOM insertion failed (host DOM changed) — explicit error shown, but Copy remains available and is never itself broken by an Insert failure (AC-053①) / Error: LLM call failed, same fallback/error pattern as UX-004 / Fallback: visible "폴백 응답 사용 중" indicator when a cached/pre-scripted response is shown (AC-041) / InterpretResult (conditional P3, AC-055): shows (a) the likely intended request/expectation, (b) the quoted evidence span, (c) possible misreading points, all labeled "해석 (추정)" / InterpretNoEvidence (conditional P3, AC-055②): explicit "판단 근거 부족" message instead of an invented interpretation / **RecipientAutoSelected (conditional P2, AC-067②): page context gave a single confident match — the panel names the evidence used and shows a "변경/해제" control** / **RecipientCandidates (conditional P2): multiple plausible candidates found, none pre-selected, user picks one** / **RecipientNoCandidates (conditional P2, AC-067③④): no usable evidence — nothing is auto-selected; behaves identically to the everyday PersonalizationOff/unspecified-recipient case, whether or not this capability shipped at all.** / **MarkMode (new v6.0, conditional P2, AC-080): the panel shows a counterpart-identifier field and a "표본에 추가" primary action instead of the mediate/Interpret result area — no mediation pipeline runs in this mode, and no LLM call occurs.** / **MarkModeNoCounterpart (validation): "표본에 추가" disabled until a counterpart identifier is entered.** / **MarkModeConfirming: brief in-progress state while the local aggregate is computed and sent.** / **MarkModeSuccess: brief confirmation showing the counterpart's updated total sample count plus a "표본 관리 보기" link to UX-019; the panel stays open (does not auto-close) so another selection can be marked in the same session.** / **MarkModeError: save failed — inline error + retry, selected text and entered counterpart identifier both retained.** |
+| Validation | The pre-filled text is editable before running mediation (same pattern as the now-deprecated UX-014); **a soft character-count indicator appears once it nears 5,000 characters — advisory only, never a hard block on typing or on running mediation (AC-061, confirmed with a 6,000-character regression case, same rule as UX-004).** "Run Mediation"/"해석 실행" enabled only when the text field is non-empty; **a recipient is never required to enable it (AC-066①).** "Copy to clipboard" and "Insert into input field" are each enabled only after a successful result exists for the current text — mirrors UX-004's Approve & Send gating, adapted since copy/insert (not sending) is the gated action here (AC-040, AC-053④). **Recipient auto-selection is enabled only when the panel can name specific evidence for it — absent evidence, nothing is auto-selected (AC-067②③, verified with ≥2 no-evidence cases).** **"표본에 추가" (new v6.0) is enabled only once a non-empty, valid-format counterpart identifier is entered — mirrors the same required+format-check pattern as every other recipient/counterpart field in this document.** |
+| Failure | LLM call fails → banner + retry, pre-filled text never lost (same AC-029 pattern as UX-004). DOM insertion fails → explicit error naming the failure, with Copy highlighted as the working alternative — never a dead end. Not logged in → NotLoggedIn state with a link to the web app's login. Interpret mode with no evidence → explicit "판단 근거 부족," which is a legitimate result, not an error. Recipient candidate detection has no failure state of its own — an inconclusive read simply falls through to RecipientNoCandidates, never an error banner. **Mark mode save fails (new v6.0) → inline error + retry; selected text and entered counterpart identifier both retained (never re-requires reselecting page text).** |
+| Accessibility | Panel is keyboard-dismissible (Escape = Cancel/Close); focus moves into the panel on open and returns to the triggering floating button on close. Copy and Insert are each individually labeled controls (not icon-only), and when Insert is absent (ClipboardOnly state) it is simply not present in the accessibility tree — never announced as a disabled control. All status text (urgency, warnings, Interpret labels, PersonalizationOff, recipient-candidate evidence) available to screen readers, not conveyed by icon/color alone. The recipient candidate list (when shown) is a keyboard-operable list/radio group, not click-only. **The mode selector (mediate / Interpret / Mark-as-counterpart's, new v6.0) is a keyboard-operable choice control, and the active mode is exposed as text (`aria-current` or equivalent), not by position/color alone.** |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | High (MVP Scope #32 is P1 and explicitly **not a cut target** — Planning Decision #61/#62; schedule-protect this screen the same way Core was protected in the prior round). The recipient-candidate portion specifically (AC-067/AC-068) is P2/cut-eligible and must not be allowed to block or delay the base panel (AC-067④). **The Mark-as-counterpart's-message mode (new v6.0, AC-080/AC-081) is likewise P2/cut-eligible, bundled with MVP Scope #34/T71 — it must not block or delay the base panel either, same isolation principle as the recipient-candidate portion.** |
+| Business Rules | No site-identification branching in the base panel/copy path — this is the definition of Layer 1 (Planning Decision #61). The panel calls the identical core mediation interface UX-004 uses (T15) — no separate "extension engine" (T56). "Insert into input field" renders only when a Layer 2 module is registered for the current site's origin (T57's registry contract); it is never rendered disabled/greyed when absent (AC-053②). Even with every Layer 2 module removed, the full select → panel → mediate → approve → copy path must keep working (AC-053③) — this is verified once as a "remove all Layer 2" scenario, not a distinct UI state beyond the everyday ClipboardOnly case. The extension never auto-clicks any host site's own send/submit control, on any site (AC-040, AC-053④, Planning Decision #5) — this rule is unchanged from the now-deprecated UX-014. Interpret mode (conditional P3, AC-055) never changes what is actually transmitted in the original message — it is a read-only, on-demand explanation shown only to the reader in their own browser (Planning Decision #21 unchanged); no recipient-facing screen is created for it (AC-055④). **Interpret mode is entered only by an explicit user click — no code path auto-suggests, banners, pre-selects, or pre-executes it, including for input that reads as a received message (AC-069①②③, confirmed by PRD Planning Decision #91).** Emoji-risk and holiday-conflict warnings shown here follow the identical AC-056/AC-057/**AC-063** rules defined on UX-004 — no separate copy or logic. **Recipient is optional for this panel's base path (AC-066①)** — mediation (C1/C2/C4) runs with no resolved recipient, only personalization (C3 profile/pair protocol/timezone) is skipped, and an explicit indicator communicates that (AC-066③); the system never fabricates a recipient to fill the gap (AC-066④). **Recipient-candidate detection (conditional P2) reads page context in the browser only — it is never sent to the backend and never persisted (AC-068①, verified via network payload inspection).** Auto-selection requires visible, named evidence plus a one-click clear/change control (AC-067②); with no evidence, nothing is auto-selected (AC-067③). If this capability is absent or cut, AC-066's unspecified-recipient path is completely unaffected (AC-067④). **The 5,000-character soft cap here is advisory-only, identical in rule to UX-004 (AC-061②).** **(new v6.0) Mark mode works identically on any Layer 1 page, including at least 2 sites with no Layer 2 module registered (AC-080①) — no adapter-specific code exists for this mode. Mark mode never determines who wrote the selected text — the counterpart identifier is entered by the user, and no DOM-based sender-inference code path exists anywhere (AC-080②, verified by code search). The 4 counted indicators computed from a marked sample use the identical definitions the GitHub path (T64/UX-018) already computes, so the two sources combine into one set of per-counterpart metrics (AC-080④), and every stored sample is tagged with its source ("수동 표시" here, "GitHub" for UX-018's path — AC-080⑤). Aggregation of the selected text into indicator deltas happens entirely in the browser (extension content script) — the selected text itself is never included in any network request this mode makes; only the resulting aggregate numbers, source tag, and timestamp are sent to storage (AC-081①③, verified via network payload inspection, same verification method already used for AC-068①'s page-context rule). No page is ever automatically scanned for markable text — marking only ever happens on a selection the user explicitly made (AC-081①).** |
+| Data Required | selected text (pre-filled, user-editable); sender = current authenticated user; site-registration status (Layer 2 registry lookup) for the current page's origin; a reference to the DOM field the selection came from (for Insert); recipient identifier — **optional** (AC-066①, resolving this document's own prior Open Questions #10: `recipient` is nullable for this panel's base mediation-only path, and only required for C3/pair-protocol personalization or Layer 2 Insert context-derivation to activate); **conditionally, a detected recipient candidate + the page-context evidence used to select it (AC-067②, read in-browser only, never transmitted — AC-068①)**; **conditionally (Mark mode, new v6.0), a counterpart identifier (required, manual entry) — the selected text is read only long enough to compute local aggregate indicator deltas and is then discarded, never included in any request payload (AC-081①③)** |
+| Data Operations | Read (Layer 2 site registry, current text selection, page context for recipient-candidate detection — browser-local only); Create (diff record + mediation/interpretation log on Copy/Insert/Approve, matching UX-004/the deprecated UX-014's prior semantics); **Create (an observation sample — aggregate indicator deltas + source tag + timestamp only — on a successful Mark-mode confirm, new v6.0)** |
+| External Dependencies | Same backend mediation API as UX-004 (T15 interface); Layer 2 registry + per-site insertion functions (T57 contract, implemented in T29/T47/T49); browser clipboard API; conditional interpretation API (T59, P3); conditional recipient-candidate detection logic (T66, P2 — browser-local, no external call); **conditional (new v6.0) observation-sample storage endpoint (T71, P2 — receives only aggregate values, never raw text; no LLM call involved in Mark mode)** |
+| Permissions | Browser extension permission to read the current page's selection on any site (`all_urls`-level — AC-054, Planning Decision #64); same authenticated session shared with the web app |
+| Navigation Targets | None (panel closes back into the host page); may deep-link to the web app's login when NotLoggedIn; **(new v6.0) Mark mode's success confirmation links to UX-019 (Observation Sample Management)** |
+| Events Emitted | `selection_overlay_opened`, `overlay_mediation_requested`, `overlay_copied_to_clipboard`, `overlay_text_inserted`, `overlay_insertion_failed`, `overlay_interpret_requested` (conditional P3), `overlay_recipient_candidate_selected`, `overlay_recipient_candidate_cleared` (conditional P2), **`overlay_mark_mode_entered`, `overlay_sample_added`, `overlay_sample_add_failed` (conditional P2, new v6.0)** |
+| Expected Outputs | Clipboard content (always-available path) or DOM-inserted text (conditional Layer 2 path); a diff/log record identical in shape to UX-004's; an interpretation result (conditional P3, never persisted as a message); a resolved recipient (optional, manual or detected) feeding the same personalization pipeline as UX-004; **(new v6.0) an observation sample record (aggregate-only) attributed to the entered counterpart, feeding UX-018's Stage 2/3 and UX-019's list** |
+| Assumptions | User already logged in via the shared web app session (same assumption the deprecated UX-014 made). `mouseup` + `window.getSelection()` reliably fires on the target site — **unverified**, first confirmed only by T55's first-hour spike on 2 non-Layer-2 sites (docs/PRD.md Assumptions). The current site's DOM matches a registered Layer 2 adapter's selectors only when Layer 2 applies to that site. **Page context can reliably identify a specific counterpart — unverified/estimated (docs/PRD.md Assumptions); confirmed or refuted only by T66's first-hour spike. If false, the result is simply "no candidate detected," not a malfunction (AC-067③).** **(new v6.0) The manual-marking sample threshold (how many marks a user realistically provides per counterpart) is genuinely unmeasured — T71's own first-task spike is the actual measurement step (docs/PRD.md AC-082③); this document does not invent a number ahead of that.** |
+
+### Extension Privacy Notice (Screen ID: UX-017)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-017 |
+| Acceptance Criteria | AC-054, AC-068 (conditional content), AC-076 (new v6.0, versioned re-show), AC-081⑤ (new v6.0, conditional content) |
+| Purpose | Tell the user, once per disclosed-content version, what the extension reads and where it sends it before any Layer 1 mediation, interpret, or mark action can happen. |
+| User Goal | Know what I'm agreeing to before I use this on a site full of my own, my company's, or a counterpart's text — and know if that's changed since I last checked. |
+| Entry | Automatic, on the extension's first activation after install, **and again — but only once per version increase — if the notice's own content has grown since this browser last saw it (AC-076③)** — shown before any floating-button/panel interaction is reachable. |
+| Exit | User closes/acknowledges the notice — it does not block or gate anything further; there is no "accept vs. decline" choice, only "read and close" (confirmed scope — see Business Rules below and UX Decision Log). |
+| Primary Actions | Read the notice; Close/Acknowledge. |
+| Secondary Actions | None — no settings link, no "learn more" page, since docs/PRD.md doesn't request one. |
+| States | Shown: the current-version notice content — **with conditional disclosure items present only in a build where the corresponding capability shipped: recipient-candidate detection (AC-067/T66) and/or manual observation marking (AC-080/T71, new v6.0)** (see Business Rules) / Dismissed: notice closed, extension usable, will not reappear **until the disclosed content's version increases again (AC-076③, this document's own prior "will not reappear, ever" framing is corrected — see UX Decision Log and Open Questions #13, now answered)**. There is no Loading/Error state — this is static local content with no network call. |
+| Validation | N/A — no user input beyond the close action. |
+| Failure | N/A — no network call, nothing to fail. |
+| Accessibility | Keyboard-dismissible (Escape or a focusable "Close" button); focus moves into the notice on first show; notice content is read as plain text by screen readers, not conveyed by icon/color/layout alone. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | High (AC-054 gates the very first use of Layer 1 — MVP Scope #32/#61's `all_urls`-level permission is the reason this notice exists at all, Planning Decision #64) |
+| Business Rules | Must state, at minimum: (a) only the text the user selects is sent, never the full page (AC-054①a); (b) the destination is our backend, which proxies OpenAI (AC-054①b, consistent with AC-030); (c) the extension holds a permission to operate on any site (AC-054①c). Copy must never claim a protection that isn't actually implemented (AC-054③, same principle as AC-034's "don't overstate what's built"). **Scope is confirmed fixed at notice-only** — no consent record is stored, no withdrawal/settings UI exists (PRD Open Question #23 is resolved as of Planning Decision #81; this document's prior "still open" framing is corrected). **Content is conditional on which capabilities shipped in this build (PRD Planning Decision #83, #109):** if T66 is `done` and shipped, this notice adds "수신자 후보를 찾기 위해 현재 페이지의 일부를 브라우저 안에서 읽습니다. 그 내용은 전송·저장하지 않습니다" (AC-068②③); if T71 (manual marking) is `done` and shipped, this notice separately adds an item describing the Mark-mode behavior — what gets added to a sample (only the text the user explicitly selects), what's stored (aggregate values only, never the selected text itself), and where processing happens (in the browser, AC-081⑤). Either item is **not** shown if its capability is cut/not shipped. **(new v6.0/AC-076, resolves this document's own former Open Question #13) The "already shown" flag is versioned to the notice's own content, not a plain boolean** — the extension locally stores the highest notice-content version it has shown; on activation, if the current build's notice version is higher than the stored one, the notice shows once more and the stored version updates; if equal, it stays dismissed (AC-076③). **This is still not a consent record** — only a content-version number is stored locally, never an acceptance/decline choice or a withdrawal history (Planning Decision #81 remains fully in force, unreversed by this mechanism). Whoever finalizes a build must bump the notice's version number whenever T66 or T71 changes shipped/cut status and match the notice text to the actual shipped set — showing an undone capability or hiding a shipped one both violate AC-054③/AC-068③/AC-081⑤ alike. |
+| Data Required | Static notice copy per version (with the two independently-conditional items, above) — no user data is captured on this screen |
+| Data Operations | None (no read/write beyond a local "highest notice version shown" value, replacing the prior plain boolean flag) |
+| External Dependencies | None — no network call |
+| Permissions | None beyond the extension's own installed permission set (which this screen discloses, not requests) |
+| Navigation Targets | None — dismissing returns the user to whatever page they were on |
+| Events Emitted | `privacy_notice_shown`, `privacy_notice_acknowledged` |
+| Expected Outputs | A local "highest notice version shown" value so it only reappears on a genuine content-version increase (AC-076); no server-side record (per the confirmed notice-only scope) |
+| Assumptions | Extension is developer-mode-loaded only in MVP, so the audience is the team/judges installing it manually (Planning Decision #4) — not a general public install base. **This project deploys continuously to `main` before the 2026-08-21 submission (docs/PRD.md Delivery & Deployment)**, which is exactly the scenario AC-076's versioning mechanism exists to handle. |
+
+### Recipient Public Profile Enrichment & Collaboration Style Inference (Screen ID: UX-018)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-018 |
+| Acceptance Criteria | AC-065, AC-071, AC-072, AC-073, AC-074, AC-080 (new v6.0, combined-source indicators), AC-082 (new v6.0, source-specific thresholds) |
+| Purpose | **(v5.0 — redesigned in place, same Screen ID)** Let a sender optionally strengthen personalization and the pair protocol for a recipient using one public GitHub profile URL — first showing exactly what was factually observed from that account's public activity, then (only on explicit request) a cited draft suggestion for the pair protocol's 4 axes, and saving only what the sender explicitly confirms. Never an automated search, never a silent trait judgment. |
+| User Goal | Get a running start on ground rules with someone I haven't agreed a protocol with yet, and see *why* the tool is suggesting what it suggests, instead of it just being applied behind my back. |
+| Entry | "상대방 정보 보강" link next to the recipient identifier field on UX-004 (see Open Questions #12 on whether this link should hide once the recipient is confirmed as a registered account — unchanged by this pass, the link still opens this same screen, now larger in scope). |
+| Exit | "저장" (Save, Stage 1 only — location/company/timezone candidates) → returns to UX-004, confirmed values applied to that recipient's personalization. "확정하고 규약에 저장" (Stage 4 confirm) → writes into the pair-protocol record (UX-011), returns to UX-004 with an optional "규약 보기" link to UX-011. "취소"/Close at any stage → returns to UX-004, nothing beyond an already-explicitly-saved Stage 1 value changes. |
+| Primary Actions | Paste a GitHub public profile URL; Fetch ("조회"); Select/confirm the location-based timezone candidate; Select/confirm the activity-based time-of-day candidate; Save (Stage 1 fields); "협업 스타일 제안 보기" (view style suggestion, Stage 3 trigger); Edit a draft axis value (Stage 4); "확정하고 규약에 저장" (Stage 4 confirm). |
+| Secondary Actions | Cancel/Close without saving; Clear the URL and remove any previously saved enrichment for this recipient (data-minimization control, unchanged from the prior round); "규약 보기" link to UX-011 (new, shown once a suggestion is discarded by conflict or once a confirm succeeds). |
+| States | **Stage 1 (unchanged):** Empty: no URL entered yet / Loading: fetch in progress / Result: raw `location`/`company` strings shown exactly as fetched, or "미등록" per field when absent — plus the pasted source URL and fetch timestamp, always shown together with any populated value (AC-065⑥) / TimezoneCandidates: location-based candidate(s) listed, none pre-selected / TimezoneUnconfirmed: candidates shown but none chosen yet (AC-065④) / Error: fetch failed — explicit message, "미등록" shown for both fields, source URL/timestamp still recorded / Saved: confirmation, Stage 1 values attached to this recipient. **Stage 2 — 관측 (new, AC-071/AC-072, renders automatically once Stage 1's fetch succeeds, no separate trigger):** ActivityTimezoneCandidate: a "공개 활동 시간대" candidate shown for confirmation, same confirm-required rule as the location-based candidate (AC-071③) / ActivityTimezoneInsufficientSample: activity sample under the (tentative, unconfirmed) 30-sample threshold — shown as "미등록," never a guessed value (AC-071②) / ObservationResult: the 4 counted indicators (comment length distribution, emoji frequency, response-delay distribution, activity time-of-day distribution), **each with its own sample count, phrased only as fact** ("코멘트 평균 2.1문장 (48건 중)") — **this state never contains a trait/personality/style word** (AC-072④). **Stage 3 — 제안 (new, AC-073, entered only by the explicit "협업 스타일 제안 보기" click):** SuggestionPending: button shown, not yet clicked / SuggestionLoading: draft generation in progress / ProtocolAlreadyAuthored: the counterpart has already directly authored the pair protocol for this recipient — no draft is generated at all; a message states this and links to UX-011 (AC-037/AC-074④) / SuggestionResult: one draft value per #24 axis (직설 허용/이모지 사용/호칭/마감 표현 — no new axis, AC-073②), each with its cited observed metric/value and a confidence-or-evidence-count indicator (AC-073③④) / SuggestionInsufficientSample: "표본 부족으로 제안하지 않음" — no axis filled with a guess (AC-073⑤) / SuggestionError: generation failed, retry available, distinct from the legitimate InsufficientSample result. **Stage 4 — 합의 (new, AC-074, reachable only from SuggestionResult):** AgreementReview: the 4 draft values shown editable (same input controls as UX-011), with a persistent "이것은 제안이며 확정 전에는 저장되지 않습니다" statement always visible (AC-074⑤) / AgreementConfirming: confirm in progress / AgreementConflict: the counterpart authored the protocol directly between Stage 3 and the confirm click — confirm is rejected, nothing written, message states the counterpart's values now apply, links to UX-011 (AC-074④) / AgreementConfirmed: saved into the shared pair-protocol record, confirmation shown, visible only on this sender's own screens (AC-074③) / AgreementError: transient save failure, retry, draft values retained. |
+| Validation | Stage 1 unchanged from the prior round: URL field holds one value at a time (AC-065②); "조회" enabled only when non-empty; "저장" enabled once a fetch completes; timezone confirmation optional. **Stage 3:** "협업 스타일 제안 보기" is enabled once Stage 2's observation has rendered — clicking it is what reveals either SuggestionResult or SuggestionInsufficientSample, never a blocked/disabled state (the button itself is always clickable once observation data exists; the *outcome* depends on sample size, not the control's availability). **Stage 4:** "확정하고 규약에 저장" is enabled only when SuggestionResult exists (a draft to confirm) and disables immediately on click to prevent a double-write (same double-submit pattern as every other approval action in this document); editing a draft value never requires re-running Stage 3. |
+| Failure | Stage 1: fetch fails → inline error naming the failure; "미등록" shown for both fields; retry available; nothing guessed (AC-065⑤, unchanged). Stage 3: suggestion generation fails (LLM/backend call) → inline error + retry; no draft shown — **this is a genuine error, not the same thing as "표본 부족으로 제안하지 않음," which is a legitimate non-error result the user must be able to tell apart from a failure.** Stage 4: confirm fails transiently (network) → inline error, draft retained, retry available; confirm rejected by conflict (AgreementConflict) → not treated as an error banner but as an informative outcome — nothing was saved, the counterpart's protocol is what now applies, and the user's only next action is to view it (AC-074④). |
+| Accessibility | URL input has an accessible label; timezone/activity-time candidates form keyboard-operable radio groups, not click-only; "미등록," the source URL, the fetch timestamp, all 4 observation indicators' sample counts, and each suggestion axis's evidence/confidence are all exposed as text, never icon/color alone. The 4-stage progression is exposed to assistive tech as a labeled sequence (e.g., `aria-current` on the active stage), not conveyed by visual position alone. Draft axis edit controls in Stage 4 are the same accessible controls UX-011 already defines for the same 4 fields. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Low (P2 feature, MVP Scope #34 — cut-eligible per Planning Decision #82⑤/#98, and placed last in the P2 internal priority order per Planning Decision #92/#98; **T68·T69 are the new tasks covering Stages 2–4 and are scheduled immediately after T64·T65 per Planning Decision #98**) |
+| Business Rules | **Stage 1 (unchanged):** Fetch is triggered **exclusively** by the user's paste-and-submit action — no automatic search/crawl/link-following in any code path (AC-065②). Only `location`/`company` are extracted and persisted from the profile fields; every other profile field is discarded (AC-065③). Location-based timezone is never auto-applied (AC-065④). A value that cannot be obtained is shown as "미등록," never invented (AC-065⑤). Source URL + fetch timestamp always shown once attempted (AC-065⑥). Mediation for any recipient works identically whether or not this screen was ever used (AC-065①) — this screen never gates UF-003. **Stage 2 (관측):** The activity time-of-day candidate follows the identical never-auto-applied rule as the location-based candidate, gated at a (tentative, T64-pending) 30-sample floor (AC-071②③). **The 4 observation indicators are computed from the same fetched activity but store only aggregate counts — the underlying comment/issue/PR text content is never read into a stored field or displayed anywhere on this screen (AC-072②)**; copy for this stage must be reviewed to contain zero trait/personality/style adjectives — only counts, averages, and distributions (AC-072④, verified by a copy check). **(new v6.0) From this pass onward, each indicator's value is computed from this fetched GitHub activity combined with any manually-marked samples (T71/UF-020) already collected for the same recipient, using one shared indicator definition regardless of source (AC-080④) — implementer must not compute two separate indicator sets and merge them for display only; they are one aggregate with a source-tagged sample breakdown (AC-080⑤). The "표본 관리 보기" link routes to UX-019, which reads/deletes from the same underlying sample store this stage reads from — a deletion there must be reflected here on next view.** **Stage 3 (제안):** Draft axes are computed **only** for #24's existing 4 fields — implementer must not add a 5th axis even if the LLM/heuristic could plausibly suggest one (AC-073②, schema/UI must physically prevent a 5th field from existing). Every axis value must carry a citation to the specific observed metric/value it came from (AC-073③) — a suggestion with no citation is a defect, not a valid output. Below the sample threshold, the *entire* suggestion is withheld (not a partial guess on some axes) — "표본 부족으로 제안하지 않음" (AC-073⑤). **Before generating a draft, the system must check whether the counterpart has already directly authored the pair protocol for this recipient (UX-011) — if so, skip generation and show ProtocolAlreadyAuthored instead (AC-037/AC-074④).** No draft/suggestion record is written to persistent storage at this stage — it exists only for the current session/request until Stage 4 confirms it (AC-074②). **Stage 4 (합의):** Nothing from Stages 2–3 is written to storage until the explicit confirm click (AC-074②, verified by a storage query showing zero protocol/inference records between a shown draft and a confirm). **The confirm write target is the exact same pair-protocol record UX-011 reads/writes — never a parallel table** (AC-074①, same "one shared storage" precedent as UX-013/UX-015). **Immediately before writing, re-check the counterpart-authored-protocol condition — if it became true since Stage 3 was shown, reject the write, discard the draft, and surface the counterpart's actual values instead (AC-074④, a race-condition guard, not merely a pre-check)**; this requires whatever provenance/last-writer mechanism architect designs for UX-011 (see UX-011's Open Questions #14 cross-reference). A confirmed value is visible only on the sender's own screens — never transmitted to, or stored on, the counterpart's account (AC-074③). This screen's copy must never use "분석했다"/profiling-style language about the recipient at any stage — the recipient is a non-consenting third party with no account and no awareness of this screen (PRD Risks, "제3자 개인정보 수집" row, expanded this pass to cover the inference capability); Stage 2/3 copy specifically must read as "우리가 관측한 것"/"우리가 관측한 근거로 제안하는 것," never "이 사람의 성향"/"우리가 분석한 결과." |
+| Data Required | recipient identifier (from UX-004); pasted GitHub profile URL; fetched `location`/`company` raw strings (or their absence); activity timestamp distribution (aggregate only, never raw post content); location-based and activity-based timezone/time-of-day candidates (each optional, user-confirmed); fetch timestamp; **4 observation indicator values + per-indicator sample count (Stage 2, AC-072③)**; **draft suggestion per pair-protocol axis (value + cited evidence + confidence/evidence-count), held only for the current session until confirmed (Stage 3)**; **the pair protocol's current authorship state for this counterpart pair, to run the AC-074④ conflict check (Stage 3 entry and Stage 4 confirm)** |
+| Data Operations | Create/Update (recipient enrichment record: URL, location, company, confirmed timezone, confirmed activity time-of-day, fetched-at timestamp); Delete (user-initiated clear); Read (on redisplay; pair-protocol authorship state for the conflict check); **Create (observation aggregate, ephemeral/session-scoped); Create (suggestion draft, ephemeral/session-scoped, never persisted before confirm); Create/Update (pair-protocol record — same table UX-011 owns — only on a successful Stage 4 confirm, AC-074①②)** |
+| External Dependencies | GitHub public profile + public-activity fetch (unauthenticated, one request per submit for the whole account — feasibility/rate-limit/sample-size **unverified**, docs/PRD.md Assumptions; T64's first-30-minute spike is the confirmation step for Stage 1/2, Core is unaffected if it fails, P2); **suggestion generation (Stage 3) is LLM-backed, subject to the same cache/rate-limit/fallback behavior as AC-041** |
+| Permissions | Requires authenticated session (the sender's); the recipient being enriched/observed needs no account and is not notified — no consent mechanism exists for them in MVP (see PRD Risks, expanded this pass for the inference capability) |
+| Navigation Targets | Returns to UX-004; optional "규약 보기" link to UX-011; **(new v6.0) "표본 관리 보기" link to UX-019** |
+| Events Emitted | `recipient_profile_url_submitted`, `recipient_profile_fetched`, `recipient_profile_fetch_failed`, `recipient_timezone_confirmed`, `recipient_enrichment_saved`, `recipient_enrichment_cleared`, `recipient_observation_computed`, `recipient_style_suggestion_requested`, `recipient_style_suggestion_generated`, `recipient_style_suggestion_insufficient_sample`, `recipient_style_suggestion_skipped_protocol_exists`, `recipient_style_agreement_confirmed`, `recipient_style_agreement_conflict_discarded` |
+| Expected Outputs | An enrichment record (location/company strings, confirmed timezone(s) if any, source URL, fetched-at timestamp) that UF-003's personalization step reads for that recipient; **an observation summary (ephemeral, Stage 2); a suggestion draft (ephemeral until confirmed, Stage 3); a pair-protocol update (same schema as UX-011) only upon a successful Stage 4 confirm** |
+| Assumptions | GitHub allows unauthenticated fetch of public profile `location`/`company` fields and enough public activity to compute the 4 indicators — **unverified** (confirmed or refuted by T64's spike). `location` free text reliably maps to a timezone — **assumed false in general**, hence candidates-plus-confirmation. **The minimum sample size for a usable suggestion is tentatively 30 (matching AC-071②) but genuinely unconfirmed — T64's spike (3 real accounts) is the actual measurement step per AC-073's own text; this document does not invent a firmer number than the PRD provides.** **A mechanism exists (architect's to design) to tell "counterpart directly authored the protocol" apart from "protocol untouched by the counterpart" — assumed feasible but not yet specified (see Open Questions #14).** |
+
+### Observation Sample Management Screen (Screen ID: UX-019, new v6.0)
+| Item | Value |
+|---|---|
+| Belongs to Flow(s) | UF-021 |
+| Acceptance Criteria | AC-081④ (primary), AC-080⑤, AC-072③ (cross-reference — per-indicator sample counts) |
+| Purpose | Let the sender see exactly what observation samples have been collected for each counterpart — count, source, and collection time only, never the underlying text — and delete any of them. |
+| User Goal | Know what the tool has collected about my conversations with someone, and remove any of it I don't want kept. |
+| Entry | Nav menu "관측 표본"; "표본 관리 보기" link from UX-016's Mark-mode success confirmation (UF-020); "표본 관리 보기" link from UX-018's Stage 2 (관측). |
+| Exit | Nav menu to leave. No forward navigation beyond viewing/selecting/deleting on this screen itself. |
+| Primary Actions | Select a counterpart from the list to view their samples; Delete a sample. |
+| Secondary Actions | None. |
+| States | Loading: skeleton counterpart list / Empty: "아직 수집된 관측 표본이 없습니다" / CounterpartList: each row shows a counterpart identifier, total sample count, and a source breakdown (e.g., "12건 (수동 표시 8 · GitHub 4)") / SampleList: per selected counterpart, each sample row shows only its source tag and collection timestamp — **never the underlying quoted text (AC-081②, this screen's core constraint)** / DeleteConfirm: "이 표본을 삭제하시겠습니까?" (same destructive-action pattern as profile/terminology deletes) / Deleted: row removed, counterpart's total count updates immediately / Error: load or delete failed, retry. |
+| Validation | N/A — no form input beyond the delete-confirm click. |
+| Failure | List load fails → error banner + retry. Delete fails → inline error on that specific row; the sample is retained, retry available. |
+| Accessibility | Counterpart and sample lists are keyboard-operable list items; delete requires an explicit confirm step (never a single accidental click); counts, source tags, and timestamps are all exposed as text, never by icon/color alone. |
+| Figma Frame | N/A — no Figma reference |
+
+**Architect Handoff**
+| Item | Value |
+|---|---|
+| Priority | Low (P2 feature, tied 1:1 to MVP Scope #34/T71 — if #34 is cut, T71 never ships and this screen has nothing to show; conversely, per PRD Planning Decision #109's own reasoning, **T71 (manual marking) must never ship without this screen** — the two are a bundle within the P2 layer, not independently optional once #34 itself survives the cutline). |
+| Business Rules | Never displays underlying quoted/raw text under any state — only count, source, and collection timestamp per sample, and a count+source rollup per counterpart (AC-081②, the single hardest constraint on this screen — a reviewer/QA check here should specifically look for any code path that could render stored text). Deleting a sample removes it from that counterpart's aggregate indicators immediately — verified by UX-018's Stage 2 reflecting the updated set on next view (AC-081④). Source is always shown, both per-sample and as a per-counterpart rollup (AC-080⑤). This is the only screen where collected samples can be inspected or removed — no export, audit-log, or admin view exists, since docs/PRD.md doesn't request one. |
+| Data Required | counterpart list with sample counts (manual + GitHub, rolled up); per-counterpart sample list (id, source tag, collected timestamp — no raw text field is ever read by this screen even if one exists in storage for another purpose) |
+| Data Operations | Read (sample records, rolled-up counts); Delete (an individual sample, triggering aggregate recomputation) |
+| External Dependencies | None beyond the same storage the observation pipeline (T64 GitHub path, T71 manual-marking path) already writes to |
+| Permissions | Requires authenticated session; user sees only their own collected samples (AC-039 pattern) |
+| Navigation Targets | None forward; nav menu to leave |
+| Events Emitted | `observation_sample_list_viewed`, `observation_sample_deleted` |
+| Expected Outputs | Updated aggregate indicator values (read next by UX-018's Stage 2/3) after a delete |
+| Assumptions | A sample record structure exists that keeps count/source/timestamp fields separate from any raw content field, so this screen can be built to physically never read the latter (architect's schema, must satisfy AC-081②) |
+
+## Deprecated
+
+### Extension Mediation Overlay — GitHub, Slack & Gmail (Screen ID: UX-014)
+| Item | Value |
+|---|---|
+| Type | Screen |
+| Deprecated Since | docs/PRD.md v2.4 (Planning Decision #61/#62), formally reflected in this document as of Document Version 3.0 (2026-08-04) |
+| Reason | v2.4 restructured the Chrome extension into a two-layer model: invocation (the "Mediate" trigger) and panel/overlay display for **all** sites — including GitHub, Slack, and Gmail — now belong to Layer 1 (MVP Scope #32; "중재 호출·패널 표시는 층 1이 소유," MVP Scope rows #16/#27/#31 v2.4 redefinition). GitHub/Slack/Gmail no longer inject their own "Mediate" button or render their own overlay; they contribute only a DOM selector + insert function registered with Layer 1's panel (T57's contract). UX-014's core premise — a per-site-triggered overlay screen — is no longer how any of the three sites are reached. |
+| Replacement | UX-016 (Universal Selection Mediation Panel) — GitHub/Slack/Gmail's remaining UI contribution (the conditional "Insert into input field" control) is now documented as part of UX-016's States/Architect Handoff. |
+| Former Definition (preserved for history) | Belonged to UF-011/UF-012/UF-014; covered AC-021, AC-040, AC-042, AC-051; entry was "click the extension-injected 'Mediate' button/icon next to a supported input field"; exit was "Insert" (DOM insertion, no auto-submit) or "Cancel/Close"; states were Loading/Error/NotLoggedIn/Result/Inserted. Full original Screen Catalog text is preserved in this project's git history (docs/UX.md as of Document Version 2.0) rather than duplicated here, per this document's preference for a concise Deprecated entry over a second full copy of the template. |
+
+UF-011, UF-012, and UF-014 (the GitHub/Slack/Gmail flows) are **not** deprecated — they remain valid flows, only their Trigger/Steps were updated in place this round to route through UX-016 instead of UX-014, per the Workflow's "extend in place" preference over "deprecate and recreate" when the flow's goal is unchanged.
 
 ## Information Architecture
-{{navigation structure, screen hierarchy, or sitemap}}
+**Routes**
+- Unauthenticated: `/login` (UX-001), `/signup` (UX-002)
+- Authenticated: `/` or `/mediate` (UX-004, default landing), `/onboarding` (UX-003, shown once after first login until the user completes or explicitly skips it — no longer a permanent forced gate, AC-059), `/profile` (UX-009), `/terminology` (UX-010), `/pair-protocols` and `/pair-protocols/:counterpart` (UX-011), `/meeting-times` (UX-012), `/decisions` (UX-008), `/feedback` (UX-013), `/sent-messages` (UX-015), **`/observation-samples` and `/observation-samples/:counterpart` (UX-019, new v6.0)**. UX-018 (Recipient Public Profile Enrichment) has no distinct route — it's a modal opened from UX-004, mirroring UX-005/UX-006 (exact routing mechanism, e.g. `?enrich=<recipient>`, is architect's/implementer's choice).
+- Extension (no URL routing — content-script overlay, not a page): UX-016 (Universal Selection Mediation Panel, opened via the Layer 1 floating trigger button on any page — now also owns optional recipient-candidate selection (AC-067) and Mark-as-counterpart's-message mode (AC-080, new v6.0), with no separate route/screen for either), UX-017 (Privacy Notice, shown on first extension activation and again on a notice-content version increase — AC-076, no longer strictly "once ever" — gating access to UX-016)
+
+**Navigation** — A persistent primary nav (top bar or left rail, implementer's visual choice) is present on every authenticated screen except UX-003 (onboarding is a forced first step for any user who has neither completed nor explicitly skipped it yet — the Skip button inside UX-003 itself is the escape, not the nav bar). It links: Mediate | Profile | Terminology | Pair Protocols | Meeting Times | Decisions | Feedback | **발송 내역 (Sent, new v2.3, → UX-015)** | **관측 표본 (Observation Samples, new v6.0, → UX-019)**, plus Log out. This is navigation only, not a Dashboard/summary screen (see UX Decision Log). Adding the Sent nav item was not new feature invention (it is the entry point AC-044/T52 explicitly requires); the new 관측 표본 item is the same kind of addition — it is the entry point AC-081④/T72 explicitly requires for a privacy-defense screen, not a data-aggregation Dashboard. UX-018 has no nav entry of its own (reached only via the UX-004 link, per the modal pattern above).
+
+**Back/Cancel behavior** — Modals (UX-005, UX-006, UX-018) Cancel or Escape returns to UX-004 with the draft message text unchanged (and, for UX-018, no enrichment values changed). Browser Back on any authenticated screen returns to the previous in-app screen in history, defaulting to UX-004 if there is no history.
+
+**Direct URL access** — Unauthenticated user hitting any protected route → redirect to UX-001 (Login); after success, redirect to the originally requested URL (standard post-login redirect), falling back to UX-004 if none was requested. Authenticated user hitting `/login` or `/signup` directly → redirect to UX-004. **(v2.7/AC-059 update) Authenticated user who has neither completed nor explicitly skipped onboarding yet, hitting any URL other than `/onboarding` → forced redirect to UX-003 first (shown once).** Once the user has completed **or skipped** onboarding, this redirect never fires again — a skipped user reaches every other URL normally, with the personalization-off indicator doing the ongoing signaling instead of a redirect gate. The only way back to UX-003 after that point is the explicit "온보딩 완료하기" link on UX-009 (never a forced redirect).
+
+**Pre-login vs. post-login redirect** — Pre-login, every protected route redirects to Login. Post-login, the redirect target is the originally requested protected URL, falling back to UX-004 (or UX-003, per the onboarding-pending rule above, if the user hasn't completed/skipped it yet).
+
+**Chrome extension** — Has no independent navigation structure. **(v2.5/v2.6 update)** The extension now consists of two layers: **Layer 1** is a single, site-agnostic, selection-triggered panel (UX-016) reachable from anywhere in the browser — this is the extension's only invocation surface. **Layer 2** (GitHub/Slack/Gmail) contributes no independent screen or navigation of its own; it only makes an additional "Insert into input field" control appear inside UX-016 when the current site is registered. UX-017 (Privacy Notice) gates first-run access to UX-016 only, is shown once, and has no navigation target of its own. None of this substitutes for the web app's nav — the web app remains the primary demo path (Planning Decision #3). The previously-separate per-site overlay (UX-014) is Deprecated — see Deprecated section. **(v2.7 update)** UX-016's recipient handling is now two-tiered but still adds no navigation: the base case (no recipient, AC-066) and the optional candidate-detection case (AC-067) are both rendered inside the same panel, never a separate screen or route. **(v6.0 update)** The same is true of Mark-as-counterpart's-message mode (AC-080) — it is a mode switch inside UX-016, not a new screen or route, matching the precedent already set for Interpret mode and recipient-candidate selection.
 
 ## Interaction Patterns
-{{reusable patterns for implementer — e.g. loading (skeleton/spinner), empty state, error, validation (timing/message placement), permission denied, session expired, offline, button-disabled-while-pending, retry-on-failure, confirmation dialogs, undo, animation}}
+- **Loading**: Every AI-backed action (mediation run, ticket conversion, thread summary) shows a step-labeled progress indicator (e.g., "분류 중 → 변환 중 → 역번역 중"), never a bare unlabeled spinner beyond ~1s, per AC-029's "must not look stopped."
+- **Empty**: Every list/result screen has an explicit empty-state message with a next action, never a blank area.
+- **Error**: Every failure shows (a) what happened in plain language, (b) a retry action, and (c) confirmation that in-progress user input was not lost.
+- **Validation**: Inline, appears next to the offending field at first blur or first submit attempt, clears the instant the field becomes valid again. A form's primary submit action stays disabled until all required fields are valid.
+- **Permission denied**: Not reachable via UI navigation in this design (AC-039 guarantees server-side data scoping). If a stale link somehow points to another user's resource, it is treated as "not found," not a raw 403, to avoid confirming the resource's existence to an unauthorized user.
+- **Session expired**: Any authenticated screen whose next API call returns unauthorized shows a banner "세션이 만료되었습니다" and redirects to UX-001 on acknowledgment, preserving any in-progress draft text in local storage so it can be restored after re-login.
+- **Offline**: Not designed — always-online is the MVP assumption (docs/PRD.md's own Open Question #5, resolved via Planning Decision #31 — distinct from this document's Open Questions #5 below, which concerns reply capture, not offline support). A connectivity failure is treated identically to the generic Error pattern; no offline queueing.
+- **Retry**: Every retry button re-attempts the exact same request with the exact same input, never silently altering it.
+- **Duplicate/double-click submission**: Every submit-type control (Run Mediation, Approve & Send, Save, Add term, etc.) disables itself immediately on click until the request resolves.
+- **Stale or already-deleted data**: If a user acts on a profile item, term, or pair-protocol entry deleted elsewhere before the action completes, the server rejects it and the screen shows "이 항목은 이미 삭제되었습니다" and refreshes the list — it never silently no-ops.
+- **Very long text/overflow**: Text areas scroll internally rather than expanding the page indefinitely. The comparison view (UX-004) truncates long backtranslation/transformed text with a "더 보기" expand control, never hard-clipping content the user needs to review before approving.
+- **Slow response**: If a mediation call exceeds a few seconds (the ~5s felt-target in docs/PRD.md's Non-functional Expectations), the loading indicator's step labels keep advancing so the user can tell it's still working. There is no separate "slow" state distinct from Loading.
+- **Confirmation**: Destructive actions (delete profile item, delete term) require an explicit confirm step ("삭제하시겠습니까?" with Confirm/Cancel) before executing.
+- **Undo**: Not designed — docs/PRD.md does not request undo for any action. Deletions are confirmed-before-execution instead, consistent with the product's human-in-the-loop philosophy (Planning Decision #5).
+- **Fallback/cached response indicator** (project-specific, AC-041): Whenever a screen shows a pre-scripted/cached response instead of a live LLM result, a visible, persistent label reads "폴백 응답 사용 중" near the result — distinct from the generic Error pattern because the content is still usable, just not live, and must not be mistaken for a live model result.
+- **Human-in-the-loop approval** (project-specific, applies to UX-004/UX-007/UX-015/UX-016): No AI-generated output is ever transmitted/inserted without an explicit click of an approval-labeled control (Approve & Send / Insert / Copy to clipboard counts as the user's own subsequent action, not the tool's). Overrides (urgency level, edited text) always take precedence over the AI's original suggestion in what is sent/inserted and what is diffed for C3 learning.
+- **Degradable display under schedule pressure** (project-specific, AC-043, Planning Decision #57): Some advisory data (currently: Misread Risk on UX-004) is allowed a "reduced" display tier — a compact count badge + tooltip instead of the full per-item breakdown — so that a schedule-pressure cut can shrink the display work alone without touching data generation/storage. Whenever a screen documents both a Full and Reduced tier, the underlying data must be identical between tiers; only presentation density differs, and reverting from Reduced to Full must never require regenerating or re-fetching data that already exists.
+- **No-fabrication explicit labeling** (project-specific, applies to any AI-derived status/field without textual evidence — AC-020, AC-038, AC-047②, AC-050①, AC-055②, AC-062, AC-065⑤, AC-067③): When the system cannot determine a value from the source text/data, it shows an explicit label ("미정" / "불명" / "없음" / "판단 근거 부족" / "미등록") rather than leaving the field blank, omitting the section, or guessing — blank and "correctly determined but empty" must never look identical to the user. **This pattern always shows something to the user.** See the next pattern for the one deliberate exception.
+- **No-data country suppression** (project-specific, AC-063, applies to UX-004/UX-015/UX-016's holiday-conflict area — deliberately the opposite of the pattern above, do not generalize the "always show a label" rule to this case): When the recipient's country has no entry at all in the static holiday dataset, this is treated as structurally out of scope, not as "evidence absent within a covered domain." Nothing is shown to the user — no label, no grey/muted badge, no empty box; the area is indistinguishable from "no conflict found." The "no data" vs. "no conflict" distinction is preserved **only** in internal state values and test output (PRD Planning Decision #90). Implementer: do not "fix" this by adding a visible label — that would violate AC-063①.
+- **Soft length cap counter** (project-specific, AC-061, applies to UX-004 and UX-016's input text areas): Once input text approaches 5,000 characters, a character-count indicator appears near the text area. This is advisory only — there is no hard block, truncation, or disabled submit at or beyond 5,000 characters; mediation must run normally on longer input (confirmed with a 6,000-character regression case). The exact character count at which the counter first appears is an implementation choice, as long as it appears before 5,000 is reached.
+- **Personalization-off indicator** (project-specific, AC-059③/AC-066③, applies to UX-004/UX-016/UX-009): Whenever personalization inputs are missing — the sender's own profile is empty/skipped (AC-059), or (Layer 1 only) no recipient is resolved (AC-066) — the screen shows an explicit, visible statement that personalization is off and only base conversion is applied. This is never silent: a plain conversion result with no indicator would let the user believe personalization ran when it didn't, which is the same class of problem the no-fabrication pattern above exists to prevent.
+- **Third-party enrichment disclosure** (project-specific, AC-065⑥, applies to UX-018): Any screen that reads/displays data about someone other than the current user's own account always shows, next to the value, where it came from (the source URL) and when it was retrieved (a timestamp) — never presenting the value as if the tool inherently knew it. Copy on such a screen must describe the mechanism ("we read the page you gave us") and never use profiling-style language ("we analyzed them") about a person who has no account and gave no consent.
+- **Selection-triggered floating button** (project-specific, AC-052, applies to UX-016's entry mechanism): On `mouseup` with a non-empty text selection anywhere on a page, a single floating trigger button renders adjacent to the selection's bounding box, clamped to stay fully within the viewport (flips to the opposite side if it would overflow the top/bottom edge; shifts horizontally to avoid the left/right edge). The button disappears immediately when the selection is cleared (click elsewhere, Escape, or a new empty selection). If the user makes a new selection while the button is already showing, the button repositions to the new location rather than leaving a stale one behind — only one instance exists on the page at a time. Before the button (or the panel it opens) is interacted with, the extension does not intercept or alter any click/scroll/keyboard behavior on the host page (AC-052⑤) — it is a purely additive overlay, never a blocking one.
+- **Absent-not-disabled controls** (project-specific, AC-053②, generalizes beyond UX-016): When a capability doesn't apply in the current context (e.g., no Layer 2 module registered for the current site, so "Insert into input field" doesn't apply), the corresponding control is **omitted from the layout entirely** — it is never rendered greyed-out/disabled. An absent control communicates "not applicable here"; a disabled control incorrectly implies "applicable but blocked right now," which reads as a defect. This is the same principle already applied to informational displays elsewhere in this document (Misread Risk area renders nothing when its underlying array is empty; the No-data country suppression pattern above is the same idea applied to a structurally-out-of-scope case) extended explicitly to interactive controls.
+- **Observation-before-suggestion disclosure** (project-specific, new v5.0, AC-072/AC-073, applies to UX-018): Any screen that derives a suggestion from a person's activity data must show the underlying counted observation **first, as a separate, always-visible step**, using only factual/quantitative phrasing (counts, averages, distributions, sample sizes) — never a trait, personality, or style adjective. The suggestion step that follows is a **separate, explicitly user-triggered** action, never auto-generated the instant observation data becomes available, and every suggested item must carry a citation back to the specific observed value it came from plus a confidence-or-evidence-count indicator. Below a defined sample threshold, the suggestion step is withheld entirely (an explicit "표본 부족으로 제안하지 않음," never a partial guess) — this is the same no-fabrication family as the pattern above, applied specifically to inference. This pattern exists so implementer never collapses "what we counted" and "what we're proposing" into one silent step, which is exactly the "conclusion without shown evidence" behavior this product's KEY 2 pitch (Planning Decision #97) is positioned against.
+- **Confirm-gated persistence for inferred data** (project-specific, new v5.0, AC-074②, applies to UX-018): Nothing produced by an inference/suggestion step is written to persistent storage until an explicit, separate confirm action — a generated-but-unconfirmed suggestion must be verifiably absent from storage (no draft row, no partial record) at any point before that confirm click. If the same data source that produced the suggestion is later found to conflict with an authoritative direct edit by another party (here: the counterpart directly authoring the pair protocol), the confirm action itself must re-check for that conflict immediately before writing and yield to the authoritative value if one now exists, discarding the suggestion — a pre-check performed only when the suggestion was first shown is not sufficient, since the conflict can arise in the time between showing and confirming.
+- **Local-only aggregation for user-marked observation samples** (project-specific, new v6.0, AC-081①③, applies to UX-016's Mark mode): When a user marks selected text as a counterpart's message, the extension computes aggregate indicator deltas (sentence count, emoji count, etc.) **in the browser**, from the selection **only**, and never as a background/automatic scan of the page. The selected text itself is never included in any network request this action makes — only the resulting aggregate numbers, a source tag, and a timestamp are ever sent to storage. This is a stricter rule than the ordinary "human-in-the-loop approval" pattern (which governs whether something is *sent*, not whether raw content ever leaves the browser at all) and must not be relaxed even for debugging/logging purposes — a debug log containing the marked text would itself violate this pattern.
+- **Aggregate-only display of collected/observed data** (project-specific, new v6.0, AC-081②, applies to UX-018's Stage 2 and UX-019): Any screen that shows what has been collected from a person's activity or marked messages shows **only** counts, source tags, timestamps, and computed distributions — never a quoted excerpt, a reconstructed sentence, or anything that could let a reader infer the original wording. This is distinct from (and stricter than) the "No-fabrication explicit labeling" pattern above, which governs what to show when there's *no* evidence — this pattern instead caps what may ever be shown even when there *is* evidence.
+- **Confirmation-request wording for observation-vs-agreement mismatches** (project-specific, new v6.0, AC-079③/AC-083, applies to UX-011): When observed activity diverges from an agreed/self-reported value, the fixed copy is exactly **"합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?"** — this is a request for the user to look, never a verdict. Wording that implies the counterpart was wrong, lied, or misreported ("~와 다르게 적었습니다," "거짓," "틀렸습니다," or similar) must never be used, because a mismatch can legitimately arise from context differences, a style change over time, or simply too few samples — none of which is the counterpart's fault. An axis with too few qualifying samples of the required source shows no banner at all (see "No-fabrication" pattern's silent-skip counterpart, consistent with the No-data-country-suppression precedent above) rather than a hedged/partial warning.
 
 ## Accessibility
 | Item | Value |
 |---|---|
-| Keyboard Navigation | {{tab order, shortcuts, or "N/A"}} |
-| Focus Order | {{...}} |
-| Screen Reader Support | {{labels/roles for assistive tech, or "N/A"}} |
-| Color Contrast | {{minimum contrast ratio, or "N/A"}} |
-| Touch Target Size | {{minimum tappable size, or "N/A"}} |
-| Error Messaging | {{confirm errors are conveyed by more than color alone — e.g. icon + text, or "N/A"}} |
+| Keyboard Navigation | All primary/secondary actions on every screen are reachable via Tab/Shift+Tab in the reading order defined per screen; Enter activates the focused primary action; Escape closes any modal/overlay. |
+| Focus Order | Top-to-bottom, left-to-right within a screen's reading order. Two-panel screens (UX-004) use Sender-panel-then-Recipient-panel order regardless of visual column position. |
+| Screen Reader Support | All form fields have programmatically associated labels; all status/urgency/concern-level/observation-indicator/suggestion-evidence/**authorship-badge/mismatch-banner/sample-source-tag** (new v6.0) values are exposed as text, never by icon/color alone; error and success banners use `role="alert"`/`role="status"`; live pipeline-progress updates use a polite live region. |
+| Color Contrast | All text and interactive controls meet at least WCAG 2.1 AA contrast ratios (4.5:1 normal text, 3:1 large text/UI components) — implementer verifies against the final visual design; color values are out of ux-design's scope. |
+| Touch Target Size | Minimum 44×44 CSS px for all interactive controls on Tablet/Mobile breakpoints (WCAG 2.5.5). |
+| Error Messaging | Every error state across every screen in this document is conveyed by icon + text together, never by color/border alone. |
 
 ## Responsive Behavior
 | Breakpoint | Layout Changes |
 |---|---|
-| Desktop | {{...}} |
-| Tablet | {{...}} |
-| Mobile | {{...}} |
+| Desktop | UX-004's Sender/Recipient panels render side by side (the "two-panel" concept). All other screens use a single-column layout with the persistent nav visible as a top bar or left rail (implementer's choice). |
+| Tablet | UX-004's two panels stack vertically (Sender panel above Recipient panel), preserving the reading order defined in Accessibility. All other screens remain single-column; the nav collapses to a top bar if it was a left rail on Desktop. |
+| Mobile | Same vertical stacking as Tablet for UX-004. Nav collapses to a menu (e.g., hamburger). Modals (UX-005/UX-006/UX-018) become full-screen rather than a centered dialog. Mobile is designed to not break rather than to be optimized — docs/PRD.md frames this as a desktop-primary demo tool, not a Mobile-first product. |
 
-If no behavior differs across breakpoints, state explicitly: "No breakpoint-specific behavior." Do not leave a row blank — a blank row is ambiguous between "not designed yet" and "no difference."
+Chrome extension (UX-016, UX-017): "No breakpoint-specific behavior" — the extension only runs inside a desktop browser by nature, so no separate responsive treatment applies.
 
 ## Claude Design Prompts
-One ready-to-paste prompt per screen or coherent screen group, for generating a visual UI mockup in Claude Design (claude.ai). Each prompt restates only what the Screen Catalog and Interaction Patterns already specify — never new features, copy, or styling requirements. Regenerate a prompt whenever its screen entry changes. Mockups are visual references only; this document remains the authoritative spec.
+One ready-to-paste prompt per screen or coherent screen group, for generating a visual UI mockup in Claude Design (claude.ai). Each prompt restates only what the Screen Catalog and Interaction Patterns already specify. Mockups are visual references only; this document remains the authoritative spec.
 
-### {{Prompt name}} (covers: {{Screen ID(s), e.g. UX-001, UX-002}})
+### Auth Screens (covers: UX-001, UX-002)
 | Item | Value |
 |---|---|
-| Source Screens | {{Screen ID(s) and names}} |
-| Last Synced With | {{Document Version of this UX.md when the prompt was last regenerated}} |
+| Source Screens | UX-001 Login Screen, UX-002 Sign Up Screen |
+| Last Synced With | Document Version 4.0 |
 
 ```
-{{the prompt itself — screen purpose, layout intent, primary/secondary actions, all States (loading/empty/error/success), validation behavior, accessibility constraints, responsive behavior, relevant Interaction Patterns}}
+Design two related web screens for a B2B collaboration tool: a Login screen and a Sign Up screen.
+
+Login screen: email field, password field, a "Log in" primary button, and a "Sign up" secondary link. States to show: empty (default), a form-level error banner reading "이메일 또는 비밀번호가 올바르지 않습니다" above the fields (use an icon plus red text, not color alone), and a loading state where the submit button shows a spinner and is disabled.
+
+Sign Up screen: email field, password field (with a show/hide toggle) with helper text directly under it reading exactly "최소 8자" — do NOT show any other password rule (no uppercase/number/special-character requirement exists, so don't imply one), confirm-password field, a "Sign up" primary button, and a "Log in" secondary link. Show an inline validation error under the password field for a password of 7 characters or fewer, an inline validation error under the confirm-password field for a mismatch, and a form-level error banner for "이미 가입된 이메일입니다" with a link back to Login.
+
+Both screens: keyboard-first design (visible focus states), labels attached to every field, primary action disabled until required fields are valid. Desktop layout: centered card, comfortable width. No breakpoint-specific redesign needed beyond the card staying centered and readable on narrower widths — this is a desktop-primary tool.
+
+Keep visual styling minimal/neutral (no brand system specified yet) — focus on clear hierarchy: heading, form, primary action, secondary link.
+```
+
+### Onboarding Profile Questionnaire (covers: UX-003)
+| Item | Value |
+|---|---|
+| Source Screens | UX-003 Onboarding Profile Questionnaire |
+| Last Synced With | Document Version 4.0 |
+
+```
+Design a one-page onboarding questionnaire screen for a cross-border collaboration tool. Purpose: capture a new user's self-reported communication style (3-5 questions covering: directness vs. indirectness preference, emoji usage preference, formality level, and honorific level (합쇼체/해요체) for Korean output) so the tool can personalize message tone conversions from the very first use.
+
+Layout: each question is its own labeled group (e.g., a fieldset with clear question text and a small set of choice options - not free text). A single "제출" (Submit) primary button at the bottom, disabled until every question has an answer, with an inline indicator next to any unanswered question. Also include a clearly visible but secondary "건너뛰기" (Skip) button/link, always enabled, that requires no answers — this is a real, always-available option, not a disabled/greyed-out affordance.
+
+States to show: default (empty form), an error banner "저장하지 못했습니다, 다시 시도해주세요" with answers still filled in, and a brief success/confirmation moment before redirecting away — the same confirmation pattern applies whether the user submitted answers or clicked Skip.
+
+Accessibility: each question keyboard-navigable via arrow keys within its choice group, clear visible focus indicators, both the Submit button and the Skip control reachable via Tab.
+
+Keep it simple and non-intimidating — this is a short first-run form, not a long survey, and skipping should feel like a legitimate, unpenalized choice, not a "wrong answer" path.
+```
+
+### Two-Panel Mediation Workspace (covers: UX-004)
+| Item | Value |
+|---|---|
+| Source Screens | UX-004 Two-Panel Mediation Workspace |
+| Last Synced With | Document Version 4.0 |
+
+```
+Design the core screen of a cross-border collaboration mediation tool: a two-panel workspace where a user writes a message and sees, side by side, how it will be classified and transformed before sending.
+
+Layout (Desktop): two columns side by side.
+LEFT — Sender panel: a recipient identifier input (email) with a small "상대방 정보 보강" (Enrich recipient info) link beside it, a large message text area with a soft character-count indicator that appears only once the text nears 5,000 characters (never a hard limit — typing is never blocked), an urgency badge showing CRITICAL / NORMAL / LOW with a short reasoning sentence beneath it, and an override control letting the user change the urgency level manually. A "Run Mediation" primary button.
+RIGHT — Recipient panel: the transformed message text with preserved items (deadlines, numbers, required actions) visually bolded AND labeled "(보존됨)" — never relying on bold alone. Below it, a short "변환 이유" (conversion reason) line, and a backtranslation section showing the transformed text translated back to the original language, with a permanently visible limitation notice: "완전한 검증이 아니라 큰 오역을 걸러내는 1차 안전장치입니다." An "Approve & Send" primary button, disabled until a mediation result exists.
+
+Just above the urgency badge, design a small "개인화 미적용" (Personalization off) inline banner/tag that shows only when the sender's own communication-style profile is empty (they skipped the onboarding questionnaire) — informative in tone, not an error or warning.
+
+Below the backtranslation section, before the Approve & Send button, show a "오해 위험" (Misread Risk) area that appears ONLY when the tool found something — design two variants: (a) Full — a small list where each item shows three labeled parts: the quoted phrase from the original, the expected misreading, and the reasoning, each expandable; (b) Reduced — a compact badge reading "오해 위험 N건" with a tooltip/expand-on-focus showing the same three-part text per item, more compact. If there is nothing to flag, this area shows nothing at all (no empty box).
+
+Also show, non-blocking and inline: (1) an honorific-level-mixing warning (only if the tool caught inconsistent 합쇼체/해요체 endings within the same Korean output), (2) an "호칭 미등록" (honorific not registered) warning naming the unrecognized person if applicable, (3) a holiday-conflict warning reading "이 마감일은 상대 국가 연휴 N일차입니다" with a small "기한 재협상" link/button, shown only if the stated deadline falls on the recipient's country holiday. Important: if the recipient's country simply has no holiday data at all, do NOT design any "no data" label, grey badge, or placeholder box for that case — it must look exactly like the no-conflict case, i.e. nothing shown there.
+
+States to design: 
+- Empty (before first run): right panel shows a neutral placeholder.
+- Loading: a step-labeled progress indicator across "분류 중 → 변환 중 → 역번역 중" (not a bare spinner), so it never looks frozen.
+- Warning: an inline, non-blocking alert for a risky emoji ("이 이모지는 해석이 갈릴 수 있습니다 — 상대와 합의된 규칙이 없습니다" — fires only for a 높음/중간-risk emoji with no agreed exception; never phrase this as a country/nationality claim like "in [country] this means..."), and/or a small note if the tool caught something worth double-checking.
+- Error: a banner "처리에 실패했습니다" with a "다시 시도" retry button; the message text the user wrote is never cleared.
+- Fallback: a persistent small label "폴백 응답 사용 중" shown near the result when a cached/pre-scripted response is displayed instead of a live one.
+- Delivered (after approval): the right panel switches to a "전달됨" state with a timestamp log entry.
+
+Secondary elements: a small "Convert to Task Ticket" link — appears only when the message reads as emotionally charged; for a plain, low-emotion message this link must be fully absent from the layout, never shown greyed-out/disabled — plus a "마감 기한 협상" button and a "수신자 아침 시간에 예약" button, both only relevant for NORMAL/LOW urgency.
+
+Tablet/Mobile: the two panels stack vertically, Sender panel above Recipient panel, same reading order.
+
+Accessibility: urgency badge shows a text label, not color alone; all warnings shown as icon + text, never color alone; all interactive elements have visible keyboard focus states; the Misread Risk tooltip content must be reachable by keyboard focus, not hover-only.
+
+None of the Misread Risk / warning / holiday-conflict elements ever disable the Approve & Send button — they are advisory only. The character-count indicator never disables Run Mediation or Approve & Send either.
+
+Keep the visual tone professional/neutral — this is a serious workplace tool, not playful.
+```
+
+### Deadline Negotiation & Scheduled Send Modals (covers: UX-005, UX-006)
+| Item | Value |
+|---|---|
+| Source Screens | UX-005 Response Deadline Negotiation Modal, UX-006 Scheduled Send Modal |
+| Last Synced With | Document Version 2.0 |
+
+```
+Design two small modal dialogs that open on top of a message-composition workspace.
+
+Modal 1 — Response Deadline Negotiation: a date/time input for "필요 기한" (needed-by deadline, may arrive pre-filled if opened from a holiday-conflict warning), a "확인" button to check feasibility. Result states: (a) feasible — a simple confirmation and a "이 기한 사용" button; (b) infeasible — the original requested deadline shown alongside at least one system-suggested counter-offer deadline (counter-offers never land on the recipient's country holidays), with the user required to explicitly pick one (never auto-selected) via "원래 기한 유지" or "역제안 수락" buttons. Include a "취소" (Cancel) link/button.
+
+Modal 2 — Scheduled Send: shows a suggested send time in the recipient's local morning, displayed in both the sender's and the recipient's local time as text labels (not just a timezone abbreviation). A "예약 확정" primary button and a "취소" button. An empty/error state for when the recipient's timezone isn't available yet, with a manual timezone entry field as a fallback.
+
+Both modals: standard modal styling (dimmed backdrop, centered card on Desktop, full-screen on Mobile), Escape key closes and acts as Cancel, clear visible focus trap while open.
+```
+
+### Vent-to-Ticket View (covers: UX-007)
+| Item | Value |
+|---|---|
+| Source Screens | UX-007 Vent-to-Ticket View |
+| Last Synced With | Document Version 4.0 |
+
+```
+Design a screen that converts an emotionally-written message into a structured task ticket with exactly 4 labeled sections: [문제 정의] (Problem Definition), [영향·리스크] (Impact/Risk), [요청 사항] (Request), and [우려 수준] (Concern Level). All 4 sections are ALWAYS shown, even when the source message gives no evidence for one — in that case the section literally displays the text "없음" rather than being omitted, left blank, or hidden. Each section is independently editable text. [우려 수준] should show both a text label (e.g., "높음"/"중간"/"낮음") and a visual indicator — never color alone — representing the preserved emotional intensity of the original message (explicitly NOT deleted, just restructured).
+
+Also show a read-only "결정 권한 상태" (Decision Authority Status) field near the 4 sections, with one of these values: 확정 (Confirmed) / 내부 승인 필요 (Needs Internal Approval) / 검토 중 (Under Review) / 불명 (Unknown) — shown together with a short evidence sentence when determined, and explicitly labeled "불명" (not left blank) when the original text gives no evidence.
+
+Primary action: "이 티켓 사용" button. Secondary action: "메시지로 돌아가기" link/button that discards the ticket and returns to the original free-text message.
+
+States: loading (conversion in progress), error (conversion failed, with retry, original message untouched), and result (all 4 sections populated and editable). If a section has no derivable content, show an explicit "없음" rather than leaving it blank.
+
+Keep the tone respectful of the emotional content — this screen exists specifically so a frustrated message gets taken seriously as a structured issue, not dismissed.
+```
+
+### Decision Summary & Unresolved Detector View (covers: UX-008)
+| Item | Value |
+|---|---|
+| Source Screens | UX-008 Decision Summary & Unresolved Detector View |
+| Last Synced With | Document Version 2.0 |
+
+```
+Design a screen with a large text input for pasting a conversation thread, and a "요약 생성" (Generate Summary) button. Below it, once generated, show two distinct sections:
+
+1. A table with columns: 결정사항 (Decision) / 담당자 (Owner) / 기한 (Deadline) / 결정 권한 상태 (Decision Authority Status: 확정/내부 승인 필요/검토 중/불명). Any Decision/Owner/Deadline cell with no evidence in the thread text shows "미정" explicitly; any Decision Authority Status cell with no evidence shows "불명" explicitly — neither is ever left blank or guessed.
+
+2. A separate "미확정 항목" (Unresolved Items) warning list below the table: each entry names which field is missing (담당자 and/or 기한) in plain text, not via icon alone.
+
+States: empty (no thread entered), loading, error (with retry, input preserved), and result (table + warnings both shown together).
+
+Accessibility: table uses real header cells for screen readers; warnings are readable as plain text, not icon-only.
+```
+
+### Profile Management Screen (covers: UX-009)
+| Item | Value |
+|---|---|
+| Source Screens | UX-009 Profile Management Screen |
+| Last Synced With | Document Version 2.0 |
+
+```
+Design a settings-style screen listing a user's learned communication-style profile items (e.g., directness preference, emoji preference, formality level, honorific level (합쇼체/해요체)). Each item shows: its current value, a small tag indicating its source — "자기신고" (self-reported) or "학습됨" (learned from repeated corrections) — and Edit/Delete controls.
+
+States: loading (skeleton list), empty ("아직 학습된 항목이 없습니다"), error (load failed, retry), success (populated list).
+
+Delete requires an explicit confirmation step ("삭제하시겠습니까?" with Confirm/Cancel) before it takes effect — never an instant, unconfirmed delete.
+
+Keyboard-operable throughout (edit/delete reachable via Tab, not hover-only).
+```
+
+### Terminology Dictionary Management Screen (covers: UX-010)
+| Item | Value |
+|---|---|
+| Source Screens | UX-010 Terminology Dictionary Management Screen |
+| Last Synced With | Document Version 2.0 |
+
+```
+Design a CRUD-style screen for managing a project's "do-not-translate" term list AND a person/honorific mapping list, combined in one screen. An "추가" (Add) form at the top starts with an entry-type choice: 용어 (Term) or 사람·호칭 (Person). If Term is chosen, show a single text field. If Person is chosen, show 3 fields: 실명 (real name) / 한국어 호칭 (Korean form of address) / 영어 호칭 (English form of address). Below the form, a list shows every registered entry with a visible type tag (용어 / 사람·호칭) and Edit/Delete controls per row.
+
+States: loading (skeleton), empty ("등록된 용어가 없습니다. 첫 용어를 추가하세요"), error (retry), success (populated list showing both entry types).
+
+Validation to depict: an inline error "이미 등록된 용어입니다" (Term) or "이미 등록된 인물입니다" (Person) under the relevant field when a duplicate is entered, clearing once corrected. Delete requires confirmation before executing.
+
+No search or filter control — the list is expected to stay small (a few hundred items at most), so keep this deliberately simple.
+```
+
+### Pair Communication Protocol Screen (covers: UX-011)
+| Item | Value |
+|---|---|
+| Source Screens | UX-011 Pair Communication Protocol Screen |
+| Last Synced With | Document Version 6.0 |
+
+```
+Design a screen for two people to agree on communication ground rules for messages between just the two of them. A counterpart identifier field (email) at the top. Near the top, a small badge/label showing who most recently defined the current rules — one of exactly 4 states: "추론 초안" (inference draft), "발신자가 확정" (sender confirmed), "상대가 직접 작성" (counterpart wrote it directly), or "아직 정해지지 않음" (not yet set). Below that, 4 labeled choice controls: 직설 허용 (directness allowed), 이모지 사용 (emoji use), 호칭 (form of address), 마감 표현 (deadline phrasing style). A "저장" (Save) primary button.
+
+For zero, one, or several of the 4 choice controls, show a small banner directly above that specific control with the exact text "합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?" — this is a gentle request to double-check, never an accusation or a verdict, so keep the tone neutral/informational, not alarmed. The banner has two small actions: "확인" (expand a one-line aggregate comparison like "규약: 이모지 사용 안 함 · 관측: 최근 표본에서 사용 빈도 높음(12건 중 5건)" — plain text only, never a quoted message) and "나중에" (dismiss). Design both a variant with zero banners (the common case) and a variant with 1-2 banners showing, so both look intentional.
+
+States: loading (skeleton while any existing protocol for this counterpart loads), empty (no protocol yet, form shows sensible defaults), error (save/load failed, retry), success (saved values shown, still editable).
+
+Note in the UI, subtly, that these values override the user's own global communication profile when the two conflict for this specific counterpart — this is the whole point of the screen.
+
+Keyboard-operable choice controls throughout; save confirmation shown with an icon plus text, not color alone; the authorship badge and any mismatch banner text must also be readable as plain text, never conveyed by color alone.
+```
+
+### Meeting Time Suggestion Screen (covers: UX-012)
+| Item | Value |
+|---|---|
+| Source Screens | UX-012 Meeting Time Suggestion Screen |
+| Last Synced With | Document Version 1.0 |
+
+```
+Design a screen with two input groups side by side or stacked: "내 시간대·가능 시간" (my timezone + available hours) and "상대방 시간대·가능 시간" (counterpart's timezone + available hours). A "추천 받기" (Get suggestions) button.
+
+Result states: up to 3 candidate overlapping meeting times shown as a clear list once found; an explicit "겹치는 시간이 없습니다" (no overlapping window found) empty state with a short explanation when none exist — never just a blank list.
+
+States: loading (computing), error (retry, inputs retained).
+
+Validation: inline error if an available-hours range has the end time before the start time.
+```
+
+### Response Feedback View (covers: UX-013)
+| Item | Value |
+|---|---|
+| Source Screens | UX-013 Response Feedback View |
+| Last Synced With | Document Version 5.0 |
+
+```
+Design a read-only screen showing evidence of whether message mediation is helping response time. Top section: a simple before/after comparison summarizing average response time, pre- vs. post-mediation, shown with clear text labels/numbers (not relying on chart color alone to convey the comparison). Below it: a list of individual sent messages, each showing its recorded reply arrival time (elapsed time).
+
+Do NOT include any sentiment/tone classification or sentiment-distribution comparison anywhere on this screen — this feature only measures and compares response time, nothing about the content or tone of the reply.
+
+States: loading (skeleton), empty ("아직 기록된 답장이 없습니다"), error (retry), success (populated).
+
+No filter or date-range controls — keep this simple and read-only, showing only messages that actually received a recorded reply (never fabricated/estimated data points).
+```
+
+### Sent Messages & Reminder Approval Screen (covers: UX-015)
+| Item | Value |
+|---|---|
+| Source Screens | UX-015 Sent Messages & Reminder Approval Screen |
+| Last Synced With | Document Version 2.0 |
+
+```
+Design a screen listing a user's previously sent messages for a cross-border collaboration tool. Each row shows: recipient identifier, sent time, and elapsed business days since sending (a plain number, e.g. "업무일 3일째"). A "답장 받음" (Reply received) button/toggle on each row lets the user manually mark that a reply arrived — there is no automatic reply detection, so this is the only way a message's status changes.
+
+For rows that have gone unanswered 2 or more business days and are not marked replied, show a small badge (e.g. "무응답 3일째") and a "리마인드 검토" (Review reminder) action. Clicking it reveals an AI-drafted reminder message, worded as a polite confirmation (never a demand), which the user can edit before clicking "Approve & Send" — no reminder is ever sent without this explicit approval click.
+
+States: loading (skeleton list), empty ("발송한 메시지가 없습니다"), error (retry), and a populated list mixing rows in different states: below-threshold (no reminder action yet), threshold-reached (reminder badge + review action), reminder-under-review (draft shown, editable, approve button), reminder-sent (a "리마인드 발송됨" timestamped log entry), and replied-marked (a static "답장 받음" state with no reminder action).
+
+Do NOT include any settings/threshold-configuration control on this screen — the 2-business-day threshold is fixed and not user-adjustable.
+
+Accessibility: every row's status conveyed as text, not color/badge-color alone; reminder review area keyboard-dismissible.
+```
+
+### Universal Selection Mediation Panel (covers: UX-016)
+| Item | Value |
+|---|---|
+| Source Screens | UX-016 Universal Selection Mediation Panel |
+| Last Synced With | Document Version 6.0 |
+
+```
+Design a compact overlay panel (browser extension inline panel style, smaller footprint than a full webpage — similar scale to a rich tooltip or a small popover, not a full-screen modal) that opens next to a text selection anywhere on any webpage, pre-filled with the text the user just selected (the user never has to paste it in). A soft character-count indicator appears near the text only once it nears 5,000 characters (never a hard limit). The panel mirrors a message-mediation result: an urgency badge (CRITICAL/NORMAL/LOW, text label not color-only) with an override control, the transformed message text with preserved items marked, and a backtranslation section with the standard limitation notice ("완전한 검증이 아니라 1차 안전장치"). Include the same non-blocking warning types as the web app when relevant: an emoji-risk warning ("이 이모지는 해석이 갈릴 수 있습니다 — 상대와 합의된 규칙이 없습니다," fires only for 높음/중간-risk emoji with no agreed exception — never a country-specific claim), and a Misread Risk area that renders nothing when empty (same rule applies to holiday-conflict warnings — a country with no holiday data shows nothing at all, not a "no data" label).
+
+A small "개인화 미적용" (Personalization off) tag/banner appears whenever no recipient is specified or detected — the full result still displays normally underneath it; this must never block or gate the rest of the panel.
+
+Optionally, near the top of the panel, design a compact recipient area: either (a) nothing shown (no recipient concept applies), (b) a small "감지됨: [name] — 근거: [evidence text] · 변경" line when the tool auto-detected one confident candidate from page context, with a one-click way to clear/change it, or (c) a short list of 2-3 candidate names/identifiers with none pre-selected, for the user to pick from. Only one of these three appears at a time, and (b)/(c) are optional/conditional — most of the time nothing recipient-related shows at all, which is normal, not broken.
+
+Primary action: "복사하기" (Copy to clipboard) — this control is ALWAYS present regardless of site. Secondary/conditional action: "입력창에 삽입" (Insert into input field) — this control is present ONLY on sites where a matching integration exists; when absent, do not show a greyed-out or disabled version of it — simply omit it from the layout entirely, so the panel with only "복사하기" looks like a complete, intentional design, not a broken one.
+
+States to show: loading (compact step-labeled progress indicator), not-logged-in (a prompt directing the user to log in via the companion web app first), result — two variants: (a) clipboard-only (just the Copy button, for most sites), (b) with-insert (Copy AND Insert both shown, for a handful of integrated sites), copied (brief confirmation after clicking Copy), inserted (brief confirmation, panel auto-closes), insert-failed (an explicit error, with Copy still working normally alongside it — never a dead end), error (failure banner + retry, pre-filled text never lost).
+
+Important constraint to reflect visually: there is no "send" or "submit" button in this panel at all. Insert only writes into the existing input field the user selected from; the user must still use that site's own send button themselves, which is not part of this panel.
+
+Keyboard-dismissible (Escape closes), focus moves into the panel on open and returns to the small floating trigger button (a separate, minimal button that appears right next to a text selection on mouse-up, and disappears the instant the selection is cleared) on close.
+
+Keep the visual footprint small and unobtrusive — this has to sit comfortably next to arbitrary third-party page content without looking like it belongs to that page.
+
+Additionally, design a small mode selector near the top of the panel — a compact set of 2-3 tabs/toggle options: "중재하기" (Mediate, the default), and conditionally "해석" (Interpret) and "상대가 쓴 것으로 표시" (Mark as counterpart's message). When "상대가 쓴 것으로 표시" is selected, replace the mediation result area with a much simpler view: one required text field labeled "상대 식별자" (counterpart identifier, plain email-style text input, no dropdown/directory/autocomplete — this is always manually typed) and a single primary button "표본에 추가" (Add to sample), disabled until the field has a value. On success, show a brief confirmation line with the counterpart's updated total sample count (e.g., "표본에 추가되었습니다 (총 12건)") and a small "표본 관리 보기" (View sample management) link — the panel stays open afterward rather than auto-closing, so the user can select another message and repeat. On failure, show an inline error with retry, keeping both the selected text and the typed identifier. This mode never shows an urgency badge, transformed text, or backtranslation — it has nothing to do with mediating, only with tagging.
+```
+
+### Extension Privacy Notice (covers: UX-017)
+| Item | Value |
+|---|---|
+| Source Screens | UX-017 Extension Privacy Notice |
+| Last Synced With | Document Version 6.0 |
+
+```
+Design a small, one-time-per-version notice screen (extension-style panel or a lightweight first-run overlay, not a full webpage) shown the first time a browser extension runs, and shown again exactly once whenever its own disclosed content grows in a later update. It explains, in plain short text, up to five things, the first three always present and the last two each independently conditional on whether that capability shipped in this build: (1) only the text the user selects is ever sent anywhere — the extension does not read or store the rest of the page, (2) the destination is the product's own backend, which forwards to OpenAI, (3) the extension has permission to run on any website the user visits, (4) CONDITIONAL — only if recipient-candidate detection shipped — "수신자 후보를 찾기 위해 현재 페이지의 일부를 브라우저 안에서 읽습니다. 그 내용은 전송·저장하지 않습니다." (we read part of the current page in-browser to find a recipient candidate; that content is never sent or stored), and (5) CONDITIONAL — only if manual observation marking shipped — a short item explaining that when the user marks a message as a counterpart's, only the text the user explicitly selected is used, only aggregate counts (never the message itself) are stored, and the processing happens in the browser. Design a few variants (3-item, 4-item, 5-item) so implementer can use whichever matches the shipped build.
+
+A single primary action: "확인" (Acknowledge/Close) — there is no accept-vs-decline choice, just read-and-close (this is a disclosure, not a permission prompt). No settings, toggles, or "learn more" links.
+
+One state only: shown, then dismissed. No loading/error states — this is static local content with no network call.
+
+Keyboard-dismissible (Escape or a focusable Close button); focus moves into the notice on open.
+
+Keep the tone plain and factual, not alarming — this is a disclosure, not a warning.
+```
+
+### Recipient Public Profile Enrichment & Collaboration Style Inference (covers: UX-018)
+| Item | Value |
+|---|---|
+| Source Screens | UX-018 Recipient Public Profile Enrichment & Collaboration Style Inference |
+| Last Synced With | Document Version 6.0 |
+
+```
+Design a screen (opens on top of/alongside the two-panel mediation workspace) with 4 clearly labeled, sequential sections/stages: "① 조회" (Look Up), "② 관측" (Observed), "③ 제안" (Suggested), "④ 합의" (Agree & Confirm). A small stepper or numbered-section indicator at the top shows which stage is active/reached — this is a progressive, single-screen flow, not 4 separate modals.
+
+① 조회: a single input field for pasting one GitHub public profile URL, with a "조회" (Fetch) button. Once fetched, show two labeled rows — "회사 (Company)" and "지역 (Location)" — each showing the exact text found or "미등록" (Not on file). Below both, in smaller/secondary text, show the source: the pasted URL and "조회 시각: [timestamp]" — always visible whenever any value is populated. If location suggests a timezone, show 1-3 candidate timezones as a radio-button choice, none pre-selected.
+
+② 관측 (renders automatically once ① succeeds, no extra click needed — and can also render even without a GitHub fetch if manually-marked samples already exist for this recipient): a small "공개 활동 시간대" (public activity time-of-day) candidate, same radio-button/none-pre-selected pattern as the location timezone, or "미등록" if the account's public activity sample is too small. Below that, 4 small stat cards/rows, each STRICTLY factual and numeric, and each combining both observation sources with a small source breakdown — e.g. "코멘트 길이: 평균 2.1문장 (48건 중 — 수동 표시 30 · GitHub 18)" / "이모지 사용: 0건/48" / "응답 지연: 평균 6시간 (12건 중)" / "활동 시간대: 09:00–11:00 KST에 집중 (48건 중)" — each showing its own combined sample count with the source split. Below the 4 stat rows, a small secondary link "표본 관리 보기" (View sample management). CRITICAL: nowhere in this section should any trait, personality, or style word appear (no "직설적이다," "격식 있다," "간결한 스타일" etc.) — this section only states counted facts.
+
+③ 제안: NOT shown automatically — instead, show a clearly separate "협업 스타일 제안 보기" (View collaboration style suggestion) button below section ②, so the user has to actively ask for it after seeing the facts. Once clicked, one of two outcomes: (a) if there's a sample-size problem, show a plain message "표본 부족으로 제안하지 않음" (Not enough data to suggest) with no draft at all; (b) otherwise, show a draft value for exactly these 4 items — 직설 허용 (directness allowed) / 이모지 사용 (emoji use) / 호칭 (form of address) / 마감 표현 (deadline phrasing) — each with a short cited-evidence line underneath it (e.g., "근거: 이모지 0건/48, 코멘트 평균 2.1문장 → 간결·격식 제안") and a small confidence/evidence-count tag (e.g., "근거 2건" or a percentage). Also handle a third outcome: if the counterpart already directly set up the pair protocol for this recipient, show a message like "상대가 이미 규약을 직접 작성했습니다" with a link to view it, and skip the draft entirely.
+
+④ 합의: only reachable after ③ produces a draft. Show the same 4 items from ③, now editable (same input style as a typical pair-protocol form — short choice controls, not free text). A persistent, clearly visible banner/line reads "이것은 제안이며 확정 전에는 저장되지 않습니다" (This is a suggestion — nothing is saved until you confirm) sitting above the confirm button at all times in this stage. Primary button: "확정하고 규약에 저장" (Confirm & save to protocol). If, at the moment of clicking confirm, the counterpart turns out to have authored the protocol directly in the meantime, show an inline message explaining the confirm didn't go through and that the counterpart's own values now apply, with a link to view them — not a generic error banner.
+
+A "저장" (Save) button applies to stage ① alone (company/location/timezone) and a "취소"/Close exits the whole screen without saving anything not already explicitly saved. A small secondary "URL 지우기" (Clear) control removes previously saved enrichment.
+
+States to depict across stages: empty (no URL yet), loading (fetching / generating suggestion / confirming — each with its own small loading indicator), error (fetch failed / suggestion generation failed / confirm failed — each an inline message with retry, distinct from the legitimate "표본 부족" no-error result), and success/saved confirmations at each relevant stage.
+
+Important tone constraint, applies to ALL 4 stages: nowhere in this screen's copy should it say anything like "we analyzed this person," "profile analysis," or state a personality/trait as settled fact ("this person is direct/formal") — phrase everything as "우리가 관측한 것" (what we observed) and "관측을 근거로 제안하는 것" (what we're suggesting based on that observation), always with the evidence shown alongside. This is about a third party who has no account here and didn't consent to being looked up, so the tone must stay factual, evidence-first, and minimal — never analytical or conclusive about who this person "is."
+
+Keyboard-operable throughout; all radio-group choices (timezone candidates, the 4-item draft in stage ④) are real radio/choice groups, not click-only; the stage indicator is exposed as text/aria-current, not conveyed by color or position alone.
+```
+
+### Observation Sample Management Screen (covers: UX-019, new v6.0)
+| Item | Value |
+|---|---|
+| Source Screens | UX-019 Observation Sample Management Screen |
+| Last Synced With | Document Version 6.0 |
+
+```
+Design a simple, two-level list screen for a cross-border collaboration tool. Top level: a list of counterparts the user has collected "observation samples" about (used to suggest communication-style ground rules), each row showing the counterpart's identifier, a total sample count, and a small source breakdown, e.g. "김민준 — 12건 (수동 표시 8 · GitHub 4)."
+
+Clicking a counterpart drills into a second-level list: their individual samples, each row showing ONLY a source tag ("수동 표시" or "GitHub") and a collected timestamp, plus a small "삭제" (Delete) action. CRITICAL constraint: no row anywhere on this screen ever shows or hints at the actual message text that was collected — this screen is a privacy/transparency tool, and its entire purpose depends on never displaying content, only metadata (count, source, when).
+
+Delete requires an explicit confirm step ("이 표본을 삭제하시겠습니까?") before it executes — never a single-click irreversible action. After confirming, the row disappears and the counterpart's total count updates immediately.
+
+States: loading (skeleton list), empty ("아직 수집된 관측 표본이 없습니다"), error (load or delete failed, retry), and the normal populated two-level view.
+
+Keep the visual tone plain, transparent, and slightly "control panel"-like — this screen exists so a user can audit and prune what's been collected about their conversations, so clarity matters more than polish here. Keyboard-operable list rows; counts/source/timestamp text never conveyed by color alone.
 ```
 
 ## UX Decision Log
 Append-only — never rewrite or delete a past entry. If docs/PRD.md changes make a decision no longer valid, add a new entry and mark the old one's Status as Superseded or Deprecated — never delete it.
 
-### {{Decision name — e.g. "Navigation: Bottom Nav vs Hamburger"}}
+### Two-Panel Workspace Interpreted as Single-User Before/After Comparison, Not a Two-Account Inbox
 | Item | Value |
 |---|---|
-| Decision | {{what was decided}} |
-| Reason | {{why}} |
-| Alternatives Considered | {{...}} |
-| Rejected Because | {{...}} |
-| Impact | {{which of Architecture / API / Database / Implementation this affects, or "None"}} |
-| Status | {{Active / Superseded / Deprecated}} |
+| Decision | UX-004's "Recipient panel" is a preview rendered within the sender's own screen (what the recipient would see), not a separate inbox the recipient's own account logs into. |
+| Reason | AC-009 asks for "the same message's before/after side by side" on one screen, and Open Question #11's resolution defines the web app's "전송" as a mock send arriving in the Recipient panel + a log entry — both point to a single-screen comparison, not a delivered-message system. |
+| Alternatives Considered | A full two-account messaging/inbox system where the recipient's own login shows a received-messages list. |
+| Rejected Because | docs/PRD.md never requests an Inbox/Messages-list feature; building one would be scope creep under the "don't invent features" rule and would consume schedule the PRD explicitly protects for Core (C1–C7). |
+| Impact | Architecture — no per-recipient message-thread storage is required for MVP display, only a sender-scoped mock-send log. |
+| Status | Active |
+
+### Recipient Identification via Manual Free-Text Field, No Directory/Contact-List
+| Item | Value |
+|---|---|
+| Decision | The recipient is identified on UX-004/UX-011 via a manually-typed email/username field, with no directory, contact list, or search feature. |
+| Reason | The core I/O schema (docs/PRD.md Constraints, AC-027) requires a `recipient` field, but no directory/contact feature is requested anywhere in docs/PRD.md. |
+| Alternatives Considered | Building a team/contact directory the sender could search or pick from. |
+| Rejected Because | Directory/Search is explicitly listed among the feature types ux-design must not invent unless the PRD calls for it — it doesn't here. |
+| Impact | Architecture/API — only a recipient identifier field + validation is needed, not a directory endpoint. |
+| Status | Active |
+
+### Persistent Nav Bar Is Navigation Only, Not a Dashboard Screen
+| Item | Value |
+|---|---|
+| Decision | The cross-screen navigation menu (Mediate / Profile / Terminology / Pair Protocols / Meeting Times / Decisions / Feedback) is documented under Information Architecture, not as its own Screen ID with dashboard-style content. |
+| Reason | docs/PRD.md never requests a Dashboard/home-summary screen; the nav's only job is switching between already-scoped screens. |
+| Alternatives Considered | A dedicated "Home"/Dashboard screen summarizing recent activity across features. |
+| Rejected Because | Dashboard is explicitly listed among the feature types not to invent unless requested. |
+| Impact | None — navigation-only, no data aggregation logic implied for architect. |
+| Status | Active |
+
+### Chrome Extension GitHub and Slack Overlays Share One Screen Definition (UX-014)
+| Item | Value |
+|---|---|
+| Decision | UX-014 covers both the GitHub adapter (UF-011) and the Slack adapter (UF-012) as a single Screen Catalog entry, rather than two near-duplicate entries. |
+| Reason | The overlay's UI shape, states, actions, and validation are identical between the two target sites; the only difference is which DOM selectors the adapter targets, which is an implementation/adapter concern (docs/Tasks.md T47 explicitly reuses T29's adapter structure). |
+| Alternatives Considered | A fully separate screen spec per target site. |
+| Rejected Because | Would duplicate the entire spec with zero UX difference, adding maintenance burden without value, and diverging if one copy is updated and the other isn't. |
+| Impact | Architecture — per-adapter selector logic differs (noted in UX-014's Architect Handoff), but the UI contract is one screen. |
+| Status | Active |
+
+### Destructive Actions Use Explicit Confirmation, Not Undo-After-the-Fact
+| Item | Value |
+|---|---|
+| Decision | Deleting a profile item (UX-009) or a terminology entry (UX-010) requires an explicit "삭제하시겠습니까?" confirm step before executing; no undo/toast-based recovery is designed. |
+| Reason | Matches the product's core human-in-the-loop philosophy (Planning Decision #5 — no consequential action happens without explicit human confirmation), applied here to destructive UI actions as well as AI-generated sends. |
+| Alternatives Considered | Soft-delete with an "실행 취소" (undo) toast after the fact. |
+| Rejected Because | docs/PRD.md never requests undo functionality anywhere; adding it would be unrequested scope on a tight 17-day schedule. |
+| Impact | None beyond the confirm-step UI itself. |
+| Status | Active |
+
+### Gmail Overlay Absorbed into Existing UX-014 Definition, Not a Separate Screen (v2.3)
+| Item | Value |
+|---|---|
+| Decision | UX-014 (renamed "Extension Mediation Overlay — GitHub, Slack & Gmail") covers the Gmail adapter (UF-014, AC-051) as part of the same single Screen Catalog entry that already covered GitHub (UF-011) and Slack (UF-012), rather than a third near-duplicate screen. |
+| Reason | Applies the same reasoning already recorded for the GitHub/Slack merge: the overlay's UI shape, states, actions, and validation are identical across all three host sites; only DOM selector logic differs, and docs/Tasks.md's T49 explicitly reuses T29's adapter structure with "DOM 선택자만 분리." |
+| Alternatives Considered | A fully separate UX-016 "Gmail Mediation Overlay" screen. |
+| Rejected Because | Would triple-duplicate an already-duplicated spec with zero UX difference, and would drift if one copy were updated (e.g., a states/accessibility change) without the others. The prior GitHub+Slack merge decision already established the precedent and reasoning for this product. |
+| Impact | Architecture — a third adapter's selector logic is now noted in UX-014's Architect Handoff (Gmail compose body, "To:" field for recipient derivation), but the UI contract remains one screen for all three adapters. |
+| Status | Active |
+
+### Misread Risk Warning Documents Two Allowed Presentation Tiers (Full / Reduced)
+| Item | Value |
+|---|---|
+| Decision | UX-004 defines two allowed presentations for `misreadRisks[]` — **Full** (per-item quote/misreading/evidence, expandable list) and **Reduced** (a compact "오해 위험 N건" count badge with a keyboard-accessible tooltip carrying the same per-item text) — both documented now rather than only the full version. |
+| Reason | docs/PRD.md Planning Decision #57 allows T12's display work alone to shrink under schedule pressure while T1/T10/T11 (schema/generation/validation) stay intact. If only the Full tier were specified here, implementer would have no ux-design-approved fallback to ship under pressure and would need an emergency ux-design re-engagement exactly when schedule pressure is highest — defeating the purpose of Decision #57's allowance. |
+| Alternatives Considered | Specifying only the Full display and leaving the Reduced fallback to be improvised by implementer if/when the cut happens. |
+| Rejected Because | An improvised fallback under deadline pressure is exactly the kind of ambiguity this document exists to prevent — reviewer/QA would have nothing to check the reduced form against. |
+| Impact | implementer may ship either tier and reviewer/QA can verify either against this spec; QA must additionally confirm the underlying `misreadRisks[]` data is still generated and stored regardless of which tier is displayed (data generation is never part of the cut). |
+| Status | Active |
+
+### Sent Messages Screen and Response Feedback View Share One Storage Concept
+| Item | Value |
+|---|---|
+| Decision | UX-015 (Sent Messages & Reminder Approval) and UX-013 (Response Feedback View) are documented as two different read/edit surfaces over one shared sent-message record set, not two independent data models. |
+| Reason | docs/PRD.md Planning Decision #51 explicitly requires T33 (R4, AC-025) to reuse T50's storage structure rather than building a second table — silence detection needs only boolean+timestamp fields, and R4 is described as "그 위에 답장 본문·감정 분류를 얹는 상위 집합" (a superset layered on top). |
+| Alternatives Considered | Independent per-screen storage, each screen owning its own sent-message table. |
+| Rejected Because | Would duplicate mock-send log data and risk the two screens showing divergent reply/timestamp data for the same underlying message — and directly contradicts the PRD's explicit no-duplicate-implementation instruction. |
+| Impact | Architecture/Database — one schema/table serves both screens' reads; architect should not design two. |
+| Status | Active |
+
+### Reminder Draft on UX-015 Is Editable Before Approval
+| Item | Value |
+|---|---|
+| Decision | UX-015 allows editing the C2-generated reminder text before "Approve & Send," mirroring the pre-approval editing already established for UX-004/UX-007/UX-014's AI-generated output. |
+| Reason | AC-044 doesn't prohibit edits, and this product's standing Interaction Pattern ("Human-in-the-loop approval") is that no AI-generated text is final until a human can review and adjust it before it's transmitted. Making the reminder draft read-only would be an unexplained, inconsistent regression from a pattern already active everywhere else in this document, not a new invented capability. |
+| Alternatives Considered | A read-only reminder draft with only Approve-or-Reject, no edit. |
+| Rejected Because | Every other AI-generated text surface in this product already permits pre-approval editing; carving out one silent exception here serves no requirement in docs/PRD.md and would surprise a user familiar with the rest of the tool. |
+| Impact | implementer must wire an editable text field into the reminder-review state, not a static text block. |
+| Status | Active |
+
+### Decision Authority Status Granularity Differs by Screen — Flagged, Not Silently Resolved
+| Item | Value |
+|---|---|
+| Decision | UX-007 (one message → one ticket) shows a single `decisionAuthority` value for the whole ticket. UX-008 (one thread → a multi-row decision table) shows `decisionAuthority` **per decision row**, per docs/Tasks.md T27's explicit instruction ("요약 표에 결정 권한 상태 컬럼 추가"). |
+| Reason | A single thread can contain several distinct decisions at different authority levels (one confirmed, one still needing internal sign-off) — collapsing that into one thread-level value would hide exactly the distinction AC-050 exists to surface. T27's own wording ("column" in "the table") only makes sense as a per-row value. |
+| Alternatives Considered | Treating `decisionAuthority` as a single value everywhere, matching docs/Tasks.md T1's literal schema description ("다건 배열이 아닌 단일 상태값"). |
+| Rejected Because | T1's "single value" description and T27's "column in the summary table" instruction are in tension for the multi-decision UX-008 case — ux-design cannot silently pick one without flagging the conflict, since it changes what shape of data architect needs to store (one field on a message record vs. one field per row of a derived decision list). This is recorded as Open Question #9 for architect rather than guessed at. |
+| Impact | Architecture/Database — architect must resolve whether `decisionAuthority` is stored per-message or per-decision-row before finalizing docs/Database.md's schema for the C7 output. |
+| Status | **Superseded by "Decision Authority Field Names Split" below (Document Version 4.0, 2026-08-04)** — PRD v2.7/AC-064/Planning Decision #84 resolves this: both granularities are required, under two different field names (`decisionAuthority` for C6, `decisions[].authorityStatus` for C7), not unified into one shape as this entry contemplated. This entry's text is preserved for history. |
+
+### Onboarding Treated as Forced and Fully Required (Working Assumption)
+| Item | Value |
+|---|---|
+| Decision | UX-003 (Onboarding) is designed as non-skippable with all 3–5 questions required before Submit is enabled. |
+| Reason | AC-011 describes answering the questions and the profile being saved, without describing a skip path; docs/PRD.md's own Risks table separately calls out a cold-start risk ("초기 개인화 정보 부족") that a skippable/partial onboarding would make worse. |
+| Alternatives Considered | Optional/skippable questions, or an entirely skippable onboarding step. |
+| Rejected Because | Not because it's confirmed wrong, but because docs/PRD.md doesn't actually say either way — this is recorded as a working assumption, not a settled fact, and is also logged as an Open Question for confirmation. |
+| Impact | Architecture — affects whether a profile record always exists post-first-login (assumed yes) or can be partial/absent. |
+| Status | **Superseded by "Onboarding Skip Allowed" below (Document Version 4.0, 2026-08-04)** — PRD v2.7/AC-059 confirms onboarding IS skippable. This entry's text is preserved for history; do not build against it. |
+
+### Layer 2 Adapters Lose Their Own Invocation UI — UX-014 Deprecated, Replaced by UX-016 (v2.5/v2.6)
+| Item | Value |
+|---|---|
+| Decision | GitHub, Slack, and Gmail no longer have their own injected "Mediate" button or overlay screen. UX-014 (Extension Mediation Overlay — GitHub, Slack & Gmail) is moved to Deprecated. All extension invocation now happens through UX-016 (Universal Selection Mediation Panel), and Layer 2 sites only add a conditional "Insert into input field" control inside that same panel. |
+| Reason | docs/PRD.md v2.4 redefined MVP Scope rows #16/#27/#31: "중재 호출·패널 표시는 층 1(#32)이 소유하므로 이 행에 남는 것은 대상 사이트 DOM 선택자 + 삽입 로직뿐이다" (Planning Decision #61/#62). This is an explicit ownership transfer stated for all three sites, not an ambiguity ux-design is filling in — the PRD itself removed Layer 2's invocation/panel responsibility. |
+| Alternatives Considered | Keeping UX-014 alongside UX-016 as two separate, still-active invocation paths for GitHub/Slack/Gmail (one via an injected button, one via selection). |
+| Rejected Because | docs/Tasks.md T29/T47/T49 (the Layer 2 tasks) explicitly scope down to "DOM 선택자 + 삽입 로직뿐" with no button/overlay work remaining in any of them — keeping UX-014 active would describe a UI surface no task builds, which would mislead implementer into either building unspecified extra work or leaving a documented screen unimplemented. |
+| Impact | Architecture — one less independent invocation surface to wire up; Layer 2's remaining contract is exactly T57's registry interface (selector + insert function), consumed by UX-016. Reviewer/QA should verify GitHub/Slack/Gmail have no separately-injected "Mediate" button in the implementation. |
+| Status | Active |
+
+### Layer 1 Panel Reuses the Extension-Overlay UI Contract, Not the Web App's Two-Panel Layout
+| Item | Value |
+|---|---|
+| Decision | UX-016 (Universal Selection Mediation Panel) is specified as a compact overlay/panel — the same UI *shape* the now-deprecated UX-014 used (urgency badge, transformed text, backtranslation, warnings, in a small footprint) — rather than a miniaturized version of UX-004's two-panel web app layout. This is ux-design's proposal for docs/Tasks.md T56's "패널의 화면 구조·컴포넌트 재사용 범위" routing item; architect confirms technical feasibility. |
+| Reason | (1) UX-016 must render inside a content script on arbitrary third-party pages (Teams web, Notion, a wiki, or a Layer 2 site) — it cannot depend on the web app's own page chrome, routing, or CSS context the way UX-004 can. (2) This project already has a directly applicable precedent: the GitHub/Slack merge and the later Gmail-absorption decisions (see the two entries above/below) established that this product's extension surface uses one shared compact-overlay contract across every host site — UX-016 extends that same contract to a site-agnostic trigger instead of inventing a third shape. (3) A two-panel-style layout assumes a sender composing to a specific counterpart with room for two full columns; UX-016 is frequently invoked on read-only third-party content (e.g., interpreting a received message, Conditional P3) where a two-panel "sender/recipient" framing doesn't fit. |
+| Alternatives Considered | (a) A shrunk-down replica of UX-004's two-panel Sender/Recipient layout. (b) A brand-new third visual shape distinct from both UX-004 and the former UX-014. |
+| Rejected Because | (a) would need to compress two full columns into a small overlay next to arbitrary page content, which the product's own precedent (UX-014's compact single-column overlay) already solved more simply, and re-deriving a two-panel compression here would be redesigning something already settled. (b) would add a third distinct UI contract for no stated benefit — this document's own precedent already established that adding new near-duplicate shapes for the same underlying capability is rejected (see "Chrome Extension GitHub and Slack Overlays Share One Screen Definition" and "Gmail Overlay Absorbed" above). |
+| Impact | Architecture/implementer — UX-016 can share component-level implementation with what would have been UX-014's build, if any of that work exists yet; no new visual language needs to be invented for the extension surface. Architect should confirm the content-script rendering approach (e.g., Shadow DOM for style isolation) can support this shape — flagged as a technical feasibility question, not a UX one. |
+| Status | Active — proposal; architect confirms technical feasibility |
+
+### Emoji Warning Rewritten to a Fixed 3-Tier Risk Lookup, No Country Field (AC-056)
+| Item | Value |
+|---|---|
+| Decision | UX-004/UX-016's emoji warning now reads from a fixed 3-tier risk lookup (높음/중간/낮음, no country/region/nationality field) and fires only when a 높음/중간-risk emoji is used with no agreed exception (pair protocol or profile). Warning copy is fixed: "이 이모지는 해석이 갈릴 수 있습니다 — 상대와 합의된 규칙이 없습니다." No screen in this document may render a country-specific interpretation claim (e.g., "in Japan this means..."). |
+| Reason | docs/PRD.md Planning Decision #77/#71 replaced the earlier country-keyed emoji data with a risk-tier-only model specifically to avoid national-stereotype claims (Planning Decision #6). This document's prior emoji-warning text (Document Version 2.0, "culturally-risky emoji usage") predates that rewrite and needed updating to match, both in the Screen Catalog and the Claude Design Prompts, so implementer doesn't build against stale country-based copy. |
+| Alternatives Considered | Leaving the emoji warning's existing generic wording unchanged, on the assumption that "culturally-risky" was already vague enough not to imply a country claim. |
+| Rejected Because | "Culturally-risky" without a fixed replacement copy leaves room for implementer or a future LLM-driven message to reintroduce a national-stereotype phrasing exactly like the one the PRD explicitly rejected — the fixed copy requirement removes that ambiguity entirely. |
+| Impact | implementer/reviewer/QA — the warning copy is now an exact-match requirement (AC-056③), not a paraphrase; a country-name check on this copy is a valid QA test. |
+| Status | Active |
+
+### C3-Only "Before/After Learning" Demo Does Not Get a New Screen
+| Item | Value |
+|---|---|
+| Decision | Planning Decision #76's C3-only demo (single sender, diff-history "before" vs. "after" comparison) is not given a new Screen ID. It is satisfied by running UX-004 twice at two points in the sender's diff-history timeline and cross-checking UX-009's learned-vs-self-reported display — no new interaction, control, or data view is added. |
+| Reason | docs/PRD.md's own framing of this demo ("같은 사람의 프로필 상태만 바꿔 보여주므로") describes a *data-state* difference (0 diffs recorded vs. 3+ diffs recorded), not a new UI capability — UX-004 already renders whatever the current profile state produces, and UX-009 already shows which items are "자기신고" vs. "학습됨." T61 (the task that builds this demo) is scoped as data seeding, not a UI task. |
+| Alternatives Considered | A dedicated "학습 전/후 비교" (before/after comparison) screen showing both states side by side. |
+| Rejected Because | docs/PRD.md does not request a comparison screen for this — inventing one would be scope creep under this document's own "don't invent features" rule, and the demo's own stated mechanism ("스냅샷 또는 토글 — 수단은 architect·implementer 판단") treats this as a data/demo-sequencing concern, not a design requirement. |
+| Impact | None on the Screen Catalog. architect/implementer may still need a way to snapshot/toggle the sender's profile state for the demo script, but that's a data/test-fixture concern, not a UI screen. |
+| Status | Active |
+
+### Note on Screen ID Coincidence — the New UX-016 Is Unrelated to a Rejected 2026-08-04 Naming Suggestion
+| Item | Value |
+|---|---|
+| Decision | The new UX-016 (Universal Selection Mediation Panel, added Document Version 3.0) is a different screen from the hypothetical "UX-016 'Gmail Mediation Overlay'" name mentioned as a **rejected alternative** in the "Gmail Overlay Absorbed into Existing UX-014 Definition" decision entry above (dated 2026-08-04, same day). |
+| Reason | Screen IDs are only consumed when a screen is actually created (per this document's own ID-assignment rule), not when a name is proposed and rejected. The earlier entry's "UX-016" was never created — Gmail was absorbed into UX-014 instead — so no ID was reserved and no collision exists in reassigning UX-016 to this round's genuinely new screen. |
+| Alternatives Considered | Skipping UX-016 and starting the new screen at UX-017 to avoid any visual similarity to the old rejected-alternative text. |
+| Rejected Because | The Screen ID rule is "never renumber an existing ID" — UX-016 was never an existing ID, only a name mentioned inside a rejected-alternative cell of prose. Skipping a number that was never assigned would be an unnecessary, undocumented gap for no rule-compliance reason. This entry exists solely so a future reader isn't confused by the textual coincidence. |
+| Impact | None — documentation clarity only. |
+| Status | Active |
+
+### Onboarding Skip Allowed — Supersedes the Prior "Forced, Fully Required" Working Assumption (v2.7/AC-059)
+| Item | Value |
+|---|---|
+| Decision | UX-003 (Onboarding) now has an explicit "건너뛰기" (Skip) control, always available, requiring no answers. Skipping saves an empty profile (never fabricated defaults) and causes UX-004/UX-016 to show an explicit "개인화 미적용" indicator. The user can complete onboarding later via a new "온보딩 완료하기" action on UX-009 (Profile). Only a full skip exists — there is no per-question skip. |
+| Reason | PRD v2.7/AC-059/Planning Decision #85 confirms this — this document's own prior working assumption ("non-skippable, all questions required," logged as Open Questions #2) was the opposite, and the PRD decision explicitly overrides it, not merely fills a gap. |
+| Alternatives Considered | Keeping onboarding non-skippable (the prior assumption); a "skip individual questions" partial-skip design. |
+| Rejected Because | Non-skippable is directly contradicted by the confirmed PRD decision. Partial/per-question skip isn't what AC-059 describes (it frames the choice as complete vs. skip, not per-question), and inventing a finer-grained skip mechanism than the PRD asked for would be unrequested scope. |
+| Impact | Architecture/Database — a profile record must now be distinguishable as "empty because skipped" vs. "not yet visited," and UX-004/UX-016/UX-009 all need to read that state. This also changes the Information Architecture's forced-redirect rule (now fires once, not on every visit while a profile is missing). |
+| Status | Active |
+
+### Recipient-Candidate Detection (AC-067) Folded Into UX-016, Not Given a New Screen ID
+| Item | Value |
+|---|---|
+| Decision | The "층 1 수신자 후보 선택 UI" routing item (planner's phrasing suggested a new screen) is implemented as an additional States/Actions section inside the existing UX-016 (Universal Selection Mediation Panel), not as a new Screen ID. A new Flow (UF-019) documents its steps, but it opens no new screen. |
+| Reason | The interaction happens inside the same panel, in the same entry context (a Layer 1 selection), and produces no new navigable surface — it's a refinement of "who is this mediation for," not a new capability with its own purpose/entry/exit. This document already has two precedents for folding a planner-suggested addition into an existing screen instead of inventing a near-duplicate: the GitHub/Slack/Gmail merge into one screen (now UX-016), and the C3-only demo (no new screen). |
+| Alternatives Considered | A new Screen ID (e.g., UX-019 "Recipient Candidate Selector") reachable from within UX-016. |
+| Rejected Because | It would describe a UI surface that never actually appears independently of UX-016 — a user cannot open it without already being inside UX-016's panel, and it has no distinct Entry/Exit of its own beyond "shown inside the same result area." Splitting it out would fragment one interaction across two Screen Catalog entries for no implementer benefit, and this document's own Screen ID discipline exists to prevent exactly that kind of fragmentation. |
+| Impact | None on the Screen Catalog count beyond what's already reflected. Contrast with UX-018 below, which *did* get a new Screen ID — the difference is that UX-018 has its own distinct entry point (a link from UX-004), its own purpose or the recipient (public-profile lookup, not page-context detection), and its own exit back to UX-004; it isn't rendered inside another screen's result area the way the candidate list is inside UX-016. |
+| Status | Active |
+
+### Decision Authority Field Names Split — `decisionAuthority` (C6) vs. `decisions[].authorityStatus` (C7) (v2.7/AC-064)
+| Item | Value |
+|---|---|
+| Decision | UX-007's ticket-level Decision Authority Status field is confirmed named `decisionAuthority` (single value). UX-008's per-decision-row field is confirmed named `decisions[].authorityStatus` (per row, inside the `decisions[]` array). Both field names exist simultaneously; neither replaces the other. Enum values and judgment logic are shared between them. |
+| Reason | PRD v2.7/AC-064/Planning Decision #84 resolves the exact tension this document flagged in Document Version 3.0 (see the now-Superseded "Decision Authority Status Granularity Differs by Screen" entry above and Open Questions #9) — not by picking one shape, but by keeping both shapes under two distinct names, which is a cleaner resolution than either "single value everywhere" or "always per-row" would have been, since it matches what each screen actually needs without forcing one screen's data shape onto the other. |
+| Alternatives Considered | (a) Unifying on a single value everywhere (loses UX-008's per-row distinction). (b) Unifying on a per-row array everywhere (forces UX-007's genuinely single ticket-level status into an unnecessary array of one). (c) Same field name reused with different shapes per screen (the option this document previously flagged as risky, since it would make it code-invisible which shape a given `decisionAuthority` reference has). |
+| Rejected Because | (a) and (b) both contradict PRD v2.7's explicit instruction that both names exist. (c) is exactly what PRD Planning Decision #84 itself rejects, for the reason already recorded in docs/PRD.md: same name + different scope means frontend/backend code can't tell which shape it's reading without external context, which is the schema-inconsistency risk PRD's own T1 rule warns against. |
+| Impact | Architecture/Database — architect's docs/Database.md must model two distinct fields (a ticket-level column/field and a per-row field inside a `decisions[]` structure), not one. This is now a confirmed requirement, not an open design choice — verified this pass: all `decisionAuthority` references in this document were checked, and UX-008's had been incorrectly using that name (fixed to `decisions[].authorityStatus` this pass; UX-007's usage was already correct). |
+| Status | Active |
+
+### Holiday No-Data Country Suppression Is a Deliberate Exception to the No-Fabrication Pattern (v2.7/AC-063)
+| Item | Value |
+|---|---|
+| Decision | When a recipient's country has no entry in the static holiday dataset at all, UX-004/UX-015/UX-016 show absolutely nothing — no label, no grey/muted badge, no empty placeholder box. This is different from every other "no evidence" case in this document (ticket sections, decision owner/deadline/authority, recipient enrichment fields, recipient-candidate detection), all of which show an explicit label like "없음"/"미정"/"불명"/"미등록" instead of hiding. |
+| Reason | PRD v2.7/AC-063/Planning Decision #90 confirms this exact behavior — and it's the opposite of this document's own working assumption from Document Version 3.0 (Open Questions #8 had recommended "keep internal/test-only, no distinct user-visible state," which happens to match, but the PRD is explicit that even a "no data" *label* must never appear, going further than this document's prior phrasing left open). |
+| Alternatives Considered | Showing an explicit "휴일 데이터 없음" label matching this document's own No-fabrication pattern (treating "country not in dataset" the same as "evidence absent within a covered domain"). |
+| Rejected Because | PRD v2.7 explicitly rejects this (Planning Decision #90's own reasoning: the case is structurally out of scope, not a genuine no-evidence judgment call within the tool's covered domain) — showing a label for every uncovered country would clutter the UI for the common case of a non-KR/US/JP/CN recipient, most of whom aren't part of this MVP's demo narrative anyway. |
+| Impact | implementer/reviewer/QA: this is now a documented, deliberate exception — a QA check that expects "some visible indication of missing data" for this specific case would be testing against the wrong requirement. The "no-data country suppression" Interaction Pattern entry exists specifically so this isn't confused with the general No-fabrication pattern. |
+| Status | Active |
+
+### R4 Reply-Sentiment Classification Removed, Response-Time-Only Retained (v5.0/AC-070/Planning Decision #94)
+| Item | Value |
+|---|---|
+| Decision | UX-013 (Response Feedback View) no longer classifies or displays reply sentiment (긍정/중립/부정) or a sentiment-distribution comparison, in any state or data field. It shows only recorded reply-arrival time and a before/after response-time comparison. |
+| Reason | PRD v2.7 Planning Decision #94/AC-070 removes this requirement: the MVP's send is a mock-send, so no real reply body ever exists to classify — the feature could not have functioned even if built. AC-025's original text is not edited (per the established AC-006/AC-049, AC-048/AC-057, AC-048④/AC-063 precedent of a new AC superseding only part of an older one); AC-025's response-time clause remains fully in force and is exactly what UX-013 now documents alone. |
+| Alternatives Considered | Keeping a placeholder/disabled sentiment section on UX-013 so the screen's shape matches its pre-v5.0 design. |
+| Rejected Because | A visible-but-nonfunctional sentiment section would violate this document's own "Absent-not-disabled controls" and no-overstatement principles (AC-034's "don't show what isn't built" applied here) — the correct treatment of a removed capability is to remove its UI, not grey it out. |
+| Impact | implementer/reviewer/QA: UX-013's data model has one fewer field family; a QA check expecting sentiment data on this screen is testing against a removed requirement. **This entry does not supersede "Sent Messages Screen and Response Feedback View Share One Storage Concept" above** — that entry's core decision (UX-013/UX-015 share one sent-message record set) remains fully valid and Active; only that entry's Reason text quotes PRD language describing R4 as a superset that included "감정 분류," which is now stale as a description (not as a decision) now that AC-070 has removed that layer. That entry's body is preserved verbatim per the append-only rule; this new entry is the correction a future reader needs, cross-referenced here rather than by altering Status on a still-correct decision. |
+| Status | Active |
+
+### UX-018 Expanded In Place to a 4-Stage Observe → Suggest → Agree Screen, No New Screen/Flow ID (v5.0/AC-071–074/Planning Decision #96)
+| Item | Value |
+|---|---|
+| Decision | The prior 2-field enrichment screen (URL → `location`/`company` → timezone confirm) is extended, under the same Screen ID (UX-018) and Flow ID (UF-018), into 4 sequential stages: 조회 (unchanged) → 관측 (AC-072, plus the previously-undocumented AC-071 activity-time candidate) → 제안 (AC-073) → 합의 (AC-074). No new Screen/Flow ID was created. |
+| Reason | The new capability shares UX-018's exact entry point (the same "상대방 정보 보강" link), the same underlying data source (the same one pasted GitHub URL, one fetch), and the same exit (back to UX-004). This matches every prior precedent in this document for folding a planner-routed addition into an existing screen rather than inventing a near-duplicate (GitHub/Slack/Gmail merge into UX-016; the C3-only demo; AC-067's recipient-candidate detection folded into UX-016 rather than given its own ID) — see those entries above for the same reasoning pattern applied here. |
+| Alternatives Considered | A new Screen ID (e.g., UX-019 "Collaboration Style Inference") reachable from UX-018's Result state, keeping the original UX-018 scoped to just `location`/`company`/timezone. |
+| Rejected Because | Would split one continuous user action (paste a URL, learn about someone, optionally propose ground rules with them) across two Screen Catalog entries with duplicated Entry/Exit/Permissions/External-Dependencies rows for no implementer benefit — the same fragmentation this document's ID discipline already exists to prevent (see "Recipient-Candidate Detection Folded Into UX-016" above for the identical reasoning). |
+| Impact | Architecture — UX-018's Architect Handoff now spans 4 stages' worth of data/storage requirements (ephemeral observation + ephemeral draft + a confirm-gated write into UX-011's shared pair-protocol table) instead of one. implementer builds one screen with a 4-stage progression, not two screens. |
+| Status | Active |
+
+### Style Suggestion Requires an Explicit User Click, Never Auto-Generated Right After Observation (v5.0/AC-073, ux-design judgment call)
+| Item | Value |
+|---|---|
+| Decision | UX-018's Stage 3 (제안) is entered only by an explicit "협업 스타일 제안 보기" click — it never renders automatically the instant Stage 2's (관측) observation data becomes available, even though both stages read the same already-fetched data with no additional network cost. |
+| Reason | docs/PRD.md AC-073/Planning Decision #96/#97 doesn't mandate this specific interaction mechanics, but the new KEY 2 pitch (Planning Decision #97 — "다른 도구는... 조용히 적용합니다. 우리는... 근거를 보여주고, 두 사람이 확정한 것만 규칙으로 남깁니다") is explicitly a claim about *process*, not just data handling — a suggestion that materializes automatically the moment observation finishes reads, to the user, indistinguishable from "the tool decided this," even if the evidence is technically shown alongside it. A separate, deliberate click makes the boundary between "what we counted" and "what we're proposing" a felt user action, not just a paragraph break. |
+| Alternatives Considered | Auto-advancing from Stage 2 to Stage 3 as soon as the sample threshold is met, since no additional fetch or user input is actually required to generate the draft. |
+| Rejected Because | Auto-advancing would technically satisfy AC-073's data requirements (citation, confidence, threshold gate) but would undercut the "we show you the evidence, you ask for the conclusion" narrative that is the entire point of the redefined KEY 2 — this is a case where the acceptance criteria are satisfiable by a design that nonetheless works against the product's own stated positioning, so ux-design chose the interaction that reinforces it instead. |
+| Impact | implementer: Stage 3 needs its own explicit trigger control and loading state, not just a conditional render tied to Stage 2's completion. No AC is violated either way — this is documented so a future "simplification" (auto-advancing to save a click) is recognized as a deliberate design reversal, not a bug fix. |
+| Status | Active |
+
+### Mark-as-Counterpart's-Message Is a Mode Inside UX-016, Not a New Screen (v6.0/AC-080)
+| Item | Value |
+|---|---|
+| Decision | The new "상대가 쓴 것으로 표시" capability (manual observation marking) is added as a third mode switch inside the existing Universal Selection Mediation Panel (UX-016), alongside the default mediate mode and the conditional Interpret mode — not as a new Screen ID, and not as a separate floating-button/menu UI outside the panel. |
+| Reason | The routing note explicitly frames this as reusing "층 1(#32)의 선택 메커니즘" (Layer 1's selection mechanism) — the same drag-select → single floating button → panel-opens entry point Interpret mode already uses for exactly the same reason (a mode difference, not an entry-point difference). This document already has a direct precedent for this shape of decision (Interpret mode, Document Version 3.0) as well as the general folding precedent (GitHub/Slack/Gmail merge, recipient-candidate detection) — see those entries above. |
+| Alternatives Considered | (a) A second, separate floating button/menu next to the existing one, offering "Mark" as a sibling entry point rather than a mode inside the panel. (b) A new Screen ID reachable only after the panel opens. |
+| Rejected Because | (a) would mean two distinct floating UI elements competing for the same small screen-adjacent space on every selection, which contradicts this document's own "keep the visual footprint small and unobtrusive" design language for this exact panel, and would require its own new Interaction Pattern where an existing one (the mode-switch pattern Interpret mode already established) already fits. (b) would fragment one entry mechanism across two Screen Catalog entries for no implementer benefit — the same reasoning already recorded for recipient-candidate detection's non-promotion to its own screen. |
+| Impact | implementer builds one additional mode inside UX-016's existing panel component, not a new component. Contrast with UX-019 below, which *does* get a new Screen ID — the deciding difference is a distinct, standalone entry point (nav menu) and no dependency on being opened from inside another screen's UI. |
+| Status | Active |
+
+### New Screen UX-019 Created for Observation Sample Management — the Privacy-Defense Screen Gets Its Own Screen ID (v6.0/AC-081④)
+| Item | Value |
+|---|---|
+| Decision | Observation Sample Management is given a new Screen ID (UX-019) and a new Flow ID (UF-021), reachable from its own nav-menu entry, rather than being folded into UX-018 (Stage 2's "관측" area) or UX-016. |
+| Reason | Unlike the mark-mode addition above, this capability has (a) its own standalone entry point that does not require the user to already be inside another screen (the nav menu, matching the "발송 내역"/UX-015 precedent for a screen whose entry point AC-044/T52 explicitly required), (b) its own distinct purpose (inspect-and-delete, not observe-then-suggest), and (c) its own exit (nav away) rather than returning into a parent screen's flow. PRD Planning Decision #109 also frames this specifically as *the* privacy-defense mechanism ("이것만이 사용자가 '내가 무엇을 모았는지' 직접 볼 수 있게 한다") — a screen that only a user could reach by first opening UX-018 (which itself requires having a GitHub URL to enrich) would leave manually-marked-only counterparts with no way to reach it at all, undermining the defense for exactly the observation path (manual marking) this batch makes primary. |
+| Alternatives Considered | Folding sample list/delete into UX-018's Stage 2 (관측) as an expandable section. Folding it into UX-011 (Pair Communication Protocol), since samples ultimately feed protocol suggestions. |
+| Rejected Because | UX-018 is entered via a per-recipient "상대방 정보 보강" link on UX-004 and requires that context; a user who has only ever used Mark mode (UX-016) for a counterpart they haven't tried to enrich via GitHub would have no way to reach their own collected samples, directly undermining AC-081④'s "사용자가 확인하고 삭제할 수 있다" requirement for exactly the primary (manual) observation path. Folding into UX-011 would tie a privacy-inspection tool to the pair-protocol editing screen for no functional reason and would mean a user with samples but no protocol yet (a realistic case — someone might mark messages before ever opening Pair Protocols) still couldn't reach it. |
+| Impact | Architecture — a new nav route and its own read/delete data operations, distinct from both UX-018's ephemeral Stage 2 render and UX-011's protocol CRUD. This is the second screen this batch adds that both UX-018-folding precedents above argue *against* folding, specifically because its entry point and audience differ from the screen it might have been folded into — see the contrast note in the entry above. |
+| Status | Active |
+
+### Pair Protocol Screen Now Displays Provenance — Reverses This Document's Own Prior "No Provenance Tagging" Stance (v6.0/AC-075)
+| Item | Value |
+|---|---|
+| Decision | UX-011 now shows a persistent 4-state authorship/provenance badge ("누가 정한 규칙인가"). This directly reverses this document's own explicit prior statement (Document Version 5.0): "this screen does not display provenance/source tagging, since docs/PRD.md doesn't request one." |
+| Reason | PRD v2.9/AC-075④/Planning Decision #101 now explicitly requests exactly this ("규약 화면에 '누가 정한 규칙인가'가 표시된다") — the prior statement was correct when written (nothing in the PRD asked for it at the time) and is not being second-guessed; the PRD has since added a concrete requirement that supersedes it. |
+| Alternatives Considered | Keeping the badge confined to UX-018 (where the inference-vs-direct-edit distinction already existed operationally, via the AC-074④ conflict check) and not surfacing it on UX-011 at all, on the theory that AC-074④'s conflict-resolution behavior doesn't strictly require a *visible* badge to function correctly. |
+| Rejected Because | AC-075④ is explicit about visibility on "규약 화면" (the protocol screen), not just about the conflict-check's internal logic — a purely internal field satisfying AC-074④'s behavior would not satisfy AC-075④'s separate display requirement. The two ACs share a data source but are different requirements (one behavioral, one about what's shown). |
+| Impact | Neither this document's prior statement nor its former Open Question #14 is deleted — the old Screen Catalog text is edited in place (per this document's normal "extend in place" preference for screen definitions, whose append-only rule applies specifically to the Decision Log, not to screen entries themselves) and this Decision Log entry exists precisely so the reversal itself isn't lost, per the append-only rule's purpose. |
+| Status | Active |
 
 ## Open Questions
 A row's Status is `open` until the named Owner decides, then `answered` with the outcome recorded in the Decision column.
 
 | # | Question | Priority | Owner | Reason | Blocking Impact | Suggested Resolution | Status | Decision |
 |---|---|---|---|---|---|---|---|---|
-| 1 | {{unresolved UX decision}} | {{Critical / High / Medium / Low}} | {{Planner / User / Architect / Implementer — whoever must decide}} | {{why this can't be decided by ux-design alone}} | {{what is blocked until this is answered}} | {{ux-design's recommendation, if any}} | open | |
+| 1 | What password policy applies to Sign Up (UX-002)? docs/PRD.md never specifies one. | Medium | Architect | Password rules are a security/auth-provider decision explicitly assigned to architect (docs/PRD.md Constraints), but no minimum is stated anywhere. | implementer cannot build UX-002's client-side validation without a concrete rule. | Minimum 8 characters, no additional complexity rule for MVP — matches the "간단 로그인" (simple login) framing of Planning Decision #30. | **answered** | **(v2.7) Resolved by docs/PRD.md AC-060/Planning Decision #86: minimum 8 characters, no additional complexity rule (uppercase/number/special character) — confirms this document's own suggested resolution exactly. UX-002 updated accordingly.** |
+| 2 | Is Onboarding (UX-003) skippable, and are all 3–5 questions mandatory? | Medium | Planner | AC-011 says answering the questions saves a profile, but doesn't state whether skipping is allowed or what happens to personalization if it is skipped. | Blocks the forced-redirect gate logic (Information Architecture) and UX-003's Submit-enablement rule. | Make onboarding non-skippable with all questions required (the working assumption applied throughout this document) — confirm or override. | **answered** | **(v2.7) Resolved by docs/PRD.md AC-059/Planning Decision #85 — the opposite of this document's own prior working assumption: onboarding IS skippable (all-or-nothing, no per-question skip). Skipping saves an empty profile, never fabricated defaults, and personalization-off is shown explicitly wherever it applies. UX-003/UX-004/UX-009/UX-016 and Information Architecture all updated this pass; see UX Decision Log "Onboarding Skip Allowed."** |
+| 3 | How is the message recipient identified in the UI — is it always a free-text email field, and must the recipient already be a registered account for mediation to run at all, or only for personalization (pair protocol, R2/R3 scheduling) to activate? | High | Architect / Planner | The core I/O schema includes a `recipient` field (AC-027) but docs/PRD.md never specifies how it's captured in the UI, and this affects UX-004, UX-005, UX-006, UX-011, UX-012 simultaneously. **(v2.3 update)** It now also affects UX-015 (Silence Detector), which needs the recipient's country/timezone at send time to compute business-day elapsed and holiday exclusion (AC-044②/AC-057), and UX-005's holiday-aware counter-offer logic (T39). **(v2.5/v2.6 update)** It still remains unresolved and now also touches UX-016 for the GitHub/Slack/Gmail Insert path (context-derived recipient, same as the deprecated UX-014's rule) — but see the new, narrower Open Question #10 below for UX-016's harder case (pages with no recipient concept at all). | implementer cannot finalize recipient input/validation, pair-protocol account-linking, or the Silence Detector's business-day calculation without this. | Free-text email field; mediation (C1/C2/C4) runs regardless of whether it matches a registered account, but pair-protocol/scheduling/holiday personalization only activates if it does — the interpretation applied throughout this document. Confirm or correct. | **answered** | **(v2.7) Confirmed by docs/PRD.md MVP Scope #34/AC-065/AC-066/Planning Decision #82 — this document's own working assumption was exactly right and is now formal: free-text email always works for base mediation, a registered account activates full personalization, and (new this pass) a pasted public-profile URL can partially activate personalization for a non-registered recipient via UX-018. No registered account is ever required for mediation to run at all.** |
+| 4 | When one user proposes/edits a Pair Communication Protocol (UX-011), is the counterpart notified, or must they separately navigate to the same screen to discover it? | Medium | Planner | AC-037 requires both sides to be able to view/edit the protocol, but doesn't require a notification, and Notification is a feature type ux-design must not invent unless the PRD calls for it. | Affects whether UF-008 is realistically usable without a way for the counterpart to know a protocol exists to review. | No notification in MVP; counterparts discover the shared protocol by navigating to Pair Protocols themselves — acceptable for a demo with a small number of known test accounts. | **answered** | **(v2.7) Confirmed by docs/PRD.md Planning Decision #87: no agreement-request/acceptance notification is built in MVP (no email/push/in-app channel) — matches this document's own suggested resolution exactly. The limitation (a counterpart who never navigates there never sees a proposed protocol) is acknowledged in the PRD itself, not silently accepted.** |
+| 5 | How is a "reply" actually captured for the Response Feedback View (UX-013)/R4 — webhook, manual mark-as-replied, or extension-side observation? | Medium | Architect | AC-025 requires reply arrival time + sentiment **(historical framing — as of v5.0/AC-070 the sentiment half of this requirement no longer applies; only the reply-arrival-time capture mechanism this question was actually about remains relevant)**, but docs/PRD.md never specifies the capture mechanism, and real server-side integration with Slack/GitHub is explicitly out of scope (docs/PRD.md Out of Scope list). | Without a capture mechanism, UX-013 has no way to be populated with real data at all — this was the largest open mechanism gap in the whole design. | — | **answered** | **(v2.3) Resolved by docs/PRD.md Planning Decision #51/#60 (MVP Scope #29, AC-044): reply capture is manual only — the user marks "답장 받음" themselves on UX-015; no automated/extension-side/webhook detection is built (explicit "자동 응답 감지 코드 경로가 존재하지 않는다," AC-044⑤). UX-013 and UX-015 share the same manually-marked sent-message record set (Planning Decision #51, see UX Decision Log). This document's Open Question #5 is answered by the PRD itself, not by ux-design's own working assumption.** |
+| 6 | What is the maximum message length on UX-004 (and correspondingly UX-016)? docs/PRD.md sets no limit. | Low | Architect | Needed for both UI truncation/counter behavior and backend/LLM token-budget planning. | Minor — implementer can proceed with a placeholder limit, but a firm number should come from LLM context-window planning. | Soft cap of ~5,000 characters with a visible counter near the limit, no hard block below that (as currently documented on UX-004; the same soft cap applies to UX-016's pre-filled/editable text). Confirm this is compatible with the chosen LLM's context budget and the ~5s felt-response NFR target. | **answered** | **(v2.7) Confirmed by docs/PRD.md AC-061/Planning Decision #88: exactly 5,000-character soft cap, visible counter near the limit, never a hard block (verified with a 6,000-character regression case) — matches this document's own suggested resolution exactly. Applies to both UX-004 and UX-016 as this document already specified.** |
+| 7 | Should a Ticket View (UX-007) section with no derivable content show "없음," or be left blank? | Low | Planner / User | AC-017/AC-018 don't specify empty-section handling; this document applied the same no-fabrication principle as AC-020 by analogy, which is a judgment call worth confirming rather than silently assuming. | Minor — affects only the empty-section rendering rule on one screen. | Show "없음" explicitly (as currently documented on UX-007) — confirm or override. | **answered** | **(v2.7) Confirmed by docs/PRD.md AC-062/Planning Decision #89: all 4 sections always render, "없음" explicitly for any section with no derivable content — matches this document's own suggested resolution exactly, now a hard requirement rather than an analogy-based working assumption.** |
+| 8 | When the recipient's country has no entry in the hardcoded holiday dataset (**operationally KR/US/JP/CN per AC-057**, which superseded AC-048's GB-inclusive text — Planning Decision #74), should UX-004's holiday-conflict area and UX-015's business-day count ever surface a "휴일 데이터 없음" (no holiday data) note to the user, or stay silent (identical to "no conflict found")? | Low | Planner / User | AC-057④/AC-048④ requires the system to internally label this case "휴일 데이터 없음" rather than fabricate a guess, but doesn't say whether that label must be user-visible or is purely an internal/test-verification label (T53's regression tests need to distinguish "no conflict" from "no data," which doesn't necessarily mean the UI must). | Minor — affects only whether one extra, rarely-triggered state is designed on UX-004/UX-015; doesn't block the core Silence Detector or holiday-warning behavior either way. | Keep it internal/test-only for MVP (no distinct user-visible state) — showing "we don't have holiday data for this country" for every non-KR/US/JP/CN recipient risks cluttering the UI with a caveat most demo users won't act on, and AC-057④'s requirement is satisfiable by the backend/test layer alone. Revisit if real users outside these 4 countries become common post-demo. | **answered** | **(v2.7) Confirmed by docs/PRD.md AC-063/Planning Decision #90 — and it goes slightly further than this document's own suggested resolution: not just "no distinct state," but no label/badge/box of any kind, ever, for this case (indistinguishable from "no conflict found" to the user). The internal/test-only distinction is preserved exactly as this document recommended. See UX Decision Log "Holiday No-Data Country Suppression."** |
+| 9 | Is `decisionAuthority` (AC-050) a single value per message/ticket, or a per-row value on UX-008's multi-decision summary table? docs/Tasks.md T1 describes it as "다건 배열이 아닌 단일 상태값" (a single, non-array value), but T27 instructs "요약 표에 결정 권한 상태 컬럼 추가" (add a column to the summary table), which only makes sense per-row when a thread yields multiple decisions. | High | Architect | This is a genuine schema-design tension between two planner-owned task descriptions that ux-design cannot resolve on its own — see UX Decision Log entry "Decision Authority Status Granularity Differs by Screen." | Blocks architect's docs/Database.md schema for the C7 output (one field on a message/ticket record vs. one field per row of a derived decision list) and blocks implementer's T27 UI work until the shape is settled. | Model it as per-decision-row for UX-008 (matching T27's literal instruction and the reality that one thread can yield several decisions at different authority levels) and as a single value for UX-007 (matching T1's description, where one ticket genuinely is one message). Confirm or correct. | **answered** | **(v2.7) Resolved by docs/PRD.md AC-064/Planning Decision #84 — not by picking one shape (as this document's suggested resolution proposed), but by keeping both under two distinct field names that exist simultaneously: `decisionAuthority` (ticket-level, single value, UX-007) and `decisions[].authorityStatus` (per-row, UX-008). Both share the same enum/judgment logic. UX-007/UX-008 updated accordingly; see UX Decision Log "Decision Authority Field Names Split."** |
+| 10 | **(new, v2.5/v2.6)** UX-016's mediation call needs a `recipient` per the core I/O schema (AC-027 `{text, sender, recipient, context}`), but Layer 1 by definition runs on arbitrary, site-unaware pages (Notion, an internal wiki, a random article) that may have **no natural recipient concept at all** — unlike Layer 2 sites where a recipient can often be derived from page context (GitHub PR/issue participants, Slack channel/DM, Gmail "To:" field). | High | Architect | This is a genuine schema-vs-context mismatch introduced by Layer 1's site-agnostic design (Planning Decision #61) that ux-design cannot resolve alone — the core schema was designed before a "no recipient page" case existed. | Blocks implementer's UX-016 mediation-call payload and blocks deciding whether/when the panel must prompt for a manual recipient before C3/pair-protocol personalization or Layer 2 insertion can apply. | Make `recipient` optional/nullable for Layer 1's clipboard-only path — C1/C2/C4 (urgency, tone, backtranslation, misread risk) don't strictly require a resolved recipient identity, only `context`; require a resolved recipient only when C3/pair-protocol personalization or Layer 2 insertion depends on knowing who the recipient is, in which case those specific personalization effects simply don't apply (not an error, just less personalization) rather than blocking mediation entirely. Confirm or correct. | **answered** | **(v2.7) Confirmed by docs/PRD.md AC-066/Planning Decision #83 — matches this document's own suggested resolution exactly: `recipient` is optional for the base path, the full path completes without one, only personalization is skipped (with an explicit "개인화 미적용" indicator, never silent), and no recipient is ever fabricated. UX-016 updated this pass. The related-but-narrower question of *detecting* a recipient from page context is now covered separately by AC-067 (see MVP Scope #36, UF-019).** |
+| 11 | **(new, v2.5/v2.6, low urgency — only matters if MVP Scope #33/AC-055 actually ships)** Inside UX-016, should the "해석 (Interpret)" mode ever be auto-suggested based on page context (e.g., the selection is inside an inbox/received-message view), or is switching to it always a fully manual user choice regardless of context? | Low | Planner / User | AC-055① only says the user "can select" the Interpret path — it doesn't say whether the panel should ever default to or suggest it. Since this entire feature is P3/conditional, resolving it now is optional, but T60 will need an answer if/when the activation conditions are met. | None until/unless MVP Scope #33 activates (docs/Tasks.md T5–T29 and T55–T58 all `done`, P2 remaining ≤ 6 `todo`, as of 2026-08-18 21:00 KST) — flagged now so T60 isn't blocked mid-crunch if it does activate. | Always manual — no page-context auto-detection. Auto-suggesting risks a false-positive "Interpret" default on the user's own outgoing draft (misreading their own words as someone else's), and building context-detection heuristics is exactly the kind of extra scope this already-conditional, already-tight-on-time feature shouldn't take on. Confirm or override only if/when #33 activates. | **answered** | **(v2.7) Confirmed by docs/PRD.md AC-069/Planning Decision #91 — matches this document's own suggested resolution exactly: Interpret is always an explicit manual switch, no code path auto-suggests/pre-selects/pre-executes it, verified against a received-message-looking input as a control case. UF-016/UX-016 now cite AC-069 directly.** |
+| 12 | **(new, v2.7)** Should the "상대방 정보 보강" (Enrich recipient info) link on UX-004 always be shown next to the recipient field, or should it hide once the recipient identifier is confirmed to match a registered account (since a registered account already gets full personalization via its own profile, making the link redundant for that case)? docs/PRD.md's MVP Scope #34 describes the feature's existence and scope but not this specific visibility rule, and Recipient/Search-affordance visibility is exactly the kind of small UI-state decision this document must not silently guess at. **(v5.0 recheck: unaffected by AC-070–074 — the link still opens the same UX-018 entry point, now leading into a larger 4-stage screen; the visibility question itself is unchanged.)** | Low | Planner / User | AC-065① already guarantees mediation works identically whether or not the link is ever used, so this doesn't block Core — but an always-visible link next to every recipient, including ones who are already fully personalized via a registered account, could read as confusing ("why would I need to add info about someone who already has a profile?"). | Minor — affects only the link's visibility rule on UX-004; no screen/flow is added or removed either way. | Hide the link once the recipient identifier is confirmed to match a registered account; show it whenever the recipient is not registered, or that status can't yet be determined at input time (e.g., before any lookup has happened) — this keeps the affordance visible exactly when it can do something useful. | **answered** | **(v6.0) Resolved by docs/PRD.md AC-078/Planning Decision #104 — not quite matching this document's own suggested resolution: the test is "쓸 정보가 있는가" (is there any personalization data at all: pair protocol OR enrichment fields), never registration/membership status. This is a deliberately different, broader test than "registered vs. not," because an onboarding-skipped registered member (AC-059) can be a registered account with zero usable data. UX-004 updated accordingly this pass.** |
+| 13 | **(new, v2.7)** If recipient-candidate detection (AC-067/T66) ships in a build *after* a user has already dismissed the first-run Privacy Notice (UX-017) under an earlier build that didn't have it, should the notice reappear once to disclose the new page-reading behavior, or does the "shown once, ever" rule stand as-is (leaving that user's understanding of what the extension does out of date)? This is realistic for this specific project because docs/PRD.md's own Delivery & Deployment section states the web app auto-deploys to `main` continuously before the 2026-08-21 submission — a team member/judge who installs the extension early in the build cycle could dismiss a 3-item notice, then have the capability (and the notice's accurate 4-item content) ship in a later merge without ever seeing it. **(v5.0 recheck: unaffected — AC-070–074 change nothing about what the Chrome extension/UX-016/UX-017 read or disclose; this question remains scoped to UX-017 exactly as before.)** | Medium | Planner / Architect | AC-054③/AC-068③ both require the notice to always match actual behavior — but the existing "shown once, will not reappear" rule (this document's own design, unchanged since Document Version 2.0) was written before any conditional-content scenario existed, and doesn't specify what "already shown" means once the content itself can change between shows. | If unresolved, a real (if narrow) scenario exists where an already-dismissed notice becomes silently inaccurate for a specific installed user during the dev cycle — which is exactly the class of problem AC-054③ exists to prevent, even though it's a low-probability edge case restricted to the pre-submission build window. | Version the "already shown" flag to the notice's own content (e.g., a hash or version number of what was disclosed), not a plain boolean — if the content that *would* be shown today differs from what was actually shown last time, show it once more. This is a small mechanism change, not a new screen, and keeps AC-054③/AC-068③ satisfied without reintroducing a settings/consent-history UI (which Planning Decision #81 explicitly ruled out). | **answered** | **(v6.0) Resolved by docs/PRD.md AC-076/Planning Decision #102 — matches this document's own suggested resolution exactly: a version-number comparison, one re-show per version increase, still no consent/withdrawal record stored (Planning Decision #81 unreversed). UX-017 updated this pass; the manual-marking capability (AC-081⑤) added in this same round is the first real trigger of this mechanism.** |
+| 14 | **(new, v5.0)** How does storage distinguish "the counterpart directly authored/edited the pair protocol (UX-011)" from "the protocol record has simply never been touched by the counterpart" — needed so UX-018's Stage 4 confirm (AC-074④) can correctly detect a conflict and yield to the counterpart's values? docs/PRD.md establishes the *behavior* (regulate wins) but not the storage mechanism that detects it. | High | Architect | This is a schema-design question ux-design cannot resolve alone — it determines whether AC-074④'s conflict check is even implementable as specified, similar in kind to the now-resolved Open Questions #9/#10. | Blocks architect's docs/Database.md schema for the pair-protocol table (does it need a per-field or per-record "last edited by" marker, a boolean "counterpart has ever saved directly," or something else) and blocks implementer's UX-018 Stage 3/4 conflict-check logic until the shape is settled. | Add a minimal per-record marker — e.g., a `directlyAuthoredByCounterpart: boolean` (or a `lastEditedBy` party reference) on the pair-protocol record, set `true`/updated whenever the counterpart saves UX-011 directly, and left `false`/unset when the only writer so far has been a sender's UX-018 confirm. UX-018's Stage 3 entry and Stage 4 confirm both check this marker before proceeding. Confirm or correct. | **answered** | **(v6.0) Resolved by docs/PRD.md AC-075/Planning Decision #101 — goes further than this document's own boolean-marker suggestion: exactly 4 named states (ⓐ추론 초안/ⓑ발신자 확정/ⓒ상대가 직접 작성/ⓓ미착수), read directly by the AC-074④ conflict check (never a timestamp comparison), and now also required to be visibly displayed on UX-011 itself (AC-075④, see UX Decision Log "Pair Protocol Screen Now Displays Provenance"). Exact column/type/history semantics remain architect's choice per AC-075's own closing note — UX-011's Architect Handoff carries a specific note on the one remaining ambiguity (when, if ever, a persisted read shows ⓐ).** |
+| 15 | **(new, v5.0)** AC-071② sets a tentative 30-sample floor for the activity-time-of-day candidate; AC-073⑤ separately says the Stage 3 suggestion's sample threshold is "미정(미검증)," provisionally the same 30, pending T64's 3-account spike. Should UX-018 use **one single shared threshold** for both the activity-time candidate (Stage 2) and the style-suggestion gate (Stage 3), or are these conceptually different enough (a time-of-day distribution vs. a style inference) that T64 might justify **two independently-tunable thresholds**? | Medium | Planner (pending T64 spike data) | This document currently treats them as the same tentative number (30) because the PRD does, but the PRD itself flags both as unmeasured — if T64's actual data suggests they should diverge, this document's Stage 2/Stage 3 gating logic needs to know whether that's one config value or two. | Doesn't block MVP implementation (both can launch at 30 and be tuned later without a UI change — the "표본 부족" state's existence doesn't depend on the exact number) but does block architect from hardcoding a single named constant vs. two if the two thresholds are expected to diverge. | Treat as two independently-named (if currently identically-valued) constants from the start — `activityTimezoneSampleFloor` and `styleSuggestionSampleFloor` — so T64's data can adjust either one without a schema change, even though both currently default to 30. Confirm or correct once T64 reports actual numbers. | **answered** | **(v2.9→v6.0) Resolved by docs/PRD.md AC-077/Planning Decision #103 exactly as this document's own suggested resolution proposed (two independently-named constants, both tentatively 30, T64 to measure both) — then further extended by AC-082/Planning Decision #110 (v3.0) into **4** constants once the manual-marking path (AC-080) added a second source axis: {activity-timezone, style-suggestion} × {manual, GitHub}. The GitHub-side pair keeps the tentative 30; the manual-side pair is explicitly **not** set to 30 and is left for T71 to measure from real usage (AC-082③, "30을 그대로 쓰지 않는다"). UX-018's Architect Handoff/Assumptions updated this pass to reflect 4 constants, not 2.** |
+
