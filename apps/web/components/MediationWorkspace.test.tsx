@@ -135,6 +135,118 @@ describe('MediationWorkspace', () => {
     });
   });
 
+  // MJ-4 — 클라이언트가 `Idempotency-Key` 헤더를 생성·전송하지 않으면(서버는 이미 수용 가능,
+  // `apps/web/lib/messages/idempotency.ts` + `apps/web/app/api/messages/route.ts`) 응답 유실 후
+  // 재시도 시 `sent_messages`/`diff_records`에 중복 1쌍이 생길 수 있다. 요청마다 고유 키를
+  // 생성해 헤더로 보내는지 확인한다.
+  it('MJ-4 — 승인 요청에 Idempotency-Key 헤더를 값과 함께 보낸다', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') return Promise.resolve(mediateSuccessResponse());
+      if (url === '/api/messages') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            messageId: 'msg-1',
+            diffId: 'diff-1',
+            sentAt: '2026-08-05T10:00:00Z',
+            patternKey: null,
+            learnedApplied: false,
+          }),
+        });
+      }
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    fireEvent.click(within(recipientPanel).getByRole('button', { name: /승인/ }));
+
+    await waitFor(() => {
+      const messagesCalls = fetchMock.mock.calls.filter(([url]) => url === '/api/messages');
+      expect(messagesCalls).toHaveLength(1);
+    });
+
+    const [, requestInit] = fetchMock.mock.calls.find(([url]) => url === '/api/messages')!;
+    const headers = new Headers((requestInit as RequestInit).headers);
+    const idempotencyKey = headers.get('Idempotency-Key');
+    expect(idempotencyKey).toBeTruthy();
+    expect(idempotencyKey!.length).toBeGreaterThan(0);
+  });
+
+  // MJ-4-2(reviewer 재검토, Major 1 → 수정) — 위 테스트는 값이 "있다"만 확인해 `Math.random()`
+  // 처럼 매 호출마다 재생성되는 구현도 통과시켰다. 의도한 시나리오(응답 유실 후 같은 키로
+  // 재시도 → 서버가 중복 저장 대신 첫 응답을 재사용)는 같은 승인 시도 안에서 키가 "고정"돼야만
+  // 성립한다. 첫 승인이 실패한 뒤(같은 스냅샷·같은 최종문으로) 재시도하면 두 번째 요청도 첫
+  // 요청과 **같은** Idempotency-Key를 보내는지 확인한다.
+  it('MJ-4-2 — 승인 실패 후(같은 스냅샷으로) 재시도하면 이전과 동일한 Idempotency-Key를 보낸다', async () => {
+    let messagesCallCount = 0;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') return Promise.resolve(mediateSuccessResponse());
+      if (url === '/api/messages') {
+        messagesCallCount += 1;
+        if (messagesCallCount === 1) {
+          return Promise.resolve({
+            ok: false,
+            json: async () => ({
+              error: { code: 'INTERNAL', message: '전송 실패', retryable: true },
+            }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            messageId: 'msg-1',
+            diffId: 'diff-1',
+            sentAt: '2026-08-05T10:00:00Z',
+            patternKey: null,
+            learnedApplied: false,
+          }),
+        });
+      }
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    fireEvent.click(within(recipientPanel).getByRole('button', { name: /승인/ }));
+
+    await waitFor(() => {
+      expect(within(recipientPanel).getByRole('alert')).toBeTruthy();
+    });
+
+    // 원문·수신자·최종문 어느 것도 바꾸지 않고 그대로 재시도한다.
+    fireEvent.click(within(recipientPanel).getByRole('button', { name: /승인/ }));
+
+    await waitFor(() => {
+      const messagesCalls = fetchMock.mock.calls.filter(([url]) => url === '/api/messages');
+      expect(messagesCalls).toHaveLength(2);
+    });
+
+    const messagesCalls = fetchMock.mock.calls.filter(([url]) => url === '/api/messages');
+    const firstKey = new Headers((messagesCalls[0][1] as RequestInit).headers).get(
+      'Idempotency-Key',
+    );
+    const secondKey = new Headers((messagesCalls[1][1] as RequestInit).headers).get(
+      'Idempotency-Key',
+    );
+    expect(firstKey).toBeTruthy();
+    expect(secondKey).toBe(firstKey);
+  });
+
   it('중재 결과가 없으면 승인 버튼 자체가 없다(승인 대상 없음)', () => {
     render(<MediationWorkspace />);
 
@@ -171,6 +283,35 @@ describe('MediationWorkspace', () => {
       name: /승인/,
     }) as HTMLButtonElement;
     expect(approveButton.disabled).toBe(true);
+  });
+
+  // 🔴 Major 4(reviewer 재검토 → 수정) — `SenderPanel`이 `originalTextSnapshot` prop을 잘
+  // 전달하는지는 `SenderPanel.test.tsx` MJ-5가 이미 검증하지만, `MediationWorkspace`가 실제로
+  // 올바른 값(`approvalSnapshot?.text ?? text`)을 그 prop에 실어 보내는지는 어떤 테스트도
+  // 검증하지 않았다 — 그 줄을 `text`로 되돌려도 전체 스위트가 green으로 남았다. 여기서 배선
+  // 자체를 통합 레벨로 확인한다: 실행 성공 → 재실행 없이 원문을 편집 → 비교 뷰의 "원문" 컬럼에는
+  // 편집 전(스냅샷) 텍스트가 계속 보이고, 편집한 새 텍스트는 보이지 않는다.
+  it('Major 4 — 실행 성공 후 재실행 없이 원문을 편집해도 비교 뷰의 원문은 편집 전 스냅샷 그대로다(originalTextSnapshot 배선)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mediateSuccessResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    const comparisonView = screen.getByLabelText('원문·변환문·변환 이유 비교');
+    expect(within(comparisonView).getByText('내일까지 확인 부탁드립니다.')).toBeTruthy();
+
+    // 재실행 없이 원문만 편집한다 — 이 편집은 아직 어떤 중재 결과로도 검토되지 않았다.
+    fireEvent.change(screen.getByLabelText('메시지'), {
+      target: { value: '편집한 새 원문(아직 검토되지 않음)' },
+    });
+
+    expect(within(comparisonView).getByText('내일까지 확인 부탁드립니다.')).toBeTruthy();
+    expect(within(comparisonView).queryByText('편집한 새 원문(아직 검토되지 않음)')).toBeNull();
   });
 
   // 🔴 M1(reviewer 최종 APPROVED, Major 비차단 → 수정) — 재실행 없이 긴급도만 override하면

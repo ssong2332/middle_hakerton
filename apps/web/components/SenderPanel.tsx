@@ -29,6 +29,16 @@ export interface SenderPanelProps {
    * (AC-041 위반). `MediationWorkspace`의 `hasResult`(=`approvalSnapshot !== null`)를 그대로 받는다.
    */
   hasResult: boolean;
+  /**
+   * 🔴 MJ-5(사용자 지시 유지보수 라운드) — `ComparisonView`/`BackTranslationPreview`에 넘기는
+   * 원문. 라이브 `text` state가 아니라 **승인 대상 스냅샷 시점의 원문**(`approvalSnapshot.text`,
+   * `MediationWorkspace`)을 받는다. 재실행 실패 후(hasResult는 유지된 채) 원문을 편집하면,
+   * 라이브 `text`는 이미 검토되지 않은 새 값이 되지만 `transformed`/`backTranslation`은 여전히
+   * 스냅샷 시점의 원문을 기준으로 생성된 것이다 — 이 prop을 쓰면 원문·변환문·역번역이 항상 같은
+   * 시점의 짝을 이룬다. (승인 자체는 `isStale`이 이미 막으므로 오발송으로 이어지지는 않았지만,
+   * 화면에 잘못된 조합이 보이는 표시 결함이었다.)
+   */
+  originalTextSnapshot: string;
 }
 
 /**
@@ -50,6 +60,7 @@ export function SenderPanel({
   displayedUrgency,
   onRunMediation,
   hasResult,
+  originalTextSnapshot,
 }: SenderPanelProps) {
   const trimmedRecipient = recipient.trim();
   const recipientFormatInvalid = trimmedRecipient !== '' && !isValidEmailFormat(trimmedRecipient);
@@ -103,9 +114,14 @@ export function SenderPanel({
               onOverride={onOverride}
             />
           )}
-          {/* AC-008 — 원문/변환문/변환 이유 3열 비교 + AC-007 보존 항목 표시. */}
+          {/* AC-008 — 원문/변환문/변환 이유 3열 비교 + AC-007 보존 항목 표시.
+              MJ-5 — 원문은 스냅샷 시점 값(originalTextSnapshot)을 쓴다(라이브 text 아님).
+              Major 2(2026-08-05, 되돌림) — 한때 이 컴포넌트에도 `source`를 넘겨 폴백 배지를
+              띄웠지만(MJ-2), `MediationResult.source`가 C1/C2/C4를 합친 단일 값이라 C2(이 영역이
+              보여주는 변환문)가 실제로 폴백인지 알 수 없어 라이브 콘텐츠를 폴백으로 오표시할 수
+              있었다 — `ComparisonView.tsx` 헤더 주석의 Open Question(architect) 참조. */}
           <ComparisonView
-            originalText={text}
+            originalText={originalTextSnapshot}
             transformed={result.transformed}
             reason={result.reason}
             preserved={result.preserved}
@@ -119,8 +135,10 @@ export function SenderPanel({
               `MisreadRiskPanel`의 `variant` prop 하나만 바꾸면 되고, 데이터 생성(T10)에는 영향이
               없다(같은 패턴이 이미 존재 — "표시만 축소되고 데이터는 항상 동일"). */}
           <MisreadRiskPanel risks={result.misreadRisks} variant="full" />
+          {/* MJ-5 — 여기도 스냅샷 시점 원문을 쓴다(역번역은 스냅샷 시점 변환문의 역번역이므로,
+              라이브 text와 짝지으면 편집 후 원문·역번역이 서로 다른 시점의 값이 된다). */}
           <BackTranslationPreview
-            originalText={text}
+            originalText={originalTextSnapshot}
             backTranslation={result.backTranslation}
             warnings={result.warnings}
             source={result.source}

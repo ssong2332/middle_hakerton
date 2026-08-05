@@ -104,7 +104,11 @@ export const POST = withApi<MediateRequest, MediationResult>(
     // C2(T10) — 보존 대상(마감일·수치·필수 액션)을 먼저 추출해 고정한 뒤 톤을 변환하고, 같은
     // 호출 안에서 오해 사전 경고(misreadRisks)를 함께 산출한다(AC-006/043/045/046/049). 프로필의
     // 존댓말 레벨은 세션에서 아직 조회하지 않는다(파일 상단 "T10 배선" 주석 참조) — `null`을
-    // 넘기면 `runToneTransform`이 기본 레지스터로 대체한다.
+    // 넘겨도 `runToneTransform`은 기본 레지스터로 대체하지 않는다. 대신 특정 레벨을 지정하지
+    // 않은 채 "한 메시지 안에서 하나의 종결어미 레벨을 끝까지 유지하라"는 일관성 지시만 프롬프트에
+    // 싣는다(`docs/DECISIONS.md` #40, `docs/adr/0007-honorific-level-resolution-boundary.md` D2 —
+    // 기본값을 채우면 "프로필 없음"과 "프로필=특정값"의 payload가 같아져 캐시 키가 두 상태를
+    // 구분하지 못하게 된다).
     const {
       transformed,
       reason,

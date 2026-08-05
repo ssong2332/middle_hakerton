@@ -201,4 +201,42 @@ describe('RecipientPanel', () => {
     const button = screen.getByRole('button', { name: /승인/ }) as HTMLButtonElement;
     expect(button.disabled).toBe(false);
   });
+
+  // MJ-3 — 최종 발송문이 빈 값이면 서버가 400을 반환하기 전에 클라이언트에서 먼저 막는다
+  // (`messagesRequestSchema.finalText: z.string().min(1)`, `apps/web/app/api/messages/route.ts`).
+  it('MJ-3 — 최종 발송문이 빈 문자열이면 승인 버튼이 비활성화된다', () => {
+    render(
+      <RecipientPanel
+        hasResult={true}
+        isStale={false}
+        finalText=""
+        onFinalTextChange={vi.fn()}
+        onApprove={vi.fn()}
+        approveStatus="idle"
+        sentAt={null}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: /승인/ }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+  });
+
+  // MJ-3 — 공백만 있는 값도 서버 검증(min(1) 후 trim 안 함)상으로는 통과할 수 있으나, 실질적으로
+  // 빈 메시지를 보내는 것과 같으므로 같은 취급을 한다.
+  it('MJ-3 — 최종 발송문이 공백뿐이면 승인 버튼이 비활성화된다', () => {
+    render(
+      <RecipientPanel
+        hasResult={true}
+        isStale={false}
+        finalText="   "
+        onFinalTextChange={vi.fn()}
+        onApprove={vi.fn()}
+        approveStatus="idle"
+        sentAt={null}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: /승인/ }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+  });
 });

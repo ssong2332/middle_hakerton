@@ -50,8 +50,11 @@ export interface FallbackResponseEntry {
  *   세트다 — `docs/TestCases.md:345-352`). 표본이 없을 때의 중립값으로 기존 NORMAL을 그대로 쓴다.
  * - `c2`: `docs/DemoScript.md` 장면 3①(TestCases **U-01** "혹시 오늘 중으로 가능하실까요?")의
  *   설계된 변환 예시를 **그대로** 썼다 — "우리 변환: I need this by EOD today. Please confirm if
- *   that's not feasible."(`docs/DemoScript.md:117`). `preserved[]`는 같은 케이스의 마감(오늘 중 →
- *   EOD today)을 반영했다. (변경 없음 — 원래부터 U-01이었다)
+ *   that's not feasible."(`docs/DemoScript.md:117`). 🔴 Major 5(2026-08-05, reviewer 재검토 →
+ *   수정)로 `preserved[]`는 **비운다** — 이전 버전은 이 자리에 같은 케이스의 마감(오늘 중 →
+ *   EOD today)을 채워 뒀지만, 폴백은 실제 원문을 본 적이 없으므로 "이걸 원문에서 보존했다"고
+ *   주장할 근거가 없다(`ComparisonView.tsx`가 이를 "(보존됨)"으로 렌더해, 쓰지 않은 마감이
+ *   보존됐다고 통보되는 결함이었다). `transformed`(위 문구)는 U-01 시나리오 예시로 계속 유지한다.
  * - `c4`: 위 `c2.transformed`("I need this by EOD today. Please confirm if that's not
  *   feasible.")를 **이 태스크가 성실하게 역번역해 새로 작성했다** — TestCases.md/DemoScript.md
  *   원문을 그대로 옮긴 것이 아니다(U-01에는 "역번역이 이렇게 돌아오면 정상"이라는 고정 문구가
@@ -71,8 +74,21 @@ export const FALLBACK_RESPONSES: FallbackResponseEntry[] = [
     step: 'c2',
     content: JSON.stringify({
       transformed: "I need this by EOD today. Please confirm if that's not feasible.",
-      reason: '완곡한 표현 속 긴급도를 명시적 기한과 확인 요청 문장으로 복원했습니다.',
-      preserved: [{ kind: 'deadline', sourceText: '오늘 중', transformedText: 'EOD today' }],
+      // 🔴 MJ-A(2026-08-05, 사용자 지시 유지보수 라운드) — 이전 문구("완곡한 표현 속 긴급도를
+      // 명시적 기한과 확인 요청 문장으로 복원했습니다")는 실제로 보지 않은 사용자 입력을 분석해
+      // 판단한 것처럼 말했다. 마감이 없는 원문에서 이 폴백이 뜨면, 쓰지도 않은 마감("오늘 중")이
+      // 실제 원문에서 온 것처럼 preserved[]와 함께 통보되는 결함이었다. c1(`c1.ts` 폴백)과 같은
+      // 패턴 — "이건 폴백이라 실제 입력을 확인하지 못했다"는 사실만 말한다.
+      //
+      // 🔴 Major 5(reviewer 재검토 → 수정, 2026-08-05) — MJ-A는 `reason` 문구만 고쳤고
+      // `preserved`는 그대로 두어 근본 결함이 남아 있었다: `ComparisonView.tsx`가 이 배열을
+      // "EOD today (보존됨)"으로 렌더하므로, 마감이 없는 실제 원문에서 이 폴백이 떠도 사용자가
+      // 쓰지 않은 마감이 "보존됨"으로 통보됐다 — 폴백은 실제로 아무것도 "봤다"고 주장할 근거가
+      // 없으므로 `preserved`도 비운다(c1과 동일한 "사실만 말한다" 원칙). `transformed`(U-01
+      // 시나리오 예시 텍스트)는 건드리지 않는다 — U-01 데모 문구 자체는 유지 대상이다.
+      reason:
+        '폴백 응답이라 실제 입력을 확인하지 못했습니다 — 아래 변환문·보존 항목은 예시이며 실제 입력을 분석한 결과가 아닙니다.',
+      preserved: [],
       misreadRisks: [],
     }),
   },

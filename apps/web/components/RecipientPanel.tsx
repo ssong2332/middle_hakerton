@@ -57,6 +57,11 @@ export function RecipientPanel({
   sentAt,
 }: RecipientPanelProps) {
   const isDelivered = approveStatus === 'sent';
+  // MJ-3(사용자 지시 유지보수 라운드) — 최종 발송문이 비어 있으면(공백만 있는 경우 포함) 승인
+  // 버튼을 비활성화한다. 서버(`messagesRequestSchema.finalText: z.string().min(1)`,
+  // `apps/web/app/api/messages/route.ts`)가 이미 빈 값을 400으로 거부하지만, 그때까지는 클라이언트가
+  // 막지 않아 사용자가 실패 응답을 받고서야 알게 됐다 — 여기서 먼저 막는다(2차 방어선은 서버).
+  const isFinalTextEmpty = finalText.trim() === '';
 
   return (
     <section aria-label="수신자 패널">
@@ -89,7 +94,7 @@ export function RecipientPanel({
             <button
               type="button"
               onClick={onApprove}
-              disabled={approveStatus === 'sending' || isStale || isRunning}
+              disabled={approveStatus === 'sending' || isStale || isRunning || isFinalTextEmpty}
             >
               승인 & 전송
             </button>

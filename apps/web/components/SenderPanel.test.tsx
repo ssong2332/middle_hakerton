@@ -5,7 +5,7 @@
  * field, clears on edit."
  */
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { SenderPanel } from './SenderPanel';
 
 function baseProps() {
@@ -22,6 +22,7 @@ function baseProps() {
     displayedUrgency: null,
     onRunMediation: vi.fn(),
     hasResult: false,
+    originalTextSnapshot: '',
   };
 }
 
@@ -191,5 +192,60 @@ describe('SenderPanel', () => {
     expect(screen.getByText('처리에 실패했습니다')).toBeTruthy();
     expect(screen.getByText('Please confirm by tomorrow.')).toBeTruthy();
     expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
+  });
+
+  // MJ-5(사용자 지시 유지보수 라운드) — `ComparisonView`/`BackTranslationPreview`에 넘기는
+  // 원문은 라이브 `text` state가 아니라 스냅샷 시점의 원문(`originalTextSnapshot`)이어야 한다.
+  // 재실행 실패 후(hasResult는 유지된 채) 원문을 편집하면, 입력창은 새 원문을 보여줘도
+  // 비교 뷰·역번역 미리보기는 여전히 스냅샷 시점의(변환문·역번역과 짝을 이루는) 원문을 보여야
+  // 한다 — 그렇지 않으면 "새로 편집한 원문 + 옛 변환문/역번역"이 나란히 뜬다.
+  it('MJ-5 — 비교 뷰·역번역 미리보기의 원문은 라이브 편집이 아니라 스냅샷 시점의 원문이다', () => {
+    const result = {
+      urgency: 'NORMAL',
+      urgencyReason: '일반 요청입니다.',
+      transformed: 'Please confirm by tomorrow.',
+      reason: '완곡 표현을 명시적 요청으로 변환했습니다.',
+      preserved: [],
+      backTranslation: '내일까지 확인 부탁드립니다.',
+      warnings: [],
+      misreadRisks: [],
+      holidayConflicts: [],
+      personalizationApplied: true,
+      source: 'live',
+      ticketOption: { offered: false, basis: 'signal_absent' },
+    } as never;
+
+    render(
+      <SenderPanel
+        {...baseProps()}
+        text="새로 편집한 원문(아직 검토되지 않음)"
+        recipient="boss@example.com"
+        status="error"
+        result={result}
+        displayedUrgency="NORMAL"
+        hasResult
+        originalTextSnapshot="스냅샷 시점의 원문(내일까지 확인 부탁드립니다.)"
+      />,
+    );
+
+    // 입력창(textarea)에는 라이브 편집 값이 그대로 반영된다.
+    expect((screen.getByLabelText('메시지') as HTMLTextAreaElement).value).toBe(
+      '새로 편집한 원문(아직 검토되지 않음)',
+    );
+
+    // 그러나 비교 뷰·역번역 미리보기의 "원문"은 스냅샷 시점의 원문이어야 한다.
+    const comparisonView = screen.getByLabelText('원문·변환문·변환 이유 비교');
+    expect(
+      within(comparisonView).getByText('스냅샷 시점의 원문(내일까지 확인 부탁드립니다.)'),
+    ).toBeTruthy();
+    expect(within(comparisonView).queryByText('새로 편집한 원문(아직 검토되지 않음)')).toBeNull();
+
+    const backTranslationView = screen.getByLabelText('역번역 미리보기');
+    expect(
+      within(backTranslationView).getByText('스냅샷 시점의 원문(내일까지 확인 부탁드립니다.)'),
+    ).toBeTruthy();
+    expect(
+      within(backTranslationView).queryByText('새로 편집한 원문(아직 검토되지 않음)'),
+    ).toBeNull();
   });
 });
