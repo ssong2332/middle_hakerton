@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { MediationResult, UrgencyLevel } from '@cross-border/core';
 import { RecipientPanel } from './RecipientPanel';
 import { SenderPanel } from './SenderPanel';
@@ -93,6 +93,15 @@ export function MediationWorkspace() {
   const [approvalSnapshot, setApprovalSnapshot] = useState<ApprovalSnapshot | null>(null);
   const [approveStatus, setApproveStatus] = useState<ApproveStatus>('idle');
   const [sentAt, setSentAt] = useState<string | null>(null);
+  // MJ-4(reviewer 재검토, Major 1 → 수정) — Idempotency-Key는 "승인 시도 하나"의 정체성(스냅샷 +
+  // 최종문)에 묶여 한 번만 생성돼야 한다. `handleApprove` 안에서 매번 `crypto.randomUUID()`를
+  // 부르면 응답 유실 후 재시도마다 새 키가 나가 서버의 멱등성 백스톱이 아무것도 막지 못하고
+  // (`apps/web/lib/messages/idempotency.ts`), 매번 다른 키로 저장소 항목만 계속 늘어난다(그 store는
+  // 읽힐 때만 만료 정리를 하므로, 같은 키가 두 번 읽히는 일이 없으면 프로세스 수명 내내 무한정
+  // 커진다). 같은 (스냅샷, 최종문) 조합으로 재시도하면 같은 키를 재사용하고, 새 실행(새 스냅샷)이나
+  // 최종문 편집처럼 실제로 다른 내용이 되면 새 키를 발급하며, 전송 성공(`approveStatus==='sent'`)
+  // 후에는 다음 승인 시도를 위해 초기화한다.
+  const idempotencyKeyRef = useRef<{ identity: string; key: string } | null>(null);
 
   const displayedUrgency = urgencyOverride ?? result?.urgency ?? null;
   const isOverridden =
@@ -185,9 +194,24 @@ export function MediationWorkspace() {
     if (!approvalSnapshot || isStale) return;
     setApproveStatus('sending');
     try {
+      // MJ-4 — 같은 승인 시도(스냅샷 + 최종문)면 같은 키를 재사용한다. 응답이 유실된 뒤 사용자가
+      // 다시 승인을 누르면(내용을 바꾸지 않았다면) 서버가 이 키로 첫 응답을 재사용해 중복 저장을
+      // 막는다. 내용이 실제로 달라지면(새 실행으로 스냅샷이 바뀌거나 최종문을 편집하면) 새 키를
+      // 발급한다 — 그건 이미 다른 승인 대상이기 때문이다.
+      const identity = JSON.stringify({
+        text: approvalSnapshot.text,
+        recipient: approvalSnapshot.recipient,
+        urgency: approvalSnapshot.urgency,
+        transformed: approvalSnapshot.transformed,
+        finalText,
+      });
+      if (idempotencyKeyRef.current?.identity !== identity) {
+        idempotencyKeyRef.current = { identity, key: crypto.randomUUID() };
+      }
+      const idempotencyKey = idempotencyKeyRef.current.key;
       const response = await fetch('/api/messages', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify({
           originalText: approvalSnapshot.text,
           finalText,
@@ -208,6 +232,8 @@ export function MediationWorkspace() {
       const body = (await response.json()) as { sentAt: string };
       setSentAt(body.sentAt);
       setApproveStatus('sent');
+      // 전송 성공 — 이 승인 시도는 끝났다. 다음 승인(다음 실행 이후)은 새 키를 받는다.
+      idempotencyKeyRef.current = null;
     } catch {
       setApproveStatus('error');
     }
@@ -235,6 +261,11 @@ export function MediationWorkspace() {
             displayedUrgency={displayedUrgency}
             onRunMediation={handleRunMediation}
             hasResult={hasResult}
+            // MJ-5 — 스냅샷이 있으면 그 시점의 원문을, 없으면(첫 실행 전) 라이브 원문을 그대로
+            // 쓴다(스냅샷이 없을 때는 ComparisonView/BackTranslationPreview 자체가 렌더되지
+            // 않으므로 이 값은 실제로 쓰이지 않지만, prop 타입을 `string`으로 단순하게 유지하기
+            // 위한 안전한 fallback이다).
+            originalTextSnapshot={approvalSnapshot?.text ?? text}
           />
         </div>
         <div style={panelColumnStyle}>

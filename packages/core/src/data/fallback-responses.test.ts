@@ -93,15 +93,21 @@ describe('FALLBACK_RESPONSES — T16이 채운 시나리오 기본값(c1/c2/c4)'
   // 모순), c4.backTranslation은 c2.transformed와 무관한 다른 장면의 문구였다(BackTranslationPreview는
   // 바로 위에 뜬 변환문을 검증하는 컴포넌트이므로, 무관한 역번역은 그 존재 이유를 무너뜨린다).
   // 폴백 발동 시 이 3건이 SenderPanel.tsx 한 화면에 동시에 뜨므로 아래 두 불변식을 고정한다.
-  it('일관성 — c1 reason은 c2가 실제로 보존한 마감 신호의 부재를 주장하지 않는다(C-1)', () => {
+  // 🔴 Major 5(2026-08-05, reviewer 재검토 → 수정) — c2 폴백의 `preserved`가 `[]`로 비워지면서
+  // (실제로 보지 않은 마감을 "보존했다"고 주장하지 않는다) 이 테스트의 원래 전제("c2는 마감을
+  // 보존한다")는 더 이상 성립하지 않는다. c1.reason이 "마감 신호가 없다"는 취지를 주장하면 안
+  // 된다는 본래의 불변식 자체는 preserved 내용과 무관하게 여전히 유효하므로 그 assertion은
+  // 유지하고, 전제 확인만 새 현실(preserved가 비어 있다)에 맞춘다.
+  it('일관성 — c1 reason은 (더 이상 아무것도 보존하지 않는) c2와 모순되는 "마감 없음" 주장을 하지 않는다(C-1/Major 5)', () => {
     const c1Entry = FALLBACK_RESPONSES.find((e) => e.step === 'c1' && e.cacheKey === undefined)!;
     const c2Entry = FALLBACK_RESPONSES.find((e) => e.step === 'c2' && e.cacheKey === undefined)!;
     const c1Parsed = JSON.parse(c1Entry.content) as { reason: string };
     const c2Parsed = JSON.parse(c2Entry.content) as { preserved: { kind: string }[] };
 
-    // 전제 확인 — U-01 시나리오(c2)는 마감을 보존한다(오늘 중 → EOD today).
-    expect(c2Parsed.preserved.some((item) => item.kind === 'deadline')).toBe(true);
-    // c1.reason이 "마감 신호가 없다"는 취지를 주장하면 위 사실과 정면으로 모순된다.
+    // 전제 확인(Major 5로 갱신) — 폴백은 실제 입력을 본 적이 없으므로 c2는 이제 아무것도
+    // "보존했다"고 주장하지 않는다.
+    expect(c2Parsed.preserved).toEqual([]);
+    // c1.reason이 "마감 신호가 없다"는 취지를 주장하면 안 된다(입력을 봤다고 전제하는 주장이므로).
     expect(c1Parsed.reason).not.toMatch(/마감.{0,12}(없|확인되지\s*않)/);
   });
 
@@ -116,5 +122,45 @@ describe('FALLBACK_RESPONSES — T16이 채운 시나리오 기본값(c1/c2/c4)'
     // 같은 시나리오를 역번역했다면 한국어 역번역에도 "오늘"이 있어야 한다. 없으면 다른 장면
     // (예: 이전 버전의 "이 안건은 보류하고...")에서 가져온 무관한 문구라는 뜻이다.
     expect(c4Parsed.backTranslation).toContain('오늘');
+  });
+
+  // MJ-A(사용자 지시 유지보수 라운드) — c1.reason은 이미 "폴백이라 실제 입력을 확인하지
+  // 못했다"는 사실만 말하도록 고쳐져 있다(T15/T16). c2.reason은 여전히 "완곡한 표현 속 긴급도를
+  // 명시적 기한과 확인 요청 문장으로 복원했습니다" — 실제로 보지 않은 사용자 입력을 분석해
+  // 판단한 것처럼 말한다. 마감이 없는 원문에서 이 폴백이 뜨면, 쓰지도 않은 마감이 정말 원문에서
+  // 왔다는 것처럼 통보되는 결함이다. c1과 같은 패턴(사실만 말한다)을 c2에도 적용한다.
+  it('MJ-A — c2 폴백 reason도 c1과 같은 패턴으로 "폴백이라 실제 입력을 확인하지 못했다"는 사실만 말한다', () => {
+    const c1Entry = FALLBACK_RESPONSES.find((e) => e.step === 'c1' && e.cacheKey === undefined)!;
+    const c2Entry = FALLBACK_RESPONSES.find((e) => e.step === 'c2' && e.cacheKey === undefined)!;
+    const c1Parsed = JSON.parse(c1Entry.content) as { reason: string };
+    const c2Parsed = JSON.parse(c2Entry.content) as { reason: string };
+
+    const disclosurePattern = /폴백 응답이라 실제 입력을 확인하지 못했습니다/;
+    // 전제 확인 — c1은 이미 이 패턴을 쓴다(T15/T16, 회귀하지 않았는지 재확인).
+    expect(c1Parsed.reason).toMatch(disclosurePattern);
+    // c2도 같은 패턴을 공유해야 한다.
+    expect(c2Parsed.reason).toMatch(disclosurePattern);
+    // "복원했습니다"처럼 실제 입력을 분석해 얻은 결론인 것처럼 말하는 문구가 남아 있으면 안 된다.
+    expect(c2Parsed.reason).not.toMatch(/복원했습니다/);
+  });
+
+  // Major 5(reviewer 재검토 → 수정) — MJ-A는 c2.reason만 "폴백이라 실제 입력을 확인하지 못했다"로
+  // 고쳤지만, 같은 응답의 `preserved: [{kind:'deadline', ...}]`는 그대로 남아 있었다.
+  // `ComparisonView.tsx`가 이걸 "EOD today (보존됨)"으로 렌더하므로, 마감이 없는 실제 원문에서
+  // 이 폴백이 뜨면 쓰지도 않은 마감이 "보존됨"으로 통보되는 결함이 재현된다. 폴백은 실제로 아무
+  // 것도 "봤다"고 주장할 근거가 없으므로(c1이 이미 이 패턴), preserved도 비워야 한다.
+  // `transformed`(U-01 시나리오 예시 텍스트)는 그대로 둔다 — preserved만의 문제다.
+  it('Major 5 — c2 폴백의 preserved는 비어 있다(실제로 보지 않은 항목을 보존됐다고 주장하지 않는다)', () => {
+    const c2Entry = FALLBACK_RESPONSES.find((e) => e.step === 'c2' && e.cacheKey === undefined)!;
+    const c2Parsed = JSON.parse(c2Entry.content) as {
+      transformed: string;
+      preserved: unknown[];
+    };
+
+    expect(c2Parsed.preserved).toEqual([]);
+    // transformed(U-01 시나리오 예시)는 이 수정과 무관하게 그대로 유지된다.
+    expect(c2Parsed.transformed).toBe(
+      "I need this by EOD today. Please confirm if that's not feasible.",
+    );
   });
 });

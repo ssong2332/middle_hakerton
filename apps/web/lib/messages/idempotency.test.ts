@@ -8,10 +8,11 @@
  * 않은 칸"에 별도 인프라 결정이 없음) — 단일 데모 서버 프로세스 범위의 더블클릭 방지가 목적이며,
  * 여러 서버 인스턴스 간 공유는 이 구현의 범위 밖이다(구현 보고서에 명시).
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getIdempotentResponse,
   saveIdempotentResponse,
+  IDEMPOTENCY_TTL_MS,
 } from './idempotency';
 
 describe('idempotency store', () => {
@@ -32,5 +33,43 @@ describe('idempotency store', () => {
     saveIdempotentResponse('user-2', 'key-b', { messageId: 'msg-2' });
 
     expect(getIdempotentResponse('user-3', 'key-b')).toBeNull();
+  });
+
+  // Minor(사용자 지시 유지보수 라운드) — TTL 만료 분기(`entry.expiresAt < Date.now()`)를 실제로
+  // 실패시키는 테스트가 없었다(mutation testing 관점: 그 분기를 통째로 지워도 기존 테스트는
+  // 전부 green으로 남는다). TTL 만료 후 ① null이 반환되는지, ② 그 사이 같은 키로 다시 저장하면
+  // (재처리) 새 값으로 실제로 갱신되는지까지 확인한다 — "만료됐다고 보고되지만 실제로는 재처리가
+  // 막혀 있다" 같은 절반짜리 구현을 잡아내기 위함이다.
+  describe('TTL 만료', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('TTL 경과 직전까지는 저장된 응답을 그대로 반환한다', () => {
+      const start = 1_700_000_000_000;
+      vi.setSystemTime(start);
+      saveIdempotentResponse('user-ttl', 'key-ttl', { messageId: 'first' });
+
+      vi.setSystemTime(start + IDEMPOTENCY_TTL_MS - 1);
+      expect(getIdempotentResponse('user-ttl', 'key-ttl')).toEqual({ messageId: 'first' });
+    });
+
+    it('TTL 경과 후 조회하면 null을 반환하고, 재저장하면(재처리) 새 값으로 실제 갱신된다', () => {
+      const start = 1_700_000_100_000;
+      vi.setSystemTime(start);
+      saveIdempotentResponse('user-ttl', 'key-ttl-2', { messageId: 'first' });
+
+      vi.setSystemTime(start + IDEMPOTENCY_TTL_MS + 1);
+      expect(getIdempotentResponse('user-ttl', 'key-ttl-2')).toBeNull();
+
+      // 재처리 허용 확인 — 같은 (userId, key)로 다시 저장하면 이전 값이 아니라 새 값이 조회돼야
+      // 한다. "만료 판정은 하지만 실제로는 옛 값이 계속 반환된다" 같은 결함을 이 단언이 잡는다.
+      saveIdempotentResponse('user-ttl', 'key-ttl-2', { messageId: 'second' });
+      expect(getIdempotentResponse('user-ttl', 'key-ttl-2')).toEqual({ messageId: 'second' });
+    });
   });
 });

@@ -11,7 +11,9 @@
  * 충분하다(구현 보고서에 이 gap을 남긴다).
  */
 
-const IDEMPOTENCY_TTL_MS = 5 * 60 * 1000; // 5분 — 더블클릭 방지 목적, 장기 보관 불필요
+// Minor(사용자 지시 유지보수 라운드) — 테스트가 이 값을 리터럴로 복제하지 않고 참조할 수 있도록
+// export한다(`docs/CodingRules.md` 상수 격리 정신과 동일 — 값은 이 파일 1곳에만 있다).
+export const IDEMPOTENCY_TTL_MS = 5 * 60 * 1000; // 5분 — 더블클릭 방지 목적, 장기 보관 불필요
 
 interface StoredEntry {
   expiresAt: number;
