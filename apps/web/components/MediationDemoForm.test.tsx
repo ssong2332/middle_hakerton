@@ -161,6 +161,134 @@ describe('MediationDemoForm', () => {
     expect(screen.queryByText('개인화 미적용 — 기본 변환만 적용되었습니다')).toBeNull();
   });
 
+  // T8/AC-003 — C1 결과(등급+근거)를 화면에 표시한다.
+  it('AC-003 — 결과에 담긴 긴급도 등급과 근거 문장을 표시한다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        backTranslation: 'Please confirm by tomorrow.',
+        warnings: [],
+        source: 'live',
+        urgency: 'CRITICAL',
+        urgencyReason: '프로덕션 장애로 즉시 대응이 필요합니다.',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationDemoForm />);
+
+    fireEvent.change(screen.getByLabelText('메시지'), {
+      target: { value: '지금 프로덕션이 다운됐습니다' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('CRITICAL', { selector: 'strong' })).toBeTruthy();
+    });
+    expect(screen.getByText('프로덕션 장애로 즉시 대응이 필요합니다.')).toBeTruthy();
+  });
+
+  // T8/AC-004 — override한 값이 화면에 즉시 반영되고, 다음 실행 요청에 실린다.
+  it('AC-004 — 긴급도를 override하면 배지가 즉시 갱신되고 다음 실행 요청에 override 값이 실린다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        backTranslation: 'Please confirm by tomorrow.',
+        warnings: [],
+        source: 'live',
+        urgency: 'NORMAL',
+        urgencyReason: '일반 업무 요청으로 보입니다.',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationDemoForm />);
+
+    fireEvent.change(screen.getByLabelText('메시지'), {
+      target: { value: '확인 부탁드립니다.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('NORMAL', { selector: 'strong' })).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText('긴급도 조정'), { target: { value: 'CRITICAL' } });
+
+    // 배지가 override 값으로 즉시 갱신된다(서버 재호출 없이).
+    expect(screen.getByText('CRITICAL', { selector: 'strong' })).toBeTruthy();
+    expect(screen.getByText('사용자가 등급을 조정했습니다')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+    const secondRequestBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    expect(secondRequestBody.context.urgencyOverride).toBe('CRITICAL');
+  });
+
+  // M1(reviewer 라운드 → 수정) — 재현: NORMAL 판정 → 사용자가 CRITICAL로 override → "실행" 재요청 →
+  // 서버가 override를 반영해 urgency:'CRITICAL'을 반환하지만 urgencyReason은 override 전 NORMAL
+  // 판정 근거 그대로다(`route.ts`가 override 자체의 근거를 지어내지 않으므로 정상 — AC-004 주석
+  // 참조). 이때 화면이 override 표시를 지우면 "CRITICAL 등급 + NORMAL 근거 문장"만 남아 마치 AI가
+  // CRITICAL을 그 근거로 판단한 것처럼 보인다 — 재요청 뒤에도 "사용자가 등급을 조정했습니다" 안내가
+  // 유지돼야 그 모순을 막는다.
+  it('AC-004 — override를 반영해 재실행해도 "사용자가 등급을 조정했습니다" 안내가 유지된다(근거-등급 모순 방지)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          backTranslation: 'Please confirm by tomorrow.',
+          warnings: [],
+          source: 'live',
+          urgency: 'NORMAL',
+          urgencyReason: '일반 업무 요청으로 보입니다.',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          backTranslation: 'Please confirm by tomorrow.',
+          warnings: [],
+          source: 'live',
+          // 서버가 override를 반영한 등급을 돌려주지만, 근거 문장은 override 전 원래 C1 판정의
+          // 것 그대로다(`route.ts:113~119`) — 실제 서버 동작을 그대로 흉내 낸다.
+          urgency: 'CRITICAL',
+          urgencyReason: '일반 업무 요청으로 보입니다.',
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationDemoForm />);
+
+    fireEvent.change(screen.getByLabelText('메시지'), {
+      target: { value: '확인 부탁드립니다.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('NORMAL', { selector: 'strong' })).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText('긴급도 조정'), { target: { value: 'CRITICAL' } });
+    expect(screen.getByText('사용자가 등급을 조정했습니다')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    // 재요청 뒤에도 배지는 CRITICAL이고, override 안내가 사라지지 않아야 한다 — 사라지면 화면에는
+    // "CRITICAL 등급 + NORMAL 근거"만 남아 AI가 그 근거로 CRITICAL을 판단한 것처럼 보인다.
+    await waitFor(() => {
+      expect(screen.getByText('CRITICAL', { selector: 'strong' })).toBeTruthy();
+    });
+    expect(screen.getByText('사용자가 등급을 조정했습니다')).toBeTruthy();
+  });
+
   it('API가 오류를 반환하면 실패 배너를 보여주고 원문 입력을 지우지 않는다(AC-029)', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,

@@ -1,25 +1,37 @@
 /**
  * `POST /api/mediate` — `docs/API.md` "POST /api/mediate" · `docs/Architecture.md` Data Flow ①.
  *
- * 🔴 **T5 범위 경계.** 최종 계약은 C1 분류 → C3 프로필 → C5 용어 주입 → C2 변환 → C4 역번역을
- * 고정 순서로 실행하지만(AC-032), 그 오케스트레이션(`packages/core/src/pipeline.ts`의 `run()`)은
- * **T28의 범위**로 명시돼 있다(그 파일 헤더 주석 "이 파일에 구현이 없는 것은 의도다"). C1(T7)·
- * C3(T19)·C5(T22)·C2(T10)·C6(T24)도 아직 없다. 이 라우트는 **지금 실제로 동작하는 유일한
- * 스텝인 C4만 수행**하고, 나머지 필드는 `MediationResult`(F1) 계약을 만족시키는 선에서
+ * 🔴 **범위 경계(T5+T7+T9 누적).** 최종 계약은 C1 분류 → C3 프로필 → C5 용어 주입 → C2 변환 →
+ * C4 역번역을 고정 순서로 실행하지만(AC-032), 그 오케스트레이션(`packages/core/src/pipeline.ts`의
+ * `run()`)은 **T28의 범위**로 명시돼 있다(그 파일 헤더 주석 "이 파일에 구현이 없는 것은 의도다").
+ * C3(T19)·C5(T22)·C2(T10)·C6(T24)는 아직 없다. 이 라우트는 **지금 실제로 동작하는 두 스텝인
+ * C1(T7)·C4만 수행**하고, 나머지 필드는 `MediationResult`(F1) 계약을 만족시키는 선에서
  * placeholder로 채운다 — 각 필드 옆 주석이 소유 태스크를 가리킨다. 해당 태스크가 착수되면
  * 그 줄만 교체하면 된다(`packages/core/src/pipeline.ts`가 준비되면 이 라우트는 그것을 호출하는
  * 형태로 바뀐다 — T28 완료 시 이 파일도 함께 정리 대상).
  *
  * 근거: `docs/Tasks.md` T6 원문 "T5는 [BE-B] 라우트만 만들고 그것을 호출하는 브라우저 화면이
  * 없다" — T5가 실제 HTTP 라우트를 만든다는 것을 그 다음 태스크(T6)가 전제하고 있다.
+ *
+ * 🔴 **T9(AC-005) 분기점 안내.** `docs/Architecture.md` Data Flow "① 웹앱 중재" ②는 "CRITICAL이면
+ * 예약·지연 경로를 건너뛰고 톤 정제만"을 요구한다. 이 저장소에는 아직 예약 발송(UX-006)·기한
+ * 협상(UX-005)에 대응하는 코드 경로가 존재하지 않으므로(둘 다 `docs/Tasks.md`에서 아직 `todo`),
+ * 지금 이 라우트에서 실제로 건너뛸 대상이 없다 — 억지로 스킵 로직을 만들지 않는다. 대신 그
+ * 분기가 소비할 타입(`DeliveryPath`)과 순수 판정 함수(`resolveDeliveryPath`,
+ * `packages/core/src/rules/urgency-routing.ts`)를 지금 만들어 테스트로 고정해 두었다 — 예약·지연
+ * 단계가 추가되는 태스크는 `resolveDeliveryPath(effectiveUrgency) === 'immediate'`일 때 자기
+ * 자신을 건너뛰어야 한다.
  */
 import { z } from 'zod';
 import {
   honorificMixedWarning,
+  resolveEffectiveUrgency,
   runBackTranslation,
+  runUrgencyClassification,
   ticketOptionFrom,
   type LanguageCode,
   type MediationResult,
+  type ResponseSource,
   type Warning,
 } from '@cross-border/core';
 import { withApi } from '../../../lib/http';
@@ -44,6 +56,21 @@ function senderLanguageOf(direction: 'ko-en' | 'en-ko'): LanguageCode {
   return direction === 'ko-en' ? 'ko' : 'en';
 }
 
+/**
+ * 🔴 이 라우트가 지금 실제로 LLM을 두 번 호출한다(C1·C4) — `MediationResult.source`는 단일
+ * 필드라 두 호출의 출처를 하나로 합쳐야 한다. `docs/Architecture.md`·`docs/API.md` 어디에도
+ * "복수 스텝의 source를 어떻게 합치는가"에 대한 명시가 없어(T28 파이프라인 오케스트레이션의
+ * 범위로 보인다), 여기서는 AC-041의 취지("실제 LLM 결과인 것처럼 보이면 안 된다")를 따라
+ * **가장 신뢰도가 낮은 쪽이 이긴다**(fallback > cache > live)로 보수적으로 합친다 — 두 스텝 중
+ * 하나라도 폴백이었다면 전체 응답을 "폴백 응답 사용 중"으로 표시하는 쪽이, 조용히 `live`로
+ * 보이는 쪽보다 AC-041 위반 위험이 낮다. T28이 실제 파이프라인을 조립할 때 이 판단을 재검토해야
+ * 한다(합치는 스텝이 2개에서 늘어난다).
+ */
+const SOURCE_PRIORITY: Record<ResponseSource, number> = { fallback: 2, cache: 1, live: 0 };
+function combineSource(a: ResponseSource, b: ResponseSource): ResponseSource {
+  return SOURCE_PRIORITY[a] >= SOURCE_PRIORITY[b] ? a : b;
+}
+
 export const POST = withApi<MediateRequest, MediationResult>(
   { schema: mediateRequestSchema, requireAuth: true },
   async ({ input, session }) => {
@@ -55,10 +82,23 @@ export const POST = withApi<MediateRequest, MediationResult>(
     const transformed = input.text;
 
     const llm = createOpenAiLLMClient(session?.userId);
-    const { backTranslation, source } = await runBackTranslation(
+
+    // C1(T7) — 원문의 긴급도를 분류한다(AC-003). 톤 변환(C2)이 아직 없으므로 원문을 그대로
+    // 넘긴다 — C1은 변환 전 원문의 긴급도를 판정하는 스텝이라 이 순서 자체는 T10 착수 후에도
+    // 바뀌지 않는다(`docs/Architecture.md` Data Flow ①이 C1을 항상 맨 앞에 둔다).
+    const classification = await runUrgencyClassification({ text: input.text }, llm);
+    // AC-004 — 사용자 override가 있으면 C1 판정 대신 그 값을 쓴다. override 판정 로직의 단일
+    // 출처는 `resolveEffectiveUrgency`(core) 하나이며 이 라우트가 다시 구현하지 않는다.
+    const effectiveUrgency = resolveEffectiveUrgency(
+      classification.urgency,
+      input.context.urgencyOverride ?? null,
+    );
+
+    const { backTranslation, source: backTranslationSource } = await runBackTranslation(
       { text: transformed, targetLanguage: senderLanguage },
       llm,
     );
+    const source = combineSource(classification.source, backTranslationSource);
 
     // AC-046③ — EN→KO 변환문의 종결어미 레벨 혼용 감지. C2가 없는 지금은 `transformed`가
     // 원문(placeholder)이라 실질적으로 트리거될 일이 적지만, 배선 자체는 지금 완성해 둔다 —
@@ -70,9 +110,17 @@ export const POST = withApi<MediateRequest, MediationResult>(
     }
 
     const result: MediationResult = {
-      // 🔴 C1(T7) 대기. override가 있으면 그 값을 반영하고(AC-004), 없으면 중립 기본값이다.
-      urgency: input.context.urgencyOverride ?? 'NORMAL',
-      urgencyReason: 'C1 긴급도 분류가 아직 연결되지 않았습니다(T7 대기) — 임시값입니다.',
+      // AC-003 — C1 판정. override가 있으면 그 값이 반영된다(AC-004, `resolveEffectiveUrgency`).
+      urgency: effectiveUrgency,
+      // 🔴 override 여부와 무관하게 C1이 실제로 그 등급을 고른 근거 문장을 그대로 보여준다 —
+      // override는 사용자의 수동 선택이라 그 자체의 "판단 근거 문장"이 존재하지 않으며, 지어내면
+      // Error Handling "없는 값을 지어내지 않는다" 위반이다. 이 응답만 보면 "override로 나온 등급 +
+      // override 전 근거 문장"이 뒤섞여 보일 수 있으므로, 그 구분을 유지하는 책임은 FE에 있다 —
+      // `MediationDemoForm`이 이번 요청에 실어 보낸 override 값을 응답을 받은 뒤에도
+      // `appliedOverride`로 계속 들고 있다가 "사용자가 등급을 조정했습니다" 안내를 유지한다
+      // (M1, `MediationDemoForm.test.tsx` "근거-등급 모순 방지" 참조) — `UrgencyPanel` 자체는
+      // `isOverridden`을 그대로 받아 렌더만 할 뿐 이 판단을 하지 않는다.
+      urgencyReason: classification.reason,
       transformed,
       // 🔴 C2(T10) 대기.
       reason: 'C2 톤 변환이 아직 연결되지 않았습니다(T10 대기) — 임시값입니다.',
