@@ -9,10 +9,21 @@
  * 분기 순서: ① 쿠키 세션(웹앱, `apps/web/lib/supabase/server.ts`의 `createClient()`가 요청 쿠키를
  * 읽는다) → ② 없으면 `Authorization: Bearer <token>`(확장) → ③ 둘 다 없거나 무효면 `null`.
  */
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerSupabaseClient, createTokenClient } from './supabase/server';
 
 export interface Session {
   userId: string;
+  /**
+   * 🔴 T14 — RLS(`auth.uid()`)가 통과하는, 이 사용자로 인증된 Supabase 클라이언트.
+   * 사용자 소유 테이블(`sent_messages` 등)에 쓰는 라우트는 `createServiceClient()`(RLS 우회,
+   * `llm_cache`·`llm_call_log` 전용)를 쓸 수 없으므로 이 클라이언트가 유일한 합법 경로다
+   * (`docs/CodingRules.md` Directory Rules). **`Optional`로 둔 이유** — 이 필드를 추가하기 전부터
+   * 존재하던 테스트(`http.test.ts`, `mediate/route.test.ts`)가 `resolveSession()`을 모킹하며
+   * `{ userId }`만 돌려준다; 그 라우트들은 DB에 쓰지 않으므로 `client`가 없어도 정상 동작한다.
+   * 실제 구현(`resolveSession()`)은 두 분기 모두 항상 채워서 반환한다.
+   */
+  client?: SupabaseClient;
 }
 
 const BEARER_PREFIX = 'Bearer ';
@@ -45,13 +56,16 @@ async function resolveBearerSession(request: Request): Promise<Session | null> {
   // `createTokenClient()`(토큰만으로 조회하는 1회용 클라이언트)를 쓴다. "생성처는
   // `apps/web/lib/supabase/` 한 곳뿐"(`docs/CodingRules.md` Directory Rules)을 지키기 위해
   // `@supabase/supabase-js`의 `createClient()`를 여기서 직접 부르지 않는다.
+  // 🔴 T14 — `token`을 넘겨 만든다: 이 클라이언트를 검증 이후에도 `session.client`로 재사용해
+  // DB 쓰기를 RLS 통과 상태로 만들기 위해서다(`Session.client` JSDoc 참조). 토큰 없이 만들면
+  // 이후 쿼리가 익명 요청이 되어 RLS가 전부 거부한다.
   try {
-    const client = createTokenClient();
+    const client = createTokenClient(token);
     const { data, error } = await client.auth.getUser(token);
     if (error || !data.user) {
       return null;
     }
-    return { userId: data.user.id };
+    return { userId: data.user.id, client };
   } catch (error) {
     // 환경변수 누락 등 클라이언트 생성 실패 — 미인증으로 취급하되, 원인은 로그에 남긴다(Critical 2).
     logAuthError('[auth] resolveBearerSession failed — treating as unauthenticated', error);
@@ -68,7 +82,10 @@ export async function resolveSession(request: Request): Promise<Session | null> 
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.auth.getUser();
     if (!error && data.user) {
-      return { userId: data.user.id };
+      // 🔴 T14 — 쿠키에 바인딩된 이 클라이언트를 그대로 돌려준다. `@supabase/ssr`이 만든
+      // 클라이언트는 이후 `.from()` 쿼리에도 같은 세션을 자동으로 싣는다(표준 동작) — 새
+      // 클라이언트를 따로 만들 필요가 없다.
+      return { userId: data.user.id, client: supabase };
     }
   } catch (error) {
     // 쿠키 클라이언트 생성 실패(예: 환경변수 누락) — Bearer 분기로 넘어가되, 원인은 로그에

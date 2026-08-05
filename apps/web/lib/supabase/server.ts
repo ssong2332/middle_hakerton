@@ -84,8 +84,16 @@ export function createServiceClient(): SupabaseClient {
  * 🔴 이 함수가 없으면 `resolveSession()`이 `@supabase/supabase-js`의 `createClient()`를 직접
  * 불러야 해 "생성처는 `apps/web/lib/supabase/` 한 곳뿐"(`docs/CodingRules.md` Directory Rules)을
  * 어긴다.
+ *
+ * 🔴 T14 — `accessToken`을 주면 이후 이 클라이언트로 실행하는 모든 쿼리(`.from()` 등)에
+ * `Authorization: Bearer <accessToken>` 헤더가 실린다. 사용자 소유 테이블(`sent_messages` 등)에
+ * 쓰기를 하려면 RLS의 `auth.uid()`가 이 사용자로 해석돼야 하는데, `persistSession:false` 클라이언트는
+ * 세션을 기억하지 않으므로 이 헤더 없이는 익명(anon) 요청이 되어 RLS가 전부 거부한다
+ * (`docs/Database.md` "Row Level Security"). 토큰을 생략하면(검증 전용 호출) 기존과 동일하게
+ * 헤더 없는 클라이언트를 만든다 — 이 함수의 기존 호출부(`resolveBearerSession`의 `getUser` 검증)를
+ * 깨지 않는다.
  */
-export function createTokenClient(): SupabaseClient {
+export function createTokenClient(accessToken?: string): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) {
@@ -95,5 +103,6 @@ export function createTokenClient(): SupabaseClient {
   }
   return createSupabaseClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    ...(accessToken ? { global: { headers: { Authorization: `Bearer ${accessToken}` } } } : {}),
   });
 }

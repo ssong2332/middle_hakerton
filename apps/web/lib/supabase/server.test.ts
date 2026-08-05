@@ -135,4 +135,18 @@ describe('createTokenClient (Bearer 검증 전용, apps/web/lib/auth.ts 소비)'
     expect(client).toBeTruthy();
     expect(typeof client.auth.getUser).toBe('function');
   });
+
+  // T14 — `POST /api/messages`(사용자 소유 테이블 쓰기)가 확장(Bearer) 경로에서도 RLS를
+  // 통과하려면, 검증에 쓴 토큰을 이후 쿼리에도 실어 보내는 클라이언트가 필요하다
+  // (`docs/Database.md` "Row Level Security" — `auth.uid()`는 요청의 JWT에서 나온다).
+  // `accessToken`을 주면 이후 `.from()` 호출이 `Authorization: Bearer <token>` 헤더를 실어
+  // 보내도록 클라이언트를 만든다. `headers`는 supabase-js `SupabaseClient`의 protected 필드라
+  // 배선이 실제로 연결됐는지 확인할 유일한 방법이 캐스팅 접근이다(구조적 검증).
+  it('accessToken을 주면 이후 요청에 Authorization: Bearer 헤더가 실리도록 클라이언트를 만든다(T14)', () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key-placeholder');
+    const client = createTokenClient('user-access-token');
+    const headers = (client as unknown as { headers: Record<string, string> }).headers;
+    expect(headers.Authorization).toBe('Bearer user-access-token');
+  });
 });

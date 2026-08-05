@@ -1,14 +1,14 @@
-// UX-004 2패널 중재 워크스페이스 (기본 랜딩, P0) — 🔴 실제 화면(2패널 레이아웃, 긴급도 override,
-// 티켓 링크, 공휴일 충돌 등)은 T12/T13이 채운다. 여기서는 T6이 AC-030 동적 검증(브라우저에서
-// 실제 역번역 요청 1건 실행)을 수행할 수 있도록 <MediationDemoForm>만 최소로 연결한다
-// (`apps/web/components/MediationDemoForm.tsx` 헤더 주석 참조) — T12/T13이 이 자리를 대체한다.
-import { MediationDemoForm } from '../../../../components/MediationDemoForm';
+// UX-004 2패널 중재 워크스페이스 (기본 랜딩, P0) — T12(비교 뷰 + 오해 위험)·T13(2패널
+// 레이아웃)·T14(승인 후 전송)가 `MediationWorkspace`로 완성한 화면. 이 파일이 예고했던
+// "실제 화면은 T12/T13이 채운다"가 여기서 실현된다 — `MediationDemoForm`(T6의 최소 하네스)은
+// 흡수·대체되어 삭제됐다(`MediationWorkspace.tsx` 헤더 주석 참조).
+import { MediationWorkspace } from '../../../../components/MediationWorkspace';
 
 export default function MediatePage() {
   return (
     <main>
-      <h1>UX-004 Mediate (TODO: T12/T13 — 2패널 레이아웃 등 나머지 요소)</h1>
-      <MediationDemoForm />
+      <h1>중재 워크스페이스</h1>
+      <MediationWorkspace />
     </main>
   );
 }

@@ -8,9 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 const mockBearerGetUser = vi.fn();
+// T14 — Bearer 경로가 반환하는 클라이언트가 "검증에 쓴 토큰이 실린 그 클라이언트"인지 식별하기
+// 위해 항상 같은 인스턴스(tokenClientInstance)를 돌려준다(매 호출 새 객체를 만들면 `toBe` 비교가
+// 무의미해진다).
+const tokenClientInstance = { auth: { getUser: mockBearerGetUser } };
+const mockCreateTokenClient = vi.fn((_accessToken?: string) => tokenClientInstance);
 vi.mock('./supabase/server', () => ({
   createClient: vi.fn(),
-  createTokenClient: vi.fn(() => ({ auth: { getUser: mockBearerGetUser } })),
+  createTokenClient: (accessToken?: string) => mockCreateTokenClient(accessToken),
 }));
 
 import { createClient as createServerSupabaseClient } from './supabase/server';
@@ -42,15 +47,29 @@ describe('resolveSession', () => {
   });
 
   it('쿠키 세션이 있으면 그 사용자의 userId를 반환한다(웹앱 경로)', async () => {
-    mockCreateServerSupabaseClient.mockResolvedValue(
-      fakeSupabaseClient(() =>
-        Promise.resolve({ data: { user: { id: 'user-cookie-1' } }, error: null }),
-      ),
+    const cookieClient = fakeSupabaseClient(() =>
+      Promise.resolve({ data: { user: { id: 'user-cookie-1' } }, error: null }),
     );
+    mockCreateServerSupabaseClient.mockResolvedValue(cookieClient);
 
     const session = await resolveSession(requestWithAuthHeader());
 
-    expect(session).toEqual({ userId: 'user-cookie-1' });
+    expect(session?.userId).toBe('user-cookie-1');
+  });
+
+  // T14 — `POST /api/messages` 등 사용자 소유 테이블 쓰기 라우트는 RLS(`auth.uid()`)를 통과하는
+  // 클라이언트가 필요하다. 쿠키 경로는 쿠키에 바인딩된 그 세션 클라이언트를 그대로 돌려주면
+  // 이후 쿼리에 세션이 자동으로 실린다(`@supabase/ssr`의 표준 동작) — 새 클라이언트를 만들지
+  // 않는다.
+  it('T14 — 쿠키 세션 경로는 세션이 바인딩된 그 클라이언트를 session.client로 그대로 반환한다', async () => {
+    const cookieClient = fakeSupabaseClient(() =>
+      Promise.resolve({ data: { user: { id: 'user-cookie-1' } }, error: null }),
+    );
+    mockCreateServerSupabaseClient.mockResolvedValue(cookieClient);
+
+    const session = await resolveSession(requestWithAuthHeader());
+
+    expect(session?.client).toBe(cookieClient);
   });
 
   it('쿠키 세션이 없고 Authorization: Bearer 토큰이 유효하면 그 사용자의 userId를 반환한다(확장 경로)', async () => {
@@ -63,8 +82,25 @@ describe('resolveSession', () => {
 
     const session = await resolveSession(requestWithAuthHeader('Bearer valid-token'));
 
-    expect(session).toEqual({ userId: 'user-bearer-1' });
+    expect(session?.userId).toBe('user-bearer-1');
     expect(mockBearerGetUser).toHaveBeenCalledWith('valid-token');
+  });
+
+  // T14 — Bearer 경로도 RLS를 통과해야 하므로, 검증에 쓴 토큰이 헤더로 실린 클라이언트를
+  // `createTokenClient(token)`으로 만들어 `session.client`에 돌려준다(`createTokenClient()`를
+  // 인자 없이 호출해 검증만 하고 버리면 이후 쿼리가 익명 요청이 되어 RLS가 거부한다).
+  it('T14 — Bearer 경로는 createTokenClient(token)으로 만든 클라이언트를 session.client로 반환한다', async () => {
+    mockCreateServerSupabaseClient.mockResolvedValue(
+      fakeSupabaseClient(() =>
+        Promise.resolve({ data: { user: null }, error: { message: 'no session' } }),
+      ),
+    );
+    mockBearerGetUser.mockResolvedValue({ data: { user: { id: 'user-bearer-1' } }, error: null });
+
+    const session = await resolveSession(requestWithAuthHeader('Bearer valid-token'));
+
+    expect(mockCreateTokenClient).toHaveBeenCalledWith('valid-token');
+    expect(session?.client).toBe(tokenClientInstance);
   });
 
   it('쿠키·Bearer 둘 다 없으면 null을 반환한다', async () => {
@@ -138,8 +174,8 @@ describe('resolveSession', () => {
     const sessionA = await resolveSession(requestWithAuthHeader());
     const sessionB = await resolveSession(requestWithAuthHeader());
 
-    expect(sessionA).toEqual({ userId: 'user-A' });
-    expect(sessionB).toEqual({ userId: 'user-B' });
+    expect(sessionA?.userId).toBe('user-A');
+    expect(sessionB?.userId).toBe('user-B');
     expect(sessionA?.userId).not.toBe(sessionB?.userId);
   });
 });
