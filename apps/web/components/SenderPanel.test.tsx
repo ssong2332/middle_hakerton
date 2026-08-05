@@ -450,4 +450,40 @@ describe('SenderPanel', () => {
     expect(screen.getByText('Please confirm by tomorrow.')).toBeTruthy();
     expect(screen.queryByText('폴백 응답 사용 중')).toBeNull();
   });
+
+  // M1(reviewer round-3 비차단 Major) — 위 "Minor(방어적)" 테스트는 stepSources가 없을 때
+  // `source: 'live'` 픽스처만 써서, `?? 'live'` 기본값이 실제로는 `source: 'fallback'`인 응답을
+  // "라이브"로 지어내 보여줘도(AC-041 위반) 그 결함을 검출하지 못했다. 여기서는 stepSources가
+  // 없고 top-level `source`가 'fallback'인 픽스처로, 폴백 배지가 실제로 표시되는지 검증한다 —
+  // `?? 'live'`로 되돌리면(정보를 지어내면) 이 테스트는 fail해야 한다.
+  it('M1 — stepSources가 없고 source가 fallback이면, live로 지어내지 않고 폴백 배지가 표시된다', () => {
+    const resultWithoutStepSourcesFallback = {
+      urgency: 'NORMAL',
+      urgencyReason: '일반 요청입니다.',
+      transformed: 'Please confirm by tomorrow.',
+      reason: '완곡 표현을 명시적 요청으로 변환했습니다.',
+      preserved: [],
+      backTranslation: '내일까지 확인 부탁드립니다.',
+      warnings: [],
+      misreadRisks: [],
+      holidayConflicts: [],
+      personalizationApplied: true,
+      source: 'fallback',
+      ticketOption: { offered: false, basis: 'signal_absent' },
+      // stepSources 필드 자체가 없다 — 배포 스큐/향후 확장 어댑터 스텁 시나리오를 흉내낸다.
+    } as unknown as MediationResult;
+
+    render(
+      <SenderPanel
+        {...baseProps()}
+        text="내일까지 확인 부탁드립니다."
+        recipient="boss@example.com"
+        status="success"
+        result={resultWithoutStepSourcesFallback}
+        displayedUrgency="NORMAL"
+      />,
+    );
+
+    expect(screen.getAllByText('폴백 응답 사용 중').length).toBeGreaterThan(0);
+  });
 });
