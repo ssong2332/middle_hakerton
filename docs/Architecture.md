@@ -3,13 +3,14 @@
 Owner: architect (see AGENTS.md). Others read-only.
 Major decisions are logged in DECISIONS.md; details in adr/.
 Based on PRD Version: v3.2 · Based on UX Version: 6.0 · Last Updated: 2026-08-04
+(2026-08-04 3차 패스 — **PRD·UX 버전 갱신 없음**(v3.2 / 6.0 그대로, 버전 격차 0). 이 패스가 바꾼 것: **① Next.js 15 → 16**(사용자 결정, DECISIONS #37) **② F1-c 신설**(계약 불변식 강제, DECISIONS #38 · ADR-0006) **③ 문서 정정 4건**(Conventions 12 / F1-b 시그니처 / 폴더 트리 / ADR-0004 Follow-up 3))
 
 > ✅ **승인 게이트 — 기술 기반 6개 항목은 2026-08-04 사용자 결정으로 전부 승인되었다(architect 권고안 그대로).**
 > **따라서 "승인 전 T2·T3·T17·T45 착수 금지" 조항은 해제되었다.** 아래는 확정된 기반이며 권고안이 아니다.
 >
 > | 게이트 항목 | 확정값 | 상태 | 조건 |
 > |---|---|---|---|
-> | ① 언어 / 프레임워크 | Next.js 15 App Router + TypeScript(strict) **통합 1리포**(npm workspaces 3패키지) | ✅ **승인** (2026-08-04) | — |
+> | ① 언어 / 프레임워크 | **Next.js 16** App Router + TypeScript(strict) **통합 1리포**(npm workspaces 3패키지) | ✅ **승인** (2026-08-04) | 🔴 **메이저 버전만 15 → 16으로 변경**(2026-08-04 사용자 결정, DECISIONS #37). 프레임워크 선택 자체는 승인 그대로이며 바뀐 것은 버전뿐이다 — 사유는 Tech Stack 프레임워크 행 |
 > | ② DB 엔진 | PostgreSQL 15+ (관계형) | ✅ **승인** | 사용자 조건 "무료로 가능하면" — Supabase Free로 충족 확인(아래 무료 티어 한도 표) |
 > | ③ DB 호스팅 | Supabase 관리형 Postgres (Free) | ✅ **승인** | 동일 |
 > | ④ 배포 대상 | Vercel Hobby + `*.vercel.app` 기본 서브도메인 | ✅ **승인** | 사용자 조건 "무료로 진행 가능하면" — $0 확인. 단 **비상업 전용 제약이 실재**하며 MVP 기간에는 차단 아님(Risks & Trade-offs 참조) |
@@ -44,7 +45,7 @@ Based on PRD Version: v3.2 · Based on UX Version: 6.0 · Last Updated: 2026-08-
 | Layer | Choice | Reason |
 |---|---|---|
 | **언어** | **TypeScript 5.x (strict)** | 프론트·백엔드·확장이 한 언어여야 4명이 서로의 코드를 읽는다. `docs/CodingRules.md` Prohibitions "No `any`/untyped escapes"가 타입 있는 언어를 전제한다 |
-| **프레임워크** | **Next.js 15 (App Router)** — 프론트 + Route Handler 백엔드 통합 | PRD Constraints "기술 스택 팀 선호: Next.js(TypeScript) 통합". 배포 대상 1개, CI 1개, CORS 0개. AC-030(키 백엔드 경유)은 `app/api/*` Route Handler 하나로 충족 |
+| **프레임워크** | **Next.js 16 (App Router)** — 프론트 + Route Handler 백엔드 통합 | PRD Constraints "기술 스택 팀 선호: Next.js(TypeScript) 통합". 배포 대상 1개, CI 1개, CORS 0개. AC-030(키 백엔드 경유)은 `app/api/*` Route Handler 하나로 충족. <br>🔴 **15 → 16 사유(2026-08-04 사용자 결정, DECISIONS #37)**: T2 스캐폴드 직후 `npm audit --omit=dev` 에서 **next 15가 번들한 `postcss`·`sharp` 의 high severity 3건**이 검출됐고(오케스트레이터 measured, 2026-08-04 직접 실행·재현), 해소 경로가 **`next@16` breaking 업그레이드**뿐이었다. 선택지는 *"15 유지 + 위험 수용"* 과 *"16 업그레이드"* 두 가지였고 **사용자가 16을 명시적으로 선택**했다. `next@16.3.0` 이 현재 `latest` 임은 architect가 registry.npmjs.org/next/latest 를 직접 조회해 확인(measured, 2026-08-04). <br>⚠️ **문서만 갱신된 상태다** — `apps/web/package.json` 은 이 커밋 시점에 `"next": "^15.5.22"`(measured, `apps/web/package.json:15`)이며 실제 설치·마이그레이션은 implementer가 뒤이어 수행한다 |
 | 코어 엔진 | `packages/core` — **의존성 0**(프레임워크·DB·HTTP 클라이언트 import 금지) | AC-028 "코어 엔진이 특정 어댑터에 의존하지 않으며 동일 인터페이스로 두 어댑터에서 호출". 패키지 경계로 만들어야 `import` 경로로 **검증 가능**해진다 |
 | 모노리포 도구 | **npm workspaces** (Node 20+ 내장) | 추가 도구 설치 0. Turborepo·Nx는 17일 프로젝트에서 학습 비용 > 이득 |
 | **DB 엔진** | **PostgreSQL 15+ (관계형)** | 스키마가 실제로 관계형이다(user→profile→learned_items, pair→protocol, message→diff). AC-039(계정 간 데이터 미조회)를 **RLS로 DB 레벨에서** 강제할 수 있는 것이 결정적 |
@@ -78,7 +79,7 @@ Based on PRD Version: v3.2 · Based on UX Version: 6.0 · Last Updated: 2026-08-
 ```
 cross-border-mediator/
 ├─ apps/
-│  ├─ web/                                  # Next.js 15 · [FE] 소유
+│  ├─ web/                                  # Next.js 16 · [FE] 소유
 │  │  ├─ app/
 │  │  │  ├─ (auth)/login/page.tsx           # UX-001
 │  │  │  ├─ (auth)/signup/page.tsx          # UX-002
@@ -133,7 +134,9 @@ cross-border-mediator/
 │        │  ├─ misread-risk.ts              # AC-043
 │        │  ├─ emoji-risk.ts                # AC-056 — country/region/nationality 필드 없음
 │        │  ├─ honorific.ts                 # AC-046
-│        │  └─ business-days.ts             # AC-044② 업무일 계산
+│        │  ├─ business-days.ts             # AC-044② 업무일 계산
+│        │  ├─ decision-authority.ts        # 🔒 결정 권한 enum + 판정 로직 단일 출처 (AC-064④) — C6·C7 공용
+│        │  └─ ticket-gate.ts               # 🔒 F1-c — TicketOption 생성자 1개 (AC-058 fail-closed)
 │        ├─ observation/indicators.ts       # 🔒 지표 정의 단일 출처 (AC-080④) — 서버·확장 공용
 │        ├─ data/holidays-2026.ts           # KR/US/JP/CN 하드코딩 (AC-057, 외부 API 0)
 │        ├─ data/emoji-risk.ts              # 위험도 3단계 룩업
@@ -210,6 +213,8 @@ apps/web/components/*    apps/extension/src/layer2/*  (선택)
 
 **F1이 늦어지면 4명 전원이 멈춘다.** `docs/Tasks.md` Rules 첫 줄이 이미 이 규칙을 명시하고 있다("T1 완료 전 T5 이후 착수 금지").
 
+**F1 동결 후의 변경 이력** — 동결은 "절대 안 바꾼다"가 아니라 **"ADR 없이는 못 바꾼다"** 이다. 지금까지 3건이며 **셋 다 와이어 형식(JSON)을 바꾸지 않았다**: **F1-a**(`ticketOption` 12번째 필드 추가 — DECISIONS #35 · ADR-0005) · **F1-b**(파이프라인 시그니처 — #36 · ADR-0004) · **F1-c**(불변식 3개를 판별 유니온으로 — #38 · ADR-0006). [FE]의 목 데이터가 깨지는 변경은 **0건**이다.
+
 ### F1 — 코어 I/O 계약 (T1이 확정할 형태)
 
 ```ts
@@ -251,20 +256,20 @@ UX-004(UF-003, 게이트 판정처) → UX-007(UF-004, 게이트 통과 시에�
 // packages/core/src/contract.ts  — 🔒 Freeze Point 1
 export type TicketOptionBasis = 'signal_present' | 'signal_absent' | 'undetermined';
 
-export interface TicketOption {
-  /**
-   * 🔴 화면이 읽는 유일한 값. `true` 일 때만 "Convert to Task Ticket" 링크를 렌더한다(AC-058①).
-   * `false` 면 링크를 레이아웃에서 완전히 제거한다 — 비활성·회색 링크 금지(AC-058②, UX-004 TicketLinkAbsent).
-   */
-  offered: boolean;
-  /**
-   * 🔴 **내부 상태·테스트 출력 전용. 화면에 렌더하지 않는다.**
-   * `offered === true` ⟺ `basis === 'signal_present'` (불변식).
-   * `'undetermined'` = 판정 근거를 얻지 못함(C2 호출 실패·폴백 응답 등) → `offered:false` 로 **fail-closed**.
-   */
-  basis: TicketOptionBasis;
-}
+/**
+ * 🔴 **판별 유니온** (2026-08-04 F1-c, DECISIONS #38 · ADR-0006).
+ * 불변식 `offered === true` ⟺ `basis === 'signal_present'` 이 **주석이 아니라 타입**이다 —
+ * `{ offered: true, basis: 'undetermined' }`(AC-058 fail-open)는 컴파일되지 않는다.
+ * 화면은 `offered` 만 읽는다: `true` 일 때만 "Convert to Task Ticket" 링크를 렌더하고(AC-058①),
+ * `false` 면 레이아웃에서 완전히 제거한다 — 비활성·회색 링크 금지(AC-058②, UX-004 TicketLinkAbsent).
+ * `basis` 는 내부 상태·테스트 출력 전용이며 렌더하지 않는다.
+ */
+export type TicketOption =
+  | { offered: true;  basis: 'signal_present' }
+  | { offered: false; basis: 'signal_absent' | 'undetermined' };
 ```
+
+🔴 **JSON 형태는 바뀌지 않았다** — 필드 이름·값 어휘·`docs/API.md` 의 응답 예시 모두 그대로다. 바뀐 것은 **불법 조합이 타입에서 표현 불가능해진 것**뿐이며, 그 근거와 다른 두 불변식은 아래 **F1-c**에 있다.
 
 | 판정 | `offered` | `basis` | 화면 | 근거 |
 |---|---|---|---|---|
@@ -293,7 +298,20 @@ UX-004(UF-003) · UX-016(UF-011/012/014/015) / AC-015·AC-016·AC-047(용어사�
 
 ```ts
 // packages/core/src/pipeline.ts  — 🔒 Freeze Point 1
-export function run(input: MediationInput, deps: MediationDeps): Promise<MediationResult>;
+/**
+ * 🔴 **동결 형태는 함수 *선언*이 아니라 함수 *타입 별칭*이다** (2026-08-04 정정 — ADR-0004 Addendum A).
+ * 이 문서와 ADR-0004는 원래 `export function run(input, deps): Promise<MediationResult>;` 로 적었으나
+ * 그 형태는 본문 없는 함수 선언이라 `.ts` 에서 컴파일되지 않는다
+ * (measured: `error TS2391: Function implementation is missing`, T1 implementer 재현).
+ */
+export type MediationPipeline = (
+  input: MediationInput,
+  deps: MediationDeps,
+) => Promise<MediationResult>;
+
+// 🔴 T28은 이 한 형태로만 구현한다 — `export const run: MediationPipeline = async (input, deps) => {…}`.
+//    평범한 `export async function run(...)` 은 별칭을 참조하지 않아 인자 수가 어긋나도 빌드가 통과한다
+//    (measured: 3-인자 버전이 EXIT=0 통과 / `const` + 타입 주석 형태는 TS2322 로 즉시 실패).
 
 export interface MediationDeps {
   /** 실행 수단. core는 인터페이스만 알고 구현(`apps/web/lib/llm/openai.ts`)을 모른다. */
@@ -347,8 +365,140 @@ export interface LearnedItem {
 
 🔴 **프롬프트 주입 방어의 소유자**: `dictionary` 값은 사용자 자신의 데이터지만 **지시문이 아니라 데이터로 취급**한다 — 구분자로 감싼 데이터 블록으로 넣는 책임은 `packages/core/src/prompts/`(C2 프롬프트 빌더)에 있고 Route Handler에 있지 않다(Security의 Abuse cases 12행).
 
+### F1-c — 계약 불변식을 타입으로 강제한다 (DECISIONS #38 · ADR-0006)
+
+AC-058(티켓 게이트) · AC-050①/AC-064⑤(근거 없는 판정 금지) / UX-004 `TicketLinkAbsent` · UX-007 · UX-008
+
+**왜 이 절이 생겼는가**: T1 PR이 **테스트 0건으로 머지**됐고(사용자 승인 skip, "T2 직후 소급 작성"), T2에서 그 소급 테스트(`packages/core/src/contract.test.ts`)를 쓰려던 implementer가 멈춰 보고했다 — *"불법 조합 3개가 지금 타입에서 전부 유효해서, 쓸 수 있는 테스트가 '유효한 값은 유효하다'뿐이다(트리비얼 그린)."* 맞는 보고다. 아래 세 조합은 **전부 명세가 금지하는데 컴파일은 통과**한다.
+
+| # | 불변식 (명세) | 지금 타입이 통과시키는 불법 조합 | 근거 |
+|---|---|---|---|
+| 1 | `offered === true` ⟺ `basis === 'signal_present'` | `{ offered: true, basis: 'undetermined' }` = **판정 실패인데 링크를 띄운다(fail-open)** | AC-058 · ADR-0005 · `contract.ts` `TicketOption` 주석 |
+| 2 | 근거가 없으면 `decisionAuthority` 는 반드시 `'불명'` | `{ decisionAuthority: '확정', decisionAuthorityEvidence: null }` = **근거 없는 확정** | AC-050① / AC-064⑤ |
+| 3 | 근거가 없으면 `authorityStatus` 는 반드시 `'불명'` | `{ authorityStatus: '확정', authorityEvidence: null }` = 같은 문제의 **C7쪽** | AC-064⑤ *"양쪽 모두"* |
+
+세 줄 다 **주석으로만 존재하는 불변식**이었다. 주석은 테스트할 수 없다.
+
+#### 결정 — ① 타입(판별 유니온) ② 생성자 1개씩 ③ 경계는 "거부"가 아니라 "복원"
+
 ```ts
-// apps/extension/src/layer1/registry.ts  — 🔒 Freeze Point 2
+// packages/core/src/rules/decision-authority.ts  — enum·판정 로직 단일 출처 (AC-064④)
+export type DecisionAuthorityStatus = '확정' | '내부 승인 필요' | '검토 중' | '불명';   // (기존)
+export type DecisionAuthorityJudged = Exclude<DecisionAuthorityStatus, '불명'>;         // 신규
+
+/** 🔴 필드 이름이 **중립**이다 — `status`/`evidence` 는 어떤 응답 payload에도 나가지 않는다(AC-064③ grep 보호). */
+export type AuthorityVerdict =
+  | { status: DecisionAuthorityJudged; evidence: string }
+  | { status: '불명';                  evidence: string | null };
+
+/**
+ * 🔴 불변식 2·3의 **유일한 통로**. 근거가 없으면 `'불명'` 으로 되돌린다(판정을 지어내지 않는다).
+ * ⚠️ 아래는 **시그니처 표기**이며 `.ts` 에 본문 없이 그대로 쓰면 컴파일되지 않는다(F1-b Addendum A의 TS2391).
+ * 본문은 한 줄이다:
+ *   return evidence === null || status === '불명' ? { status: '불명', evidence } : { status, evidence };
+ */
+export function resolveAuthority(status: DecisionAuthorityStatus, evidence: string | null): AuthorityVerdict
+```
+
+```ts
+// packages/core/src/contract.ts  — 🔒 Freeze Point 1
+export type TicketOption =                                     // 불변식 1 (위 F1-a 코드 블록)
+  | { offered: true;  basis: 'signal_present' }
+  | { offered: false; basis: 'signal_absent' | 'undetermined' };
+
+export interface TicketResultBase { sections: TicketSections; source: ResponseSource }
+export type TicketAuthority =                                  // 불변식 2 — C6 이름
+  | { decisionAuthority: DecisionAuthorityJudged; decisionAuthorityEvidence: string }
+  | { decisionAuthority: '불명';                  decisionAuthorityEvidence: string | null };
+export type TicketResult = TicketResultBase & TicketAuthority;
+
+export interface DecisionItemBase { decision: string; owner: string | null; dueDate: string | null }
+export type ItemAuthority =                                    // 불변식 3 — C7 이름
+  | { authorityStatus: DecisionAuthorityJudged; authorityEvidence: string }
+  | { authorityStatus: '불명';                  authorityEvidence: string | null };
+export type DecisionItem = DecisionItemBase & ItemAuthority;
+```
+
+```ts
+// packages/core/src/rules/ticket-gate.ts  — 신규 파일 (F1-c)
+/**
+ * 🔴 `TicketOption` 을 만드는 **유일한 통로**. `basis` 하나만 받아 `offered` 를 파생시킨다 — 짝을 손으로 쓰지 않는다.
+ * ⚠️ 시그니처 표기다(본문 없는 선언을 `.ts` 에 그대로 쓰지 않는다 — TS2391). 본문은 한 줄이다:
+ *   return basis === 'signal_present' ? { offered: true, basis } : { offered: false, basis };
+ */
+export function ticketOptionFrom(basis: TicketOptionBasis): TicketOption
+```
+
+🔴 **JSON 와이어 형식은 한 글자도 바뀌지 않는다** — 필드 이름·순서·값 어휘가 그대로이므로 **F2(`docs/API.md`)와 [FE]의 목 데이터는 영향받지 않는다.** 단, 목 데이터가 위 3개 불법 조합 중 하나를 쓰고 있었다면 그것은 이제 컴파일 오류이며, **그 목 데이터가 애초에 명세 위반**이었다는 뜻이다.
+
+🔴 **C6·C7의 유니온을 하나로 공유하지 않고 일부러 두 벌 쓴다.** 이름만 다른 같은 모양을 제네릭 하나로 묶고 싶어지지만, **AC-064③의 판정 방법이 "두 이름이 각자의 경로에서만 나타나는지 grep"** 이다. 필드 이름을 타입 파라미터로 만들면 그 grep이 흐려진다 — 공유되는 것은 **enum과 판정 로직**(`resolveAuthority` 한 함수)이고, 나뉘는 것은 **필드 이름과 배치**뿐이라는 AC-064④/③의 분업을 그대로 코드에 옮긴 것이다.
+
+#### 생성 지점의 형태 (T24·T26이 이대로 쓴다 — 임의 변형 금지)
+
+TypeScript는 **두 변수의 상관관계를 추론하지 못한다**(correlated union). 그래서 `{ decisionAuthority: v.status, decisionAuthorityEvidence: v.evidence }` 를 그냥 쓰면 컴파일되지 않는다. **분기 한 번이 필요하며, 그 분기가 곧 불변식이 서는 자리다**:
+
+```ts
+const v = resolveAuthority(raw.status, raw.evidence);          // ← 판정 결과를 정규화 (rules 한 곳)
+const authority: TicketAuthority =                             // C7이면 ItemAuthority + 다른 두 이름
+  v.status === '불명'
+    ? { decisionAuthority: '불명', decisionAuthorityEvidence: v.evidence }
+    : { decisionAuthority: v.status, decisionAuthorityEvidence: v.evidence };
+return { sections, ...authority, source };
+```
+
+#### 경계(zod)의 역할 — 거부가 아니라 복원
+
+| 지점 | 하는 일 | 근거 |
+|---|---|---|
+| **LLM 응답 파싱**(`apps/web/lib/llm/openai.ts`, **T4**) | 모델 출력은 **느슨한 쌍**(`status` enum + `evidence: string \| null`)으로 파싱한다. 🔴 **불법 조합이 왔다고 요청 전체를 실패시키지 않는다** | Error Handling ④ *"부분 실패는 오류가 아니다"* · AC-041(폴백은 화면을 죽이지 않는다) |
+| **정규화**(`resolveAuthority` / `ticketOptionFrom`, core) | 느슨한 쌍 → 계약 타입. 근거가 없으면 `'불명'`, 판정이 없으면 `undetermined` + `offered:false`(**fail-closed**) | Conventions 9 · AC-050① · AC-058 |
+| **응답 재검증** | **두지 않는다 — N/A** | 검증 지점을 늘리면 같은 입력이 두 가지로 판정된다(DECISIONS #12). 생성자를 통과한 값은 이미 타입이 보증한다 |
+
+🔴 **어떤 zod 스키마도 `TicketOption` 을 `z.object({ offered: z.boolean(), basis: z.enum([...]) })` 로 쓰지 않는다.** 그 스키마는 불법 조합을 그대로 통과시켜 타입의 보증을 되돌린다 — 계약 타입을 zod로 표현할 일이 생기면 `z.discriminatedUnion('offered', …)` 이다.
+
+#### 이것으로 무엇이 검증 가능해지는가 (소급 테스트의 실체)
+
+| 층 | 파일 | 무엇을 주장하는가 | red / green을 어디서 얻는가 |
+|---|---|---|---|
+| **타입** | `packages/core/src/contract.test.ts` | 불법 조합 3개가 **컴파일되지 않는다** — 각 조합 위에 `// @ts-expect-error` | `npm run typecheck`. **DU 적용 전에는 "미사용 `@ts-expect-error` 지시어"(TS2578)로 실패**하고, 적용 후 통과한다 — 이것이 첨부할 red/green 쌍이다(DoD Gate "red 출력을 green 옆에 첨부") |
+| **런타임** | `rules/ticket-gate.test.ts` · `rules/decision-authority.test.ts` | `ticketOptionFrom('undetermined')` → `{ offered: false, … }`(fail-closed) · `resolveAuthority('확정', null)` → `{ status: '불명', … }` | `npm test`(Vitest). 함수가 없는 상태에서 먼저 실패시키고(red) 구현 후 통과(green) |
+| **경계** | (T4 범위) | 느슨한 LLM 출력이 정규화를 거쳐 계약 타입이 된다 | T4의 테스트. **지금은 만들지 않는다** — 존재하지 않는 코드에 의존하면 소급 테스트가 또 막힌다 |
+
+⚠️ **`contract.test.ts` 에는 런타임 `test()` 가 최소 1개 있어야 한다** — 타입 단언만 있는 파일은 Vitest가 *"No test suite found"* 로 실패시킨다. `@ts-expect-error` 단언을 `test()` 본문 안에 넣고 값에 대한 사소한 런타임 확인을 함께 두는 형태로 쓴다. 🔴 **그 런타임 확인이 이 파일의 주장이 아니다** — 이 파일이 지키는 것은 타입이며, 근거는 `npm run typecheck` 출력이다(`docs/CodingRules.md` Tests의 *"structural과 semantic은 다른 주장"* 과 같은 계열의 구분).
+
+**`@ts-expect-error` 가 실제로 검사되는지 확인됨(measured, 2026-08-04)**: `packages/core/tsconfig.json` 의 `"include": ["src"]`(:6)가 `src` 아래 **`*.test.ts` 를 포함**하고, `packages/core/package.json:9` 의 `tsc --noEmit -p tsconfig.json` 이 루트 `npm run typecheck`(`package.json:14`)에 물려 있다. 즉 타입 테스트는 CI가 이미 돌리는 게이트에서 red/green이 난다 — 새 러너·새 설정이 필요 없다.
+
+#### 왜 (a) 판별 유니온인가 — 기각한 대안
+
+| Option | Pros | Cons |
+|---|---|---|
+| **판별 유니온 + 생성자** ✅ | 불법 상태가 **표현 불가능**해진다. 지금 적용 비용이 사실상 0이다(아래 measured). 소급 테스트가 **오늘** 가능해진다 | 생성 지점에서 분기 한 번을 강제한다(위 코드). 계약 타입 3개가 `interface` → `type` 이 된다 |
+| 런타임 validator만(zod, 경계) | 실제 데이터를 막는다 | 🔴 **그 스키마가 아직 없다**(T4 이후) — 소급 테스트가 다시 막힌다. 게다가 올바른 경계 정책은 *거부*가 아니라 *복원*이라(위 표), 경계는 불변식을 **증명하는** 자리가 아니라 **복구하는** 자리다. 타입이 열려 있으면 복원을 빠뜨린 코드가 그대로 컴파일된다 |
+| 주석·리뷰 규칙으로 유지 | 변경 0 | 🔴 지금 상태다. **테스트가 존재할 수 없다** — 소급 테스트 지시의 답이 되지 않는다 |
+| `assert` 함수를 core 곳곳에 | 런타임에 잡힌다 | 🔴 던지는 위치가 흩어져 *"예외는 `withApi()` 한 곳"*(Error Handling)이 무너지고, 부분 실패를 오류로 승격시킨다 |
+
+#### 지금 적용해야 하는 이유 (측정된 비용)
+
+**현재 이 3개 타입을 *생성*하는 코드는 리포에 0줄이다**(measured, 2026-08-04 grep `ticketOption|decisionAuthority|authorityStatus|TicketOption|TicketResult|DecisionItem` — 히트는 `contract.ts` 선언부와 `llm/client.ts` 주석 1줄뿐이며, `steps/c6.ts:1-3` 등은 `export {}` 스텁이다). **소비처가 0인 지금이 F1 변경 비용의 최저점**이며, T24(C6)·T25(FE)·T26(C7)이 붙는 순간 매일 비싸진다.
+
+⚠️ **architect는 `tsc` 를 실행하지 않았다(셸 없음) — 위 "T1 산출물을 깨지 않는다"는 grep 기반 추론이다.** 확인 수단: implementer가 반영 직후 `npm run typecheck` 와 `npm test` 출력을 첨부한다. **사전 승인된 대체 인코딩**: 만약 `Base & (A | B)` 교차형에서 `v.status === '불명'` 판별 narrowing이 기대대로 동작하지 않으면, **`TicketResultBase`/`DecisionItemBase` 를 각 유니온 멤버에 펼쳐 넣은 완전한 두 interface의 union**으로 바꿔도 된다(의미 동일, 중복만 늘어남). 이 대체는 **이미 승인된 것으로 취급**하며 architect 재호출이 필요 없다 — 다만 어느 쪽을 썼는지 보고에 적는다.
+
+#### 소유 태스크
+
+| 무엇을 | 누가 | 비고 |
+|---|---|---|
+| `contract.ts` 3개 유니온 + `rules/ticket-gate.ts` + `resolveAuthority` + 테스트 3파일 | **현 T2 브랜치의 소급 작업**(F1 수정이므로 T1 산출물에 대한 후속) | 이 절이 그 착수 근거다 |
+| `resolveAuthority` 를 쓰는 **판정 로직 본체**(텍스트 → status) | **T24**, 재사용은 **T26** | AC-064④ — 별도 파이프라인 금지 |
+| 느슨한 LLM 출력 파싱 + 정규화 호출 | **T4**(`apps/web/lib/llm/openai.ts`) | ⚠️ `docs/Tasks.md` 는 planner 소유라 architect가 고치지 않는다. **이 문서의 결론은 "T4가 소유해야 한다"** 이며(근거: `docs/Tasks.md:32` T4 = OpenAI 호출 백엔드 프록시 = LLM 응답 경계), 태스크 문구 반영 여부는 planner 판단이다 |
+| `ticketOptionFrom` 호출 위치(파이프라인 어디서 게이트를 산출하는가) | **T10 / T28** | ADR-0005 Follow-up 2가 이미 지정했다. F1-c는 *어디서 세우는가*를 바꾸지 않고 *무엇으로 세우는가*(생성자 1개)만 고정한다 |
+
+---
+
+### F4 — 층 2 어댑터 계약 (`registry.ts`)
+
+```ts
+// apps/extension/src/layer1/registry.ts  — 🔒 Freeze Point F4
+// (파일 안의 라벨도 "F4" 로 쓴다 — 위 동결 지점 표의 번호가 단일 출처다)
 export interface Layer2Adapter {
   id: 'github' | 'slack' | 'gmail';
   matches(url: URL): boolean;            // origin/path 판정만
@@ -474,7 +624,7 @@ Outcome of architect's Security Design Checklist (see .claude/agents/architect.m
 | Sensitive data | **보유하는 것**: ① 사용자 이메일·비밀번호 해시(Supabase Auth 관리) ② 사용자가 입력한 업무 메시지 원문·변환문(`sent_messages`, `diff_records`) ③ 자기신고 커뮤니케이션 프로필 ④ **제3자(수신자) 정보** — `location`/`company`/활동 시간대(`recipient_enrichments`)와 관측 집계값(`observation_samples`). **위치**: Supabase Postgres(전송 구간 TLS, 저장 시 관리형 암호화). **추가 보호 없음** — 컬럼 단위 암호화·pseudonymization은 MVP에 구현하지 않는다. **전송**: 메시지 원문은 백엔드를 경유해 OpenAI로 나간다(구조상 불가피). 완화는 Planning Decision #11(합성 데이터만 사용)이며 **실사용 단계에서는 성립하지 않는 완화**임을 PRD Risks가 이미 명시한다. 🔴 **관측 표본의 원문은 저장하지 않는다** — 확장 콘텐츠 스크립트에서 집계 후 폐기하며 `observation_samples` 에 원문 컬럼이 **존재하지 않는다**(AC-081②③). 🔴 **정보주체 통지는 미구현** — 관측 대상이 된 사람은 그 사실을 알지 못한다. 이것은 설계로 해결되지 않는 남은 한계이며 발표에서 먼저 인정한다(PRD Risks) |
 | Input validation boundaries | **경계는 3개, 검증 소유자는 각각 하나다.** ① **HTTP 경계** — `apps/web/lib/http.ts` 의 `withApi()` 가 **zod 스키마로** 모든 요청 body/query를 파싱한다. 파싱 실패 = 400 `VALIDATION_FAILED`. core 함수는 **이미 검증된 타입만** 받는다(core 안에 재검증을 만들지 않는다). ② **외부 API 응답 경계** — OpenAI 응답은 신뢰하지 않는다. `apps/web/lib/llm/openai.ts` 가 JSON 파싱 + zod 검증에 실패하면 `LLM_MALFORMED` 로 폴백 경로(AC-041)로 넘긴다. GitHub 공개 프로필 응답도 동일(`location`/`company` 외 필드는 **파싱 단계에서 버린다** — AC-065③). ③ **확장 → 백엔드 경계** — 확장이 보내는 값도 외부 입력으로 취급해 ①과 같은 검증을 통과시킨다. 🔴 **입력 길이는 검증 대상이 아니다** — 5,000자는 소프트 캡이며 초과를 차단하는 코드 경로를 만들지 않는다(AC-061②). **파일 업로드 없음** — N/A |
 | Attack surface | **노출되는 것**: ① `*.vercel.app` 의 HTTPS 엔드포인트 — `docs/API.md` 에 열거된 라우트 전부. 열린 포트는 없다(서버리스). ② Supabase의 공개 REST 엔드포인트 — `anon key` 로 접근 가능하나 **RLS가 전 테이블에 걸려 있어** 인증 없이는 0행이 반환된다. ③ **Chrome 확장의 `all_urls` 급 권한** — 이 프로젝트 최대의 노출면(Planning Decision #64). **제한 수단**: manifest 권한을 `activeTab` + 우리 API origin `host_permissions` + 콘텐츠 스크립트 `<all_urls>` 로 최소화하고 T58에서 1회 검토·기록(AC-054②). `externally_connectable` 은 **우리 앱 origin 1개로 제한**(임의 사이트가 확장에 메시지를 보낼 수 없게). ④ **제3자 콜백 없음** — 웹훅·OAuth 리다이렉트·결제 콜백을 만들지 않는다(결제는 MVP 제외, Monetization). **제한 수단 요약**: 전 라우트 인증 필수(`/api/health` 제외), RLS, LLM 요청 상한 2겹, 서비스 롤 키 사용처 2곳으로 격리 |
-| Dependency risk | **신규 의존성 전부 `docs/DECISIONS.md` 에 행이 있다**: `next`·`react`(#1), `@supabase/supabase-js`·`@supabase/ssr`(#4), `openai`(#7), `zod`(#12), `vitest`(#13), `eslint`+`prettier`(#14), `vite`(#15). **유지보수 위험 판정**: 8개 모두 주요 프로젝트이며 미유지보수·알려진 위험 패키지 **0건**. ⚠️ 다만 **취약점 스캔을 이번 세션에 실행하지 않았다(추정)** — 확인 수단: T2 스캐폴드 직후 `npm audit --omit=dev` 1회 실행, 결과를 T2 보고에 첨부. **정책**: 위 8개 외의 신규 의존성은 `docs/CodingRules.md` Prohibitions에 따라 DECISIONS.md 행 없이 추가할 수 없다 |
+| Dependency risk | **신규 의존성 전부 `docs/DECISIONS.md` 에 행이 있다**: `next`·`react`(#1), `@supabase/supabase-js`·`@supabase/ssr`(#4), `openai`(#7), `zod`(#12), `vitest`(#13), `eslint`+`prettier`(#14), `vite`(#15). **유지보수 위험 판정**: 8개 모두 주요 프로젝트이며 미유지보수·알려진 위험 패키지 **0건**. <br>✅ **취약점 스캔이 실행됐다 — 앞 패스의 `추정` 항목이 해소됐다.** T2 스캐폴드 직후 `npm audit --omit=dev` 를 오케스트레이터가 직접 실행해(measured, 2026-08-04) **high severity 3건**을 확인했다: **next 15가 번들한 `postcss`·`sharp`**. 해소 경로가 `next@16` breaking 업그레이드뿐이었고 **사용자가 업그레이드를 선택**했다(DECISIONS #37 · Tech Stack 프레임워크 행). ⚠️ **architect는 이 명령을 재실행하지 않았다(셸 없음)** — 위 수치의 출처는 오케스트레이터 실행 출력이다. **재확인 수단**: `next@16` 설치 직후 `npm audit --omit=dev` 를 1회 더 실행해 3건이 0건이 됐는지 출력을 첨부한다(업그레이드가 실제로 해소했는지는 **아직 미확인**이다). **정책**: 위 8개 외의 신규 의존성은 `docs/CodingRules.md` Prohibitions에 따라 DECISIONS.md 행 없이 추가할 수 없다 |
 | Abuse cases | 아래 별도 표 |
 
 ### C6 게이트 판정과 EU AI Act 방어선 (2026-08-04 추가 · DECISIONS #35 · ADR-0005)
@@ -565,7 +715,8 @@ implementer가 지켜야 할 아키텍처 규칙. 위반은 reviewer의 Major �
 9. **없는 값을 지어내지 않는다.** `미정`/`불명`/`미등록`/빈 배열이 정상 반환값이다(AC-020/043②/047②/050①/065⑤). 기본값으로 채우는 코드가 곧 AC 위반이다.
 10. **프롬프트는 `packages/core/src/prompts/` 에 두고 `PROMPT_VERSION` 을 함께 올린다.** 캐시 키에 들어가므로, 올리지 않으면 프롬프트를 고쳐도 옛 응답이 반환된다.
 11. **DB 조회물은 core 밖에서 조회해 `deps.data` 로 넘긴다.** core 안에 조회 함수·조회 인터페이스를 만들지 않는다(조회 *결과*만 받는다 — F1-b). 새 조회물이 생기면 F1-b의 판정표에 행을 추가한 뒤 반영하고, 임의로 `MediationInput` 에 필드를 늘리지 않는다. 위반 판정: `packages/core` 안에 `Promise` 를 반환하는 저장소성 인자가 새로 생긴 diff(예외: `LLMClient`).
-12. **네이밍/디렉터리/스타일 세부 규칙은 `docs/CodingRules.md`(User 소유)** — architect는 편집하지 않는다. 현재 Naming/Directory/Style 표가 비어 있어 DoD Gate "Lint passes"가 실행 불가 상태이며, 초안은 보고서에서 권고했다.
+12. **네이밍/디렉터리/스타일 세부 규칙은 `docs/CodingRules.md`(User 소유)** — architect는 편집하지 않는다. <br>🔴 **2026-08-04 정정**: 이 항목은 *"Naming/Directory/Style 표가 비어 있어 DoD Gate 'Lint passes'가 실행 불가"* 라고 적고 있었다. **결론(당시 실행 불가)은 맞았지만 원인이 틀렸다.** `docs/CodingRules.md` 는 **이미 채워져 있다**(measured — architect가 2026-08-04 전문 열람, 126줄. Naming 12행 / Directory Rules 11행 / Style 6항목 / Error Handling 7행 / Tests 표 6행 + "채우지 않은 칸" 5행이 모두 값과 판정 방법을 갖고 있다. DECISIONS #34로 architect가 초안을 작성했다). 진짜 원인은 **설정 파일이 T2 산출물이었다는 것**이며, 그 사실은 `docs/CodingRules.md:7`·:81 이 이미 조건부로 명시하고 있었다. <br>✅ **그 조건도 해소됐다** — T2가 `eslint.config.js` · `.prettierrc` · `vitest.config.ts` · `.github/workflows/ci.yml` 을 생성했다(measured — 2026-08-04 리포에 파일 존재 확인). **"Lint passes"는 이제 실행 가능하며 사용자 승인 skip이 필요하지 않다.**
+13. 🔴 **불변식은 주석이 아니라 타입으로 쓴다(F1-c).** `TicketOption` · `TicketResult`(`decisionAuthority`) · `DecisionItem`(`authorityStatus`)의 짝은 **판별 유니온**이며, 값을 만들 때는 `rules/ticket-gate.ts` 의 `ticketOptionFrom()` 과 `rules/decision-authority.ts` 의 `resolveAuthority()` **만** 쓴다. <br>**위반 판정**: ① 이 세 타입을 `boolean`/평 enum + 별도 필드로 되돌리는 diff ② 짝을 객체 리터럴로 손수 조립하는 diff(생성자 우회) ③ 이 타입들을 `z.object({...})` 로 표현한 zod 스키마(불법 조합을 되살린다 — `z.discriminatedUnion` 을 쓴다) ④ `contract.test.ts` 의 `@ts-expect-error` 를 지우거나 `@ts-ignore` 로 바꾸는 diff(`@ts-ignore` 는 조합이 합법이 돼도 조용히 통과한다).
 
 ---
 
@@ -609,6 +760,8 @@ Every row gets a decision or an explicit "N/A — reason"; never blank.
 | Vercel Hobby | 🔴 **비상업·개인 사용 전용 제약이 실재한다 — `추정`이 아니라 `measured`다**(*"the Hobby plan restricts users to non-commercial, personal use only"*, vercel.com/docs/plans/hobby, 2026-08-04 오케스트레이터 직접 열람). **MVP 기간(~2026-08-21)에는 차단 요인이 아니다** — 해커톤 제출·시연은 비상업이다. **걸리는 시점은 상용화다**: Planning Decision #27(실사용자 확장)과 Open Question #6 결정(좌석당 $8~12 구독, Monetization user-approved)이 실행되는 순간 이 제약에 정면으로 걸리며 **Pro($20/user/월)로 전환해야 한다.** 즉 이 무료 선택은 **MVP 한정 유효**이며 수익 모델과 함께 재검토 대상이다. <br>부수 제약(measured): 런타임 로그 보존 1시간 → `llm_call_log` 로 완화(DECISIONS #26). 조직 소유 리포 연결 불가 → **우리 리포는 개인 계정 소유라 해당 없음**(Deployment 절). <br>**그럼에도 채택한 이유**: Planning Decision #28의 무료·기본 서브도메인 조건을 만족하면서 **즉시 롤백**(Promote to Production)이 되는 가장 짧은 경로 | — |
 | Supabase Free 프로젝트가 **1주 미사용 시 일시정지**(measured) | 발표 직전 정지되면 시연이 죽는다. **완화**: 8/4~8/21 사이 매일 개발·리허설 트래픽이 있어 현실적 위험은 낮다. **T36 배포 동결 점검에 "Supabase 프로젝트 상태 active 확인" 1줄을 넣는다** | — |
 | **C6 게이트 판정을 `{ offered, basis }` 2필드로만 (감정 점수·라벨 미채택)** | 게이트가 왜 안 떴는지 **사용자에게 설명하지 않는다**(`basis` 미렌더). 임계값을 조정하려면 재배포가 필요하다(FE에서 점수를 다시 판정하지 않으므로). **그럼에도**: AC-058이 요구하는 것은 옵션 제시 여부뿐이고, 점수·라벨을 응답에 두는 순간 산출물의 성격이 "옵션 제시"에서 **"사람의 감정 상태에 대한 등급 판정"** 으로 바뀌어 PRD Risks의 EU AI Act 방어 서술과 어긋난다. ⚠️ **리스크가 0이 되는 것은 아니다 — 법률 자문 없음(추정)** | [0005](adr/0005-c6-ticket-gate-field.md) |
+| **Next.js 15 → 16 업그레이드**(2026-08-04 사용자 결정) | 🔴 **마감 17일 프로젝트에서 메이저 업그레이드는 그 자체가 위험이다** — 코드 0줄에 가까운 지금이라 표면이 작을 뿐, breaking change가 `apps/web` 스캐폴드·빌드 설정·Vercel 빌드에 걸릴 수 있다(**추정** — 확인 수단: 업그레이드 후 `npm run build` + 첫 Vercel 배포). **그럼에도 채택한 이유**: 대안이 *"high 3건을 안 채로 발표·제출"* 이었고, 이 프로젝트는 심사 제출물이라 의존성 취약점이 그대로 남는 쪽의 비용이 더 크다고 **사용자가 판단**했다. **비용이 최저인 시점에 치른다**는 점도 같은 방향이다(스캐폴드 직후 = 화면·라우트 0개). ⚠️ **업그레이드가 3건을 실제로 0건으로 만드는지는 아직 미확인** — 설치 후 `npm audit --omit=dev` 재실행이 완료 조건이다 | [0001](adr/0001-nextjs-integrated-monorepo-with-pure-core.md) Addendum A |
+| **계약 불변식을 판별 유니온으로**(F1-c) | 생성 지점마다 **분기 한 번**을 강제한다(correlated union을 TS가 추론하지 못한다). `TicketResult`·`DecisionItem` 이 `interface` 에서 `type` 이 되어 선언 병합이 불가능해지고, 에디터 hover가 교차형으로 보여 읽기 약간 나빠진다. C6·C7 유니온이 **모양은 같고 이름만 다른 두 벌**로 중복된다. **그럼에도**: 불변식 3개가 전부 "명세는 금지하는데 컴파일은 통과"였고, 그 상태에서는 **소급 테스트가 트리비얼 그린 말고 존재할 수 없다.** 중복 2벌은 AC-064③의 grep 판정을 지키기 위한 **의도된 비용**이다(제네릭으로 묶으면 필드 이름이 타입 파라미터가 되어 grep이 흐려진다) | [0006](adr/0006-contract-invariants-as-discriminated-unions.md) |
 | **DB 조회물을 조회 *함수*가 아니라 조회 *결과*로 core에 주입** | `CRITICAL` 로 C3를 건너뛸 때 `learnedItems` 조회 1건이 **버려진다.** Route Handler가 그만큼 두꺼워진다. **그럼에도**: core가 순수 함수로 남아야 T11(회귀 26건)이 저장소 목 없이 "하나의 실행 출력"을 내고, 저장소 실패가 core 안에서 터지지 않아야 *"예외는 `withApi()` 한 곳"* 이라는 Error Handling이 유지된다. 버려지는 조회 1건은 동시 10명(NFR Scale)에서 무의미하다 | [0004](adr/0004-core-pipeline-input-vs-deps.md) |
 | **채택하지 않은 더 정교한 대안 — 왜 지금은 아닌가** | **Hexagonal/Clean Architecture 3계층 + DI 컨테이너**: 코어 순수성은 이미 패키지 경계로 얻었고, 추가 계층은 파일 수만 3배로 만든다 — 17일·4명에서는 경계가 아니라 **경계를 지날 때마다 드는 타이핑**이 병목이다. / **이벤트 소싱/아웃박스**: mock-send 제품에 전달 보장이 필요 없다. / **BFF 분리**: 클라이언트가 웹·확장 2개이고 **둘이 같은 계약을 쓰는 것이 AC-028의 요구사항**이라 BFF는 요구를 정면으로 거스른다. / **Feature flag 시스템**: 컷이 "파일 삭제"라서 런타임 플래그가 필요 없다. 플래그를 넣으면 컷된 코드가 리포에 남아 컴파일 대상이 된다 | — |
 
