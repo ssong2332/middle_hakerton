@@ -843,6 +843,153 @@ describe('MediationWorkspace', () => {
     );
   });
 
+  // 🔴 CR-1(reviewer REJECTED → 수정) — Major 2/MJ-A 가드의 `setFinalText((prev) => prev ===
+  // lastAutoFilledFinalTextRef.current ? '' : prev)` 다음 줄에서 즉시
+  // `lastAutoFilledFinalTextRef.current = ''`로 초기화한다. React는 함수형 업데이터를 호출 시점이
+  // 아니라 나중에(렌더 단계에서) 실행하므로, 업데이터가 실제로 도는 시점엔 ref가 이미 ''로 바뀐
+  // 뒤다 — 비교식이 사실상 `prev === ''`가 되어, 직전 실행이 live/cache로 finalText를 채워둔
+  // 상태(`prev`가 빈 문자열이 아님)에서 fallback으로 전이하면 조건이 항상 거짓이 되어 절대 비워지지
+  // 않는다. `previousAutoFilled`를 로컬 `const`로 먼저 캡처해 초기화 전 값과 비교하도록 고친다.
+  it('CR-1 회귀 — live 실행 뒤 재실행이 fallback이면(사용자 편집 없음) 이전 실행의 변환문이 남지 않고 finalText가 비워지며 승인 버튼이 비활성화된다', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') {
+        const callCount = fetchMock.mock.calls.filter(([u]) => u === '/api/mediate').length;
+        if (callCount <= 1) {
+          return Promise.resolve(mediateSuccessResponse());
+        }
+        return Promise.resolve(
+          mediateSuccessResponse({
+            source: 'fallback',
+            stepSources: { c1: 'live', c2: 'fallback', c4: 'live' },
+          }),
+        );
+      }
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+      'Please confirm by tomorrow.',
+    );
+
+    // 원문을 바꾸지 않고 재실행 — 이번엔 fallback.
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
+    });
+
+    expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe('');
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    expect(
+      (within(recipientPanel).getByRole('button', { name: /승인/ }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  // 🔴 CR-1 회귀 — 위와 같은 메커니즘을, 재실행 사이에 원문을 바꾼 경우에도 확인한다. 원문이 달라져도
+  // fallback 분기는 `body.transformed`로 finalText를 채우지 않으므로(비우거나 사용자 편집을
+  // 보존할 뿐), 직전 live 실행이 자동 채웠던 값이 새 원문과 무관하게 남아 있으면 안 된다.
+  it('CR-1 회귀 — 원문을 바꿔 재실행했는데 다시 fallback이면 이전 원문의 자동 채움 값이 발송창에 남지 않는다', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') {
+        const callCount = fetchMock.mock.calls.filter(([u]) => u === '/api/mediate').length;
+        if (callCount <= 1) {
+          return Promise.resolve(mediateSuccessResponse());
+        }
+        return Promise.resolve(
+          mediateSuccessResponse({
+            transformed: 'Different fallback text irrelevant to autofill check.',
+            source: 'fallback',
+            stepSources: { c1: 'live', c2: 'fallback', c4: 'live' },
+          }),
+        );
+      }
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+      'Please confirm by tomorrow.',
+    );
+
+    // 원문을 바꿔서 재실행한다 — 사용자는 최종 발송문을 직접 편집하지 않았다.
+    fireEvent.change(screen.getByLabelText('메시지'), {
+      target: { value: '다른 원문입니다. 확인 부탁드립니다.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
+    });
+
+    expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe('');
+  });
+
+  // 🔴 CR-1 회귀 — 같은 메커니즘이 cache→fallback 전이에서도 성립하는지 확인한다(cache는 live와
+  // 동일하게 finalText를 자동 채운다).
+  it('CR-1 회귀 — cache 실행 뒤 재실행이 fallback이면(사용자 편집 없음) 이전 실행의 변환문이 남지 않고 finalText가 비워진다(cache→fallback 전이)', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') {
+        const callCount = fetchMock.mock.calls.filter(([u]) => u === '/api/mediate').length;
+        if (callCount <= 1) {
+          return Promise.resolve(
+            mediateSuccessResponse({
+              source: 'cache',
+              stepSources: { c1: 'live', c2: 'cache', c4: 'live' },
+            }),
+          );
+        }
+        return Promise.resolve(
+          mediateSuccessResponse({
+            source: 'fallback',
+            stepSources: { c1: 'live', c2: 'fallback', c4: 'live' },
+          }),
+        );
+      }
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+      'Please confirm by tomorrow.',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
+    });
+
+    expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe('');
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    expect(
+      (within(recipientPanel).getByRole('button', { name: /승인/ }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
   // 🔴 M2(reviewer 최종 APPROVED, Major 비차단 → 수정) — 실행 성공(A) → 재실행 시작(진행 중) →
   // 그 사이 승인 클릭(A가 전송됨) → 재실행 완료(B) → 화면이 B로 갱신되는데 Delivered 잠금
   // 상태라 "발송됨" 표시와 함께 B가 남아, 실제로 전송된 A가 아니라 B가 보이는 불일치가

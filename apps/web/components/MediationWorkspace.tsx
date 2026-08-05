@@ -219,7 +219,12 @@ export function MediationWorkspace() {
         // 사이 편집한 값이 무시되고 "재실행 시작 시점"의 옛 값으로 "편집 안 했다"고 오판정해
         // 방금 입력한 텍스트를 지울 수 있었다. 함수형 업데이트로 항상 응답이 도착한 시점의
         // 실제 최신 state(prev)와 비교한다 — stale closure가 개입할 여지가 없다.
-        setFinalText((prev) => (prev === lastAutoFilledFinalTextRef.current ? '' : prev));
+        // CR-1(reviewer REJECTED → 수정) — `setFinalText`의 함수형 업데이터는 호출 시점이 아니라
+        // 나중에(렌더 단계에서) 실행된다. 바로 다음 줄에서 ref를 ''로 초기화하면, 업데이터가 실제로
+        // 도는 시점엔 이미 ref가 ''라 비교식이 사실상 `prev === ''`가 되어 직전 live/cache 자동
+        // 채움 값이 있을 때 절대 비워지지 않는다. 초기화 전 값을 로컬 상수로 먼저 캡처해 비교한다.
+        const previousAutoFilled = lastAutoFilledFinalTextRef.current;
+        setFinalText((prev) => (prev === previousAutoFilled ? '' : prev));
         lastAutoFilledFinalTextRef.current = '';
       } else {
         setFinalText(body.transformed);
