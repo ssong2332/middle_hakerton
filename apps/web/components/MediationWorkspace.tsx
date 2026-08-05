@@ -184,9 +184,16 @@ export function MediationWorkspace() {
   // "재실행 시작 시점"의 옛 값으로 "편집 안 했다"고 오판정해 방금 입력한 텍스트를 지울 수 있었다.
   // 함수형 업데이트로 항상 응답이 도착한 시점의 실제 최신 state(prev)와 비교한다 — stale closure가
   // 개입할 여지가 없다.
+  //
+  // MJ-1(reviewer APPROVED, 비차단 Major → 수정) — `prev === previousAutoFilled`만으로 판정하면
+  // 사용자가 발송문을 완전히 지운 상태(`''`)도 "직접 편집"으로 잡혀, 그 뒤 어떤 재실행(live/cache/
+  // fallback 무엇이든)도 다시 채우지 못하는 막다른 상태가 된다(MJ-3의 빈 발송문 승인 비활성화와
+  // 겹쳐 승인·전송 화면에 도달할 방법이 없어진다). 공백뿐인 값(trim 결과 빈 문자열)은 "아직
+  // 아무것도 안 쓴 상태"로 보고 자동 채움을 다시 허용한다 — 의미 있는 텍스트(공백이 아님)를 직접
+  // 편집한 경우는 여전히 보존된다.
   function applyAutoFill(newText: string) {
     const previousAutoFilled = lastAutoFilledFinalTextRef.current;
-    setFinalText((prev) => (prev === previousAutoFilled ? newText : prev));
+    setFinalText((prev) => (prev === previousAutoFilled || prev.trim() === '' ? newText : prev));
     lastAutoFilledFinalTextRef.current = newText;
   }
 

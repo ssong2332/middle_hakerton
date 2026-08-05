@@ -1174,6 +1174,95 @@ describe('MediationWorkspace', () => {
     );
   });
 
+  // 🔴 MJ-1(reviewer APPROVED, 비차단 Major → 수정) — 발송문을 완전히 비우면(trim 결과 빈 문자열)
+  // 그 뒤 어떤 재실행으로도 복구할 수 없었다. 빈 문자열도 "사용자 편집"으로 판정돼(`prev('') !==
+  // previousAutoFilled`) 이후 모든 재실행이 빈 값을 영구히 보존했기 때문이다 — MJ-3(빈 발송문 →
+  // 승인 비활성화)까지 겹쳐 중재 결과가 새로 와도 승인·전송 화면에 도달할 방법이 없는 막다른
+  // 상태였다. 발송문이 공백뿐이면 사용자 편집으로 보지 않고 자동 채움을 다시 허용한다. reviewer가
+  // 실측한 재현 시나리오(live 자동 채움 → 전부 지움 → 재실행 → 새 live 응답)를 그대로 검증한다.
+  it('MJ-1 — 발송문을 완전히 비운 뒤 재실행하면 새 결과로 다시 채워지고 승인 버튼이 활성화된다', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') {
+        const callCount = fetchMock.mock.calls.filter(([u]) => u === '/api/mediate').length;
+        if (callCount <= 1) {
+          return Promise.resolve(mediateSuccessResponse());
+        }
+        return Promise.resolve(mediateSuccessResponse({ transformed: 'Second live response.' }));
+      }
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+        'Please confirm by tomorrow.',
+      );
+    });
+
+    const finalTextArea = screen.getByLabelText('최종 발송문') as HTMLTextAreaElement;
+
+    // 사용자가 발송문을 완전히 비운다.
+    fireEvent.change(finalTextArea, { target: { value: '' } });
+    expect(finalTextArea.value).toBe('');
+
+    // 재실행 — 새 live 응답이 온다.
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+        'Second live response.',
+      );
+    });
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    expect(
+      (within(recipientPanel).getByRole('button', { name: /승인/ }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  // 🔴 MJ-1 확장 — "공백뿐"은 완전히 지운 상태(`''`)만이 아니라 공백 문자만 남은 상태(trim 결과
+  // 빈 문자열)도 포함한다. 수정이 단순 `=== ''` 비교가 아니라 `.trim() === ''`를 쓰는지 이 케이스로
+  // 확인한다.
+  it('MJ-1 확장 — 발송문에 공백 문자만 남기고 재실행하면(trim 결과 빈 문자열) 새 결과로 다시 채워진다', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') {
+        const callCount = fetchMock.mock.calls.filter(([u]) => u === '/api/mediate').length;
+        if (callCount <= 1) {
+          return Promise.resolve(mediateSuccessResponse());
+        }
+        return Promise.resolve(mediateSuccessResponse({ transformed: 'Second live response.' }));
+      }
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+        'Please confirm by tomorrow.',
+      );
+    });
+
+    const finalTextArea = screen.getByLabelText('최종 발송문') as HTMLTextAreaElement;
+
+    // 사용자가 발송문을 공백 문자만 남긴다(완전한 빈 문자열은 아니다).
+    fireEvent.change(finalTextArea, { target: { value: '   ' } });
+    expect(finalTextArea.value).toBe('   ');
+
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+        'Second live response.',
+      );
+    });
+  });
+
   // 🔴 M2(reviewer 최종 APPROVED, Major 비차단 → 수정) — 실행 성공(A) → 재실행 시작(진행 중) →
   // 그 사이 승인 클릭(A가 전송됨) → 재실행 완료(B) → 화면이 B로 갱신되는데 Delivered 잠금
   // 상태라 "발송됨" 표시와 함께 B가 남아, 실제로 전송된 A가 아니라 B가 보이는 불일치가
