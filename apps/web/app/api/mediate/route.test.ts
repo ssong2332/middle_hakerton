@@ -143,7 +143,9 @@ describe('POST /api/mediate', () => {
     expect(body.source).toBe('live');
   });
 
-  it('T1 계약의 12개 필드를 모두 채운다(C3/C5/C6 대기 중에도 스키마는 만족)', async () => {
+  // 🔴 (2026-08-05 갱신 — F1-e, DECISIONS #48 · ADR-0009) `stepSources`가 13번째 필드로 덧붙어
+  // 12개 → 13개로 늘었다(테스트 이름도 갱신). 기존 12개 필드는 이름·순서·타입 그대로다.
+  it('T1 계약의 13개 필드를 모두 채운다(C3/C5/C6 대기 중에도 스키마는 만족)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
     mockCreateClient.mockReturnValue(fakeLlm());
 
@@ -161,6 +163,7 @@ describe('POST /api/mediate', () => {
         'preserved',
         'reason',
         'source',
+        'stepSources',
         'ticketOption',
         'transformed',
         'urgency',
@@ -175,6 +178,8 @@ describe('POST /api/mediate', () => {
     expect(body.holidayConflicts).toEqual([]);
     expect(body.misreadRisks).toEqual([]);
     expect(body.preserved).toEqual([]);
+    // 🔴 F1-e — 세 스텝 모두 필수(AC-032 고정 순서상 항상 실행된다). 기본 mock은 모두 live다.
+    expect(body.stepSources).toEqual({ c1: 'live', c2: 'live', c4: 'live' });
   });
 
   it('AC-003 — C1이 분류한 urgency와 근거 문장을 그대로 응답에 담는다', async () => {
@@ -442,6 +447,27 @@ describe('POST /api/mediate', () => {
     );
     const body = await response.json();
 
+    expect(body.source).toBe('fallback');
+  });
+
+  // 🔴 F1-e(DECISIONS #48 · ADR-0009 Follow-up #1) — `stepSources`가 세 스텝의 출처를 **뒤섞지
+  // 않고** 각자 담는지 확인한다. 위 세 테스트는 합쳐진 `source`만 보므로, 세 값이 서로 달라도
+  // (c1≠c2≠c4) `stepSources.c1`/`.c2`/`.c4`가 각각 자신의 스텝 값과 일치하는지는 별도로 확인해야
+  // 잘못된 매핑(예: c2와 c4가 뒤바뀜)을 잡을 수 있다.
+  it('stepSources는 C1/C2/C4 각각의 출처를 뒤섞지 않고 그대로 담는다(F1-e)', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+    mockCreateClient.mockReturnValue(
+      fakeLlm({ urgencySource: 'cache', toneSource: 'fallback', backTranslationSource: 'live' }),
+    );
+
+    const response = await POST(
+      postRequest({ text: 'hello', context: { languageDirection: 'ko-en', channel: 'web' } }),
+    );
+    const body = await response.json();
+
+    expect(body.stepSources).toEqual({ c1: 'cache', c2: 'fallback', c4: 'live' });
+    // 합쳐진 값은 세 스텝 중 가장 신뢰도가 낮은 fallback(AC-041) — stepSources와 source가 함께
+    // 검증되어야 F1-e의 파생 불변식(`source = worst(stepSources)`)이 이 라우트에서도 지켜진다.
     expect(body.source).toBe('fallback');
   });
 });

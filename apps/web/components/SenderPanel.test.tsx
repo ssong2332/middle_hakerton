@@ -108,6 +108,7 @@ describe('SenderPanel', () => {
       holidayConflicts: [],
       personalizationApplied: true,
       source: 'live',
+      stepSources: { c1: 'live', c2: 'live', c4: 'live' },
       ticketOption: { offered: false, basis: 'signal_absent' },
     } as never;
 
@@ -139,6 +140,7 @@ describe('SenderPanel', () => {
       holidayConflicts: [],
       personalizationApplied: true,
       source: 'live',
+      stepSources: { c1: 'live', c2: 'live', c4: 'live' },
       ticketOption: { offered: false, basis: 'signal_absent' },
     } as never;
 
@@ -174,6 +176,9 @@ describe('SenderPanel', () => {
       holidayConflicts: [],
       personalizationApplied: true,
       source: 'fallback',
+      // 🔴 F1-e — `source: 'fallback'`만으로는 더 이상 배지가 뜨지 않는다(`ComparisonView`가 이제
+      // `stepSources.c2`를 본다). C2를 fallback으로 지정해 비교 뷰 배지를 켠다.
+      stepSources: { c1: 'live', c2: 'fallback', c4: 'live' },
       ticketOption: { offered: false, basis: 'signal_absent' },
     } as never;
 
@@ -212,6 +217,7 @@ describe('SenderPanel', () => {
       holidayConflicts: [],
       personalizationApplied: true,
       source: 'live',
+      stepSources: { c1: 'live', c2: 'live', c4: 'live' },
       ticketOption: { offered: false, basis: 'signal_absent' },
     } as never;
 
@@ -247,5 +253,149 @@ describe('SenderPanel', () => {
     expect(
       within(backTranslationView).queryByText('새로 편집한 원문(아직 검토되지 않음)'),
     ).toBeNull();
+  });
+
+  // 🔴 C-1(reviewer REJECTED → 수정, AC-041 회귀 재발 방지) — ADR-0009 D3 매핑표는
+  // "stepSources.c1 → UrgencyPanel.tsx"를 지정한다. c1만 fallback이고 c2/c4가 live일 때도
+  // 화면 어딘가에는 "폴백 응답 사용 중" 배지가 있어야 한다 — c2/c4 기준 컴포넌트(ComparisonView/
+  // BackTranslationPreview)만으로는 이 조합을 표시할 수 없다.
+  it('C-1 — stepSources.c1만 fallback이어도 폴백 배지가 화면에 표시된다(UrgencyPanel)', () => {
+    const result = {
+      urgency: 'NORMAL',
+      urgencyReason: '일반 요청입니다.',
+      transformed: 'Please confirm by tomorrow.',
+      reason: '완곡 표현을 명시적 요청으로 변환했습니다.',
+      preserved: [],
+      backTranslation: '내일까지 확인 부탁드립니다.',
+      warnings: [],
+      misreadRisks: [],
+      holidayConflicts: [],
+      personalizationApplied: true,
+      source: 'fallback',
+      stepSources: { c1: 'fallback', c2: 'live', c4: 'live' },
+      ticketOption: { offered: false, basis: 'signal_absent' },
+    } as never;
+
+    render(
+      <SenderPanel
+        {...baseProps()}
+        text="내일까지 확인 부탁드립니다."
+        recipient="boss@example.com"
+        status="success"
+        result={result}
+        displayedUrgency="NORMAL"
+      />,
+    );
+
+    expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
+  });
+
+  // 🔴 M-1(reviewer REJECTED → 수정) — c2/c4 배선을 서로 바꿔도 기존 테스트는 green이었다(전역
+  // getByText만 썼기 때문). 영역을 특정(within)해서 배지가 정확한 컴포넌트에 붙는지 확인한다.
+  //
+  // ⓐ {c2:'live', c4:'fallback'} — 비교 뷰에는 배지가 없고, 역번역 영역에만 있어야 한다.
+  it('M-1ⓐ — c2가 live·c4가 fallback이면 비교 뷰에는 배지가 없고 역번역 영역에만 있다', () => {
+    const result = {
+      urgency: 'NORMAL',
+      urgencyReason: '일반 요청입니다.',
+      transformed: 'Please confirm by tomorrow.',
+      reason: '완곡 표현을 명시적 요청으로 변환했습니다.',
+      preserved: [],
+      backTranslation: '내일까지 확인 부탁드립니다.',
+      warnings: [],
+      misreadRisks: [],
+      holidayConflicts: [],
+      personalizationApplied: true,
+      source: 'fallback',
+      stepSources: { c1: 'live', c2: 'live', c4: 'fallback' },
+      ticketOption: { offered: false, basis: 'signal_absent' },
+    } as never;
+
+    render(
+      <SenderPanel
+        {...baseProps()}
+        text="내일까지 확인 부탁드립니다."
+        recipient="boss@example.com"
+        status="success"
+        result={result}
+        displayedUrgency="NORMAL"
+      />,
+    );
+
+    const comparisonView = screen.getByLabelText('원문·변환문·변환 이유 비교');
+    const backTranslationView = screen.getByLabelText('역번역 미리보기');
+    expect(within(comparisonView).queryByText('폴백 응답 사용 중')).toBeNull();
+    expect(within(backTranslationView).getByText('폴백 응답 사용 중')).toBeTruthy();
+  });
+
+  // ⓑ {c2:'fallback', c4:'live'} — 반대 조합. 이 조합은 실제로 도달 가능하고 의미도 정합하다
+  // (C2가 폴백으로 강등되면, C4는 그 폴백 transformed를 입력받아 정상적인 live 역번역을 만들 수
+  // 있다 — reviewer가 직접 확인). 비교 뷰에만 배지가 있고, 역번역 영역에는 없어야 한다.
+  it('M-1ⓑ — c2가 fallback·c4가 live면 비교 뷰에만 배지가 있고 역번역 영역에는 없다', () => {
+    const result = {
+      urgency: 'NORMAL',
+      urgencyReason: '일반 요청입니다.',
+      transformed: 'Please confirm by tomorrow.',
+      reason: '완곡 표현을 명시적 요청으로 변환했습니다.',
+      preserved: [],
+      backTranslation: '내일까지 확인 부탁드립니다.',
+      warnings: [],
+      misreadRisks: [],
+      holidayConflicts: [],
+      personalizationApplied: true,
+      source: 'fallback',
+      stepSources: { c1: 'live', c2: 'fallback', c4: 'live' },
+      ticketOption: { offered: false, basis: 'signal_absent' },
+    } as never;
+
+    render(
+      <SenderPanel
+        {...baseProps()}
+        text="내일까지 확인 부탁드립니다."
+        recipient="boss@example.com"
+        status="success"
+        result={result}
+        displayedUrgency="NORMAL"
+      />,
+    );
+
+    const comparisonView = screen.getByLabelText('원문·변환문·변환 이유 비교');
+    const backTranslationView = screen.getByLabelText('역번역 미리보기');
+    expect(within(comparisonView).getByText('폴백 응답 사용 중')).toBeTruthy();
+    expect(within(backTranslationView).queryByText('폴백 응답 사용 중')).toBeNull();
+  });
+
+  // 🔴 M-2(reviewer REJECTED → 수정) — 배지를 3개 다 띄울지, 화면 레벨 1개 + 문제 영역만 띄울지는
+  // ux-design 소관(ADR-0009 Follow-up #6, 유보). 여기서는 그 설계를 바꾸지 않고, 세 스텝이 모두
+  // fallback일 때 동일 문구가 중복 렌더되는 **현재 동작**을 그대로 고정만 한다.
+  it('M-2 — 세 스텝 모두 fallback이면 "폴백 응답 사용 중"이 3번(중복) 렌더된다(현재 동작 고정, 시각 설계는 ux-design 소관)', () => {
+    const result = {
+      urgency: 'NORMAL',
+      urgencyReason: '일반 요청입니다.',
+      transformed: 'Please confirm by tomorrow.',
+      reason: '완곡 표현을 명시적 요청으로 변환했습니다.',
+      preserved: [],
+      backTranslation: '내일까지 확인 부탁드립니다.',
+      warnings: [],
+      misreadRisks: [],
+      holidayConflicts: [],
+      personalizationApplied: true,
+      source: 'fallback',
+      stepSources: { c1: 'fallback', c2: 'fallback', c4: 'fallback' },
+      ticketOption: { offered: false, basis: 'signal_absent' },
+    } as never;
+
+    render(
+      <SenderPanel
+        {...baseProps()}
+        text="내일까지 확인 부탁드립니다."
+        recipient="boss@example.com"
+        status="success"
+        result={result}
+        displayedUrgency="NORMAL"
+      />,
+    );
+
+    expect(screen.getAllByText('폴백 응답 사용 중')).toHaveLength(3);
   });
 });

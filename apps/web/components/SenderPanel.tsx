@@ -107,24 +107,31 @@ export function SenderPanel({
       {(status === 'success' || hasResult) && result && (
         <>
           {displayedUrgency && (
+            // 🔴 (2026-08-05 — C-1, reviewer REJECTED → 수정, F1-e·ADR-0009 D3) `stepSources.c1`을
+            // 넘긴다 — ADR-0009 D3 매핑표가 "c1 → UrgencyPanel.tsx"를 지정했는데 이전 배선에는 이
+            // 컴포넌트에 출처를 넘기는 경로 자체가 없어, c1만 fallback이고 c2/c4가 live일 때 화면
+            // 어디에도 폴백 배지가 뜨지 않는 AC-041 회귀가 있었다.
             <UrgencyPanel
               urgency={displayedUrgency}
               urgencyReason={result.urgencyReason}
               isOverridden={isOverridden}
               onOverride={onOverride}
+              source={result.stepSources.c1}
             />
           )}
           {/* AC-008 — 원문/변환문/변환 이유 3열 비교 + AC-007 보존 항목 표시.
               MJ-5 — 원문은 스냅샷 시점 값(originalTextSnapshot)을 쓴다(라이브 text 아님).
-              Major 2(2026-08-05, 되돌림) — 한때 이 컴포넌트에도 `source`를 넘겨 폴백 배지를
-              띄웠지만(MJ-2), `MediationResult.source`가 C1/C2/C4를 합친 단일 값이라 C2(이 영역이
-              보여주는 변환문)가 실제로 폴백인지 알 수 없어 라이브 콘텐츠를 폴백으로 오표시할 수
-              있었다 — `ComparisonView.tsx` 헤더 주석의 Open Question(architect) 참조. */}
+              🔴 (2026-08-05 복원 — F1-e, DECISIONS #48 · ADR-0009) Major 2(2026-08-05)가 되돌렸던
+              폴백 배지를 정확한 값으로 복원한다. `MediationResult.source`(C1/C2/C4를 합친 단일 값)
+              대신 `result.stepSources.c2`를 넘긴다 — 이 영역이 보여주는 변환문/변환 이유는 C2
+              산출물이므로 C2 전용 출처만 봐야 라이브 콘텐츠를 폴백으로 오표시하지 않는다
+              (ADR-0009 D3 매핑표, `ComparisonView.tsx` 헤더 주석 참조). */}
           <ComparisonView
             originalText={originalTextSnapshot}
             transformed={result.transformed}
             reason={result.reason}
             preserved={result.preserved}
+            source={result.stepSources.c2}
           />
           {/* AC-043 — 오해 사전 경고. 승인(Approve & Send, RecipientPanel) 이전 단계인 이 화면에서
               항상 먼저 렌더된다. 빈 배열이면 컴포넌트 자체가 아무것도 그리지 않는다.
@@ -136,12 +143,17 @@ export function SenderPanel({
               없다(같은 패턴이 이미 존재 — "표시만 축소되고 데이터는 항상 동일"). */}
           <MisreadRiskPanel risks={result.misreadRisks} variant="full" />
           {/* MJ-5 — 여기도 스냅샷 시점 원문을 쓴다(역번역은 스냅샷 시점 변환문의 역번역이므로,
-              라이브 text와 짝지으면 편집 후 원문·역번역이 서로 다른 시점의 값이 된다). */}
+              라이브 text와 짝지으면 편집 후 원문·역번역이 서로 다른 시점의 값이 된다).
+              🔴 (2026-08-05 갱신 — F1-e, DECISIONS #48 · ADR-0009) `result.source`(합산값) 대신
+              `result.stepSources.c4`를 넘긴다 — 폴백 c4 문구는 폴백 c2 문구를 역번역한 고정
+              문자열이라(`packages/core/src/data/fallback-responses.ts:58~62`·`:96~100`), C2가
+              실제로 라이브면 그 역번역이 화면의 실제 변환문과 무관해지는 정확성 문제가 있다
+              (AC-001/AC-002). C4 전용 출처를 봐야 이 영역의 안전장치 표시가 정확하다. */}
           <BackTranslationPreview
             originalText={originalTextSnapshot}
             backTranslation={result.backTranslation}
             warnings={result.warnings}
-            source={result.source}
+            source={result.stepSources.c4}
           />
           {result.personalizationApplied === false && (
             <p role="status">개인화 미적용 — 기본 변환만 적용되었습니다</p>

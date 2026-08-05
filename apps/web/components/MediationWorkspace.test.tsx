@@ -23,6 +23,11 @@ function mediateSuccessResponse(overrides: Record<string, unknown> = {}) {
       holidayConflicts: [],
       personalizationApplied: true,
       source: 'live',
+      // 🔴 F1-e(2026-08-05 — DECISIONS #48 · ADR-0009) 13번째 필드. 기본값은 세 스텝 모두 live —
+      // 폴백 배지를 켜야 하는 테스트는 `overrides.stepSources`로 개별 스텝 값을 지정한다
+      // (`SenderPanel.tsx`가 이제 합산 `source`가 아니라 `stepSources.c2`/`.c4`를 각 영역에
+      // 전달하므로, `source`만 바꾸는 것으로는 더 이상 배지가 뜨지 않는다).
+      stepSources: { c1: 'live', c2: 'live', c4: 'live' },
       ticketOption: { offered: false, basis: 'signal_absent' },
       ...overrides,
     }),
@@ -450,9 +455,17 @@ describe('MediationWorkspace', () => {
   // 있었다(AC-041 위반 — 승인 직전에 폴백 표시가 사라짐). 승인 가능한 스냅샷(hasResult)이 있으면
   // 발신자 패널의 결과 블록도 status와 무관하게 유지되어야 한다.
   it('M-2 — 재실행이 실패해도 직전 성공 결과의 폴백 배지가 발신자 패널에서 사라지지 않는다', async () => {
+    // 🔴 F1-e — `source: 'fallback'`만으로는 더 이상 배지가 뜨지 않는다(SenderPanel이 이제
+    // `stepSources.c2`/`.c4`를 각 영역에 넘긴다). C2를 fallback으로 지정해 비교 뷰 배지를 켠다
+    // (worst(stepSources) === 'fallback'과도 일치하도록 합산 `source`도 함께 'fallback').
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(mediateSuccessResponse({ source: 'fallback' }))
+      .mockResolvedValueOnce(
+        mediateSuccessResponse({
+          source: 'fallback',
+          stepSources: { c1: 'live', c2: 'fallback', c4: 'live' },
+        }),
+      )
       .mockResolvedValueOnce({
         ok: false,
         json: async () => ({
