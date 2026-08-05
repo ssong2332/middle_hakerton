@@ -116,7 +116,16 @@ export function SenderPanel({
               urgencyReason={result.urgencyReason}
               isOverridden={isOverridden}
               onOverride={onOverride}
-              source={result.stepSources.c1}
+              // Minor(방어적, 사용자 지시 유지보수 라운드) — 계약(F1)상 `stepSources`는 필수
+              // 필드지만, 유일한 생산자(`route.ts`) 밖의 경로(배포 스큐, 향후 확장 어댑터 스텁 등)
+              // 가 이 필드를 채우지 못한 응답을 보낼 가능성까지 방어한다.
+              // 🔴 M1(reviewer round-3 비차단 Major, 2026-08-06 수정) — `?? 'live'`는 정보가 없는
+              // 상황을 "라이브"로 지어내, 실제로는 `source:'fallback'`인 응답에서도 폴백 배지가
+              // 뜨지 않게 만들었다(AC-041 위반, `docs/CodingRules.md` Error Handling: 없는 값을
+              // 지어내지 않는다). 없으면 구 계약 필드인 집계 `source`로 degrade한다 —
+              // ADR-0009 이전 동작(단일 `source` 기준 배지)으로 안전하게 물러날 뿐, 정보를
+              // 지어내지 않는다.
+              source={result.stepSources?.c1 ?? result.source}
             />
           )}
           {/* AC-008 — 원문/변환문/변환 이유 3열 비교 + AC-007 보존 항목 표시.
@@ -131,7 +140,9 @@ export function SenderPanel({
             transformed={result.transformed}
             reason={result.reason}
             preserved={result.preserved}
-            source={result.stepSources.c2}
+            // Minor(방어적) — SenderPanel.tsx의 UrgencyPanel 배선과 같은 이유.
+            // M1(2026-08-06) — 같은 이유로 `?? result.source`로 수정(정보를 지어내지 않는다).
+            source={result.stepSources?.c2 ?? result.source}
           />
           {/* AC-043 — 오해 사전 경고. 승인(Approve & Send, RecipientPanel) 이전 단계인 이 화면에서
               항상 먼저 렌더된다. 빈 배열이면 컴포넌트 자체가 아무것도 그리지 않는다.
@@ -153,7 +164,9 @@ export function SenderPanel({
             originalText={originalTextSnapshot}
             backTranslation={result.backTranslation}
             warnings={result.warnings}
-            source={result.stepSources.c4}
+            // Minor(방어적) — SenderPanel.tsx의 UrgencyPanel 배선과 같은 이유.
+            // M1(2026-08-06) — 같은 이유로 `?? result.source`로 수정(정보를 지어내지 않는다).
+            source={result.stepSources?.c4 ?? result.source}
           />
           {result.personalizationApplied === false && (
             <p role="status">개인화 미적용 — 기본 변환만 적용되었습니다</p>

@@ -6,6 +6,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
+import type { MediationResult } from '@cross-border/core';
 import { SenderPanel } from './SenderPanel';
 
 function baseProps() {
@@ -259,8 +260,16 @@ describe('SenderPanel', () => {
   // "stepSources.c1 → UrgencyPanel.tsx"를 지정한다. c1만 fallback이고 c2/c4가 live일 때도
   // 화면 어딘가에는 "폴백 응답 사용 중" 배지가 있어야 한다 — c2/c4 기준 컴포넌트(ComparisonView/
   // BackTranslationPreview)만으로는 이 조합을 표시할 수 없다.
-  it('C-1 — stepSources.c1만 fallback이어도 폴백 배지가 화면에 표시된다(UrgencyPanel)', () => {
-    const result = {
+  //
+  // Minor(사용자 지시 유지보수 라운드) — 이전 버전은 전역 `screen.getByText`만 써서 영역을
+  // 특정하지 않았다(배지가 엉뚱한 컴포넌트에 붙어도 통과했을 것이다). M-1 테스트가 이미 확립한
+  // `within(screen.getByLabelText(...))` 패턴을 여기도 적용해, 배지가 정확히 긴급도 영역에만
+  // 있고 비교뷰·역번역 영역에는 없는지 함께 단언한다. 이 테스트의 판별력은
+  // `SenderPanel.tsx`의 `source={result.stepSources?.c1 ?? 'live'}` 배선을 일시적으로
+  // `result.stepSources?.c2`로 바꿔 재실행 → 실패(red, 배지가 긴급도 영역에서 사라짐) → 원복 →
+  // 재실행 → 통과(green)로 확인했다(구현 보고서 참조).
+  it('C-1 — stepSources.c1만 fallback이어도 폴백 배지가 긴급도 영역에 표시되고, 비교뷰·역번역 영역에는 없다(UrgencyPanel)', () => {
+    const result: MediationResult = {
       urgency: 'NORMAL',
       urgencyReason: '일반 요청입니다.',
       transformed: 'Please confirm by tomorrow.',
@@ -274,7 +283,7 @@ describe('SenderPanel', () => {
       source: 'fallback',
       stepSources: { c1: 'fallback', c2: 'live', c4: 'live' },
       ticketOption: { offered: false, basis: 'signal_absent' },
-    } as never;
+    };
 
     render(
       <SenderPanel
@@ -287,7 +296,12 @@ describe('SenderPanel', () => {
       />,
     );
 
-    expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
+    const urgencyPanel = screen.getByLabelText('긴급도');
+    const comparisonView = screen.getByLabelText('원문·변환문·변환 이유 비교');
+    const backTranslationView = screen.getByLabelText('역번역 미리보기');
+    expect(within(urgencyPanel).getByText('폴백 응답 사용 중')).toBeTruthy();
+    expect(within(comparisonView).queryByText('폴백 응답 사용 중')).toBeNull();
+    expect(within(backTranslationView).queryByText('폴백 응답 사용 중')).toBeNull();
   });
 
   // 🔴 M-1(reviewer REJECTED → 수정) — c2/c4 배선을 서로 바꿔도 기존 테스트는 green이었다(전역
@@ -295,7 +309,7 @@ describe('SenderPanel', () => {
   //
   // ⓐ {c2:'live', c4:'fallback'} — 비교 뷰에는 배지가 없고, 역번역 영역에만 있어야 한다.
   it('M-1ⓐ — c2가 live·c4가 fallback이면 비교 뷰에는 배지가 없고 역번역 영역에만 있다', () => {
-    const result = {
+    const result: MediationResult = {
       urgency: 'NORMAL',
       urgencyReason: '일반 요청입니다.',
       transformed: 'Please confirm by tomorrow.',
@@ -309,7 +323,7 @@ describe('SenderPanel', () => {
       source: 'fallback',
       stepSources: { c1: 'live', c2: 'live', c4: 'fallback' },
       ticketOption: { offered: false, basis: 'signal_absent' },
-    } as never;
+    };
 
     render(
       <SenderPanel
@@ -332,7 +346,7 @@ describe('SenderPanel', () => {
   // (C2가 폴백으로 강등되면, C4는 그 폴백 transformed를 입력받아 정상적인 live 역번역을 만들 수
   // 있다 — reviewer가 직접 확인). 비교 뷰에만 배지가 있고, 역번역 영역에는 없어야 한다.
   it('M-1ⓑ — c2가 fallback·c4가 live면 비교 뷰에만 배지가 있고 역번역 영역에는 없다', () => {
-    const result = {
+    const result: MediationResult = {
       urgency: 'NORMAL',
       urgencyReason: '일반 요청입니다.',
       transformed: 'Please confirm by tomorrow.',
@@ -346,7 +360,7 @@ describe('SenderPanel', () => {
       source: 'fallback',
       stepSources: { c1: 'live', c2: 'fallback', c4: 'live' },
       ticketOption: { offered: false, basis: 'signal_absent' },
-    } as never;
+    };
 
     render(
       <SenderPanel
@@ -369,7 +383,7 @@ describe('SenderPanel', () => {
   // ux-design 소관(ADR-0009 Follow-up #6, 유보). 여기서는 그 설계를 바꾸지 않고, 세 스텝이 모두
   // fallback일 때 동일 문구가 중복 렌더되는 **현재 동작**을 그대로 고정만 한다.
   it('M-2 — 세 스텝 모두 fallback이면 "폴백 응답 사용 중"이 3번(중복) 렌더된다(현재 동작 고정, 시각 설계는 ux-design 소관)', () => {
-    const result = {
+    const result: MediationResult = {
       urgency: 'NORMAL',
       urgencyReason: '일반 요청입니다.',
       transformed: 'Please confirm by tomorrow.',
@@ -383,7 +397,7 @@ describe('SenderPanel', () => {
       source: 'fallback',
       stepSources: { c1: 'fallback', c2: 'fallback', c4: 'fallback' },
       ticketOption: { offered: false, basis: 'signal_absent' },
-    } as never;
+    };
 
     render(
       <SenderPanel
@@ -397,5 +411,79 @@ describe('SenderPanel', () => {
     );
 
     expect(screen.getAllByText('폴백 응답 사용 중')).toHaveLength(3);
+  });
+
+  // Minor(방어적, 사용자 지시 유지보수 라운드) — 현재는 유일한 생산자(`route.ts`)가 항상
+  // `stepSources`를 채우지만, 응답에 `stepSources`가 없는 경우(배포 스큐, 향후 확장 어댑터
+  // 스텁 등)에도 `result.stepSources.c1/.c2/.c4`를 그냥 읽으면 렌더 자체가 TypeError로 깨진다.
+  // 배지가 안 뜨는 정도로 degrade하되 화면 자체는 깨지지 않아야 한다.
+  it('Minor(방어적) — 응답에 stepSources가 없어도(배포 스큐 등) 렌더가 깨지지 않고 폴백 배지 없이 표시된다', () => {
+    const resultWithoutStepSources = {
+      urgency: 'NORMAL',
+      urgencyReason: '일반 요청입니다.',
+      transformed: 'Please confirm by tomorrow.',
+      reason: '완곡 표현을 명시적 요청으로 변환했습니다.',
+      preserved: [],
+      backTranslation: '내일까지 확인 부탁드립니다.',
+      warnings: [],
+      misreadRisks: [],
+      holidayConflicts: [],
+      personalizationApplied: true,
+      source: 'live',
+      ticketOption: { offered: false, basis: 'signal_absent' },
+      // stepSources 필드 자체가 없다 — 배포 스큐/향후 확장 어댑터 스텁 시나리오를 흉내낸다.
+    } as unknown as MediationResult;
+
+    expect(() =>
+      render(
+        <SenderPanel
+          {...baseProps()}
+          text="내일까지 확인 부탁드립니다."
+          recipient="boss@example.com"
+          status="success"
+          result={resultWithoutStepSources}
+          displayedUrgency="NORMAL"
+        />,
+      ),
+    ).not.toThrow();
+
+    expect(screen.getByText('Please confirm by tomorrow.')).toBeTruthy();
+    expect(screen.queryByText('폴백 응답 사용 중')).toBeNull();
+  });
+
+  // M1(reviewer round-3 비차단 Major) — 위 "Minor(방어적)" 테스트는 stepSources가 없을 때
+  // `source: 'live'` 픽스처만 써서, `?? 'live'` 기본값이 실제로는 `source: 'fallback'`인 응답을
+  // "라이브"로 지어내 보여줘도(AC-041 위반) 그 결함을 검출하지 못했다. 여기서는 stepSources가
+  // 없고 top-level `source`가 'fallback'인 픽스처로, 폴백 배지가 실제로 표시되는지 검증한다 —
+  // `?? 'live'`로 되돌리면(정보를 지어내면) 이 테스트는 fail해야 한다.
+  it('M1 — stepSources가 없고 source가 fallback이면, live로 지어내지 않고 폴백 배지가 표시된다', () => {
+    const resultWithoutStepSourcesFallback = {
+      urgency: 'NORMAL',
+      urgencyReason: '일반 요청입니다.',
+      transformed: 'Please confirm by tomorrow.',
+      reason: '완곡 표현을 명시적 요청으로 변환했습니다.',
+      preserved: [],
+      backTranslation: '내일까지 확인 부탁드립니다.',
+      warnings: [],
+      misreadRisks: [],
+      holidayConflicts: [],
+      personalizationApplied: true,
+      source: 'fallback',
+      ticketOption: { offered: false, basis: 'signal_absent' },
+      // stepSources 필드 자체가 없다 — 배포 스큐/향후 확장 어댑터 스텁 시나리오를 흉내낸다.
+    } as unknown as MediationResult;
+
+    render(
+      <SenderPanel
+        {...baseProps()}
+        text="내일까지 확인 부탁드립니다."
+        recipient="boss@example.com"
+        status="success"
+        result={resultWithoutStepSourcesFallback}
+        displayedUrgency="NORMAL"
+      />,
+    );
+
+    expect(screen.getAllByText('폴백 응답 사용 중').length).toBeGreaterThan(0);
   });
 });

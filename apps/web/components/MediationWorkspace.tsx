@@ -24,6 +24,25 @@ interface ApprovalSnapshot {
   transformed: string;
 }
 
+// Major(비차단, 사용자 지시 유지보수 라운드) — `crypto.randomUUID`는 secure context가 아닌
+// 환경(http:// + non-localhost, 예: LAN IP로 접속하는 로컬/LAN 데모)에서 `undefined`라 호출하면
+// 던진다(배포 타깃 Vercel/HTTPS인 프로덕션에서는 재현되지 않는다). 그 상태에서 이 리포 유일의
+// `crypto.randomUUID()` 호출부(`handleApprove` 안 Idempotency-Key 생성)가 예외를 던지면 승인이
+// 그 세션 내내(재시도해도 같은 환경이므로) 영구 실패한다. `crypto.randomUUID`가 없는 환경에서도
+// 동작하도록, UUID 규격을 정확히 지키지는 않지만 멱등성 키로 쓰기에 충분한 무작위 문자열을 만드는
+// 폴백을 둔다 — 이 키는 서버로 그대로 전달돼 요청 식별 목적으로만 쓰이고 보안 토큰이 아니므로
+// `Math.random()` 기반이어도 무방하다(암호학적 무작위성이 필요한 값이 아니다).
+function generateIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const random = (Math.random() * 16) | 0;
+    const value = char === 'x' ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
 const srOnlyStyle = {
   position: 'absolute',
   width: '1px',
@@ -206,7 +225,7 @@ export function MediationWorkspace() {
         finalText,
       });
       if (idempotencyKeyRef.current?.identity !== identity) {
-        idempotencyKeyRef.current = { identity, key: crypto.randomUUID() };
+        idempotencyKeyRef.current = { identity, key: generateIdempotencyKey() };
       }
       const idempotencyKey = idempotencyKeyRef.current.key;
       const response = await fetch('/api/messages', {

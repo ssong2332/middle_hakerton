@@ -1,6 +1,7 @@
 'use client';
 
 import type { PreservedItem, ResponseSource } from '@cross-border/core';
+import { NON_LIVE_NOTICE } from '../lib/non-live-notice';
 
 export interface ComparisonViewProps {
   originalText: string;
@@ -50,9 +51,6 @@ export interface ComparisonViewProps {
 // 아니다). 정교한 디자인 시스템 없이 최소 flex 레이아웃으로 "나란히" 조건만 충족한다.
 const columnsStyle = { display: 'flex', gap: '16px' } as const;
 const columnStyle = { flex: '1 1 0%', minWidth: 0 } as const;
-
-/** `docs/UX.md:920` — live가 아닌 응답에 상시 노출하는 고정 문구(`BackTranslationPreview`와 동일 문구). */
-const NON_LIVE_NOTICE = '폴백 응답 사용 중';
 
 export function ComparisonView({
   originalText,
