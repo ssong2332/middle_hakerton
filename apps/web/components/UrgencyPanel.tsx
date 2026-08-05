@@ -1,6 +1,6 @@
 'use client';
 
-import type { UrgencyLevel } from '@cross-border/core';
+import type { ResponseSource, UrgencyLevel } from '@cross-border/core';
 
 export interface UrgencyPanelProps {
   /** 화면에 표시할 등급 — 부모가 override(있으면)와 C1 판정 중 무엇을 보일지 계산해 넘긴다. */
@@ -15,9 +15,20 @@ export interface UrgencyPanelProps {
   isOverridden: boolean;
   /** 사용자가 select에서 등급을 바꿀 때마다 새 값을 부모에 알린다(AC-004). */
   onOverride: (value: UrgencyLevel) => void;
+  /**
+   * 🔴 C-1(2026-08-05, reviewer REJECTED → 수정, AC-041 회귀) — `MediationResult.stepSources.c1`
+   * (ADR-0009 D3 매핑표: "c1 → urgency(판정분)·urgencyReason → `UrgencyPanel.tsx`"). 이 영역이
+   * 보여주는 `urgency`/`urgencyReason`은 C1 산출물이므로 "이 영역의 진실"은 C1 전용 출처뿐이다 —
+   * 합산값(`MediationResult.source`)이 아니다. `ComparisonView`/`BackTranslationPreview`와 같은
+   * 패턴("폴백 응답 사용 중", `role="status"`)으로 non-live일 때 배지를 표시한다.
+   */
+  source: ResponseSource;
 }
 
 const URGENCY_LEVELS: UrgencyLevel[] = ['CRITICAL', 'NORMAL', 'LOW'];
+
+/** `docs/UX.md:920` — live가 아닌 응답에 상시 노출하는 고정 문구(다른 결과 영역과 동일 문구). */
+const NON_LIVE_NOTICE = '폴백 응답 사용 중';
 
 /**
  * C1 긴급도 결과 표시 + override UI(`docs/UX.md` UX-004 "urgency badge ... and an override
@@ -34,6 +45,7 @@ export function UrgencyPanel({
   urgencyReason,
   isOverridden,
   onOverride,
+  source,
 }: UrgencyPanelProps) {
   return (
     <section aria-label="긴급도">
@@ -43,6 +55,8 @@ export function UrgencyPanel({
         <strong>{urgency}</strong>
       </p>
       <p>{urgencyReason}</p>
+      {/* AC-041, ADR-0009 D3 — 이 영역(등급/근거)의 진실은 `stepSources.c1`뿐이다. */}
+      {source !== 'live' && <p role="status">{NON_LIVE_NOTICE}</p>}
       {isOverridden && <p role="status">사용자가 등급을 조정했습니다</p>}
       <label htmlFor="urgency-override">긴급도 조정</label>
       <select

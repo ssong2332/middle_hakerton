@@ -18,6 +18,7 @@ describe('UrgencyPanel', () => {
         urgencyReason="프로덕션 장애로 즉시 대응이 필요합니다."
         isOverridden={false}
         onOverride={vi.fn()}
+        source="live"
       />,
     );
 
@@ -33,6 +34,7 @@ describe('UrgencyPanel', () => {
         urgencyReason="일반 업무 요청입니다."
         isOverridden={false}
         onOverride={onOverride}
+        source="live"
       />,
     );
 
@@ -48,6 +50,7 @@ describe('UrgencyPanel', () => {
         urgencyReason="근거"
         isOverridden={true}
         onOverride={vi.fn()}
+        source="live"
       />,
     );
 
@@ -61,6 +64,7 @@ describe('UrgencyPanel', () => {
         urgencyReason="근거"
         isOverridden={false}
         onOverride={vi.fn()}
+        source="live"
       />,
     );
 
@@ -69,7 +73,13 @@ describe('UrgencyPanel', () => {
 
   it('선택 컨트롤은 현재 표시 중인 등급을 값으로 갖는다', () => {
     render(
-      <UrgencyPanel urgency="LOW" urgencyReason="근거" isOverridden={false} onOverride={vi.fn()} />,
+      <UrgencyPanel
+        urgency="LOW"
+        urgencyReason="근거"
+        isOverridden={false}
+        onOverride={vi.fn()}
+        source="live"
+      />,
     );
 
     expect((screen.getByLabelText('긴급도 조정') as HTMLSelectElement).value).toBe('LOW');

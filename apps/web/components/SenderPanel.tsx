@@ -107,11 +107,16 @@ export function SenderPanel({
       {(status === 'success' || hasResult) && result && (
         <>
           {displayedUrgency && (
+            // 🔴 (2026-08-05 — C-1, reviewer REJECTED → 수정, F1-e·ADR-0009 D3) `stepSources.c1`을
+            // 넘긴다 — ADR-0009 D3 매핑표가 "c1 → UrgencyPanel.tsx"를 지정했는데 이전 배선에는 이
+            // 컴포넌트에 출처를 넘기는 경로 자체가 없어, c1만 fallback이고 c2/c4가 live일 때 화면
+            // 어디에도 폴백 배지가 뜨지 않는 AC-041 회귀가 있었다.
             <UrgencyPanel
               urgency={displayedUrgency}
               urgencyReason={result.urgencyReason}
               isOverridden={isOverridden}
               onOverride={onOverride}
+              source={result.stepSources.c1}
             />
           )}
           {/* AC-008 — 원문/변환문/변환 이유 3열 비교 + AC-007 보존 항목 표시.
