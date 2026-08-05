@@ -1,8 +1,12 @@
 /**
- * `POST /api/mediate` — T5+T7+T9 범위(C1 분류·C4 역번역이 실제로 동작, `docs/Tasks.md` T5/T6/T7/T9·
- * `docs/API.md`). 🔴 C2/C3/C5/C6은 아직 없다 — 이 테스트는 그 필드들이 T1 계약을 만족하는
- * placeholder 값으로 나가는 것과, C1(긴급도 분류+override, AC-003/AC-004)·C4(역번역)·
- * AC-046③(존댓말 혼용 경고)이 실제로 동작하는 것을 확인한다.
+ * `POST /api/mediate` — T5+T7+T9+T10 범위(C1 분류·C2 톤 변환·C4 역번역이 실제로 동작,
+ * `docs/Tasks.md` T5/T6/T7/T9/T10 · `docs/API.md`). 🔴 C3/C5/C6은 아직 없다 — 이 테스트는 그
+ * 필드들이 T1 계약을 만족하는 placeholder 값으로 나가는 것과, C1(긴급도 분류+override,
+ * AC-003/AC-004)·C2(톤 변환+보존+오해 경고, AC-006/043)·C4(역번역)·AC-046③(존댓말 혼용 경고)이
+ * 실제로 동작하는 것을 확인한다. C2의 의미적 정확도(변환 품질)는 이 파일이 아니라
+ * `packages/core/src/steps/c2.test.ts`(스키마·폴백 계약)와 `docs/TestCases.md`를 쓰는 T11
+ * 러너(`tests/regression-c2.ts`)의 몫이다 — 여기서는 라우트 배선(세 스텝을 순서대로 부르고
+ * source를 합치는 것)만 본다.
  * `resolveSession()`(T45 스텁)과 OpenAI 호출(`createOpenAiLLMClient`)은 모킹한다.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -24,9 +28,9 @@ const mockCreateClient = vi.mocked(createOpenAiLLMClient);
 type Source = 'live' | 'cache' | 'fallback';
 
 /**
- * 🔴 이 라우트는 이제 LLM을 두 번 호출한다(C1 분류 → C4 역번역, `route.ts` 헤더 주석 참조).
- * `step` 인자로 어느 호출인지 구분해 각각 다른 응답을 흉내 낸다 — 옵션을 생략하면 각 스텝의
- * 무난한 기본값(NORMAL/back)을 쓴다.
+ * 🔴 이 라우트는 이제 LLM을 세 번 호출한다(C1 분류 → C2 톤 변환 → C4 역번역, `route.ts` 헤더
+ * 주석 참조, T10에서 C2가 추가됐다). `step` 인자로 어느 호출인지 구분해 각각 다른 응답을 흉내
+ * 낸다 — 옵션을 생략하면 각 스텝의 무난한 기본값을 쓴다.
  */
 function fakeLlm(
   options: {
@@ -34,6 +38,12 @@ function fakeLlm(
     urgencyReason?: string;
     urgencySource?: Source;
     urgencyContent?: string;
+    toneTransformed?: string;
+    toneReason?: string;
+    tonePreserved?: unknown[];
+    toneMisreadRisks?: unknown[];
+    toneSource?: Source;
+    toneContent?: string;
     backTranslation?: string;
     backTranslationSource?: Source;
     backTranslationContent?: string;
@@ -44,6 +54,12 @@ function fakeLlm(
     urgencyReason = '일반 업무 요청입니다.',
     urgencySource = 'live',
     urgencyContent,
+    toneTransformed = 'transformed text',
+    toneReason = '톤을 다듬었습니다.',
+    tonePreserved = [],
+    toneMisreadRisks = [],
+    toneSource = 'live',
+    toneContent,
     backTranslation = 'back',
     backTranslationSource = 'live',
     backTranslationContent,
@@ -55,6 +71,19 @@ function fakeLlm(
         return Promise.resolve({
           content: urgencyContent ?? JSON.stringify({ urgency, reason: urgencyReason }),
           source: urgencySource,
+        });
+      }
+      if (step === 'c2') {
+        return Promise.resolve({
+          content:
+            toneContent ??
+            JSON.stringify({
+              transformed: toneTransformed,
+              reason: toneReason,
+              preserved: tonePreserved,
+              misreadRisks: toneMisreadRisks,
+            }),
+          source: toneSource,
         });
       }
       return Promise.resolve({
@@ -114,7 +143,7 @@ describe('POST /api/mediate', () => {
     expect(body.source).toBe('live');
   });
 
-  it('T1 계약의 12개 필드를 모두 채운다(C2/C3/C5/C6 대기 중에도 스키마는 만족)', async () => {
+  it('T1 계약의 12개 필드를 모두 채운다(C3/C5/C6 대기 중에도 스키마는 만족)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
     mockCreateClient.mockReturnValue(fakeLlm());
 
@@ -227,13 +256,18 @@ describe('POST /api/mediate', () => {
     expect(body.urgency).toBe('LOW');
   });
 
-  it('AC-046③ — en-ko 방향에서 존댓말 혼용이 감지되면 warnings에 경고가 담긴다', async () => {
+  // 🔴 T10 이후 존댓말 혼용 검사는 입력 원문이 아니라 **C2의 변환문**(`transformed`)을 본다
+  // (`route.ts`의 `honorificMixedWarning(transformed)` 호출) — 아래 테스트는 C2 mock의
+  // `toneTransformed`로 검사 대상 텍스트를 직접 지정한다.
+  it('AC-046③ — en-ko 방향에서 C2 변환문에 존댓말 혼용이 있으면 warnings에 경고가 담긴다', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(fakeLlm());
+    mockCreateClient.mockReturnValue(
+      fakeLlm({ toneTransformed: '확인 부탁드립니다. 편하실 때 연락 주세요.' }),
+    );
 
     const response = await POST(
       postRequest({
-        text: '확인 부탁드립니다. 편하실 때 연락 주세요.',
+        text: 'Please check this. Contact me when convenient.',
         context: { languageDirection: 'en-ko', channel: 'web' },
       }),
     );
@@ -244,7 +278,9 @@ describe('POST /api/mediate', () => {
 
   it('ko-en 방향에서는 존댓말 혼용 검사를 실행하지 않는다(AC-046은 EN→KO 전용)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(fakeLlm());
+    mockCreateClient.mockReturnValue(
+      fakeLlm({ toneTransformed: '확인 부탁드립니다. 편하실 때 연락 주세요.' }),
+    );
 
     const response = await POST(
       postRequest({
@@ -259,17 +295,61 @@ describe('POST /api/mediate', () => {
 
   it('경고가 없으면 warnings는 빈 배열이다', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(fakeLlm());
+    mockCreateClient.mockReturnValue(fakeLlm({ toneTransformed: '확인해 주세요.' }));
 
     const response = await POST(
       postRequest({
-        text: '확인해 주세요.',
+        text: 'Please check.',
         context: { languageDirection: 'en-ko', channel: 'web' },
       }),
     );
     const body = await response.json();
 
     expect(body.warnings).toEqual([]);
+  });
+
+  it('AC-006/043 — C2가 반환한 preserved/misreadRisks/reason/transformed가 그대로 응답에 담긴다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+    const preserved = [
+      { kind: 'deadline', sourceText: '금요일까지', transformedText: 'by Friday' },
+    ];
+    const misreadRisks = [
+      { quote: '확인 부탁드립니다', misreading: '단순 참고로 읽힘', evidence: '명시적 기한 없음' },
+    ];
+    mockCreateClient.mockReturnValue(
+      fakeLlm({
+        toneTransformed: 'Please confirm by Friday.',
+        toneReason: '완곡한 요청을 명시적 요청으로 복원했습니다.',
+        tonePreserved: preserved,
+        toneMisreadRisks: misreadRisks,
+      }),
+    );
+
+    const response = await POST(
+      postRequest({
+        text: '금요일까지 확인 부탁드립니다.',
+        context: { languageDirection: 'ko-en', channel: 'web' },
+      }),
+    );
+    const body = await response.json();
+
+    expect(body.transformed).toBe('Please confirm by Friday.');
+    expect(body.reason).toBe('완곡한 요청을 명시적 요청으로 복원했습니다.');
+    expect(body.preserved).toEqual(preserved);
+    expect(body.misreadRisks).toEqual(misreadRisks);
+  });
+
+  it('C2 응답이 스키마 검증에 실패하면 502 LLM_MALFORMED를 반환한다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+    mockCreateClient.mockReturnValue(fakeLlm({ toneContent: '유효하지 않은 JSON' }));
+
+    const response = await POST(
+      postRequest({ text: 'hello', context: { languageDirection: 'ko-en', channel: 'web' } }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(body.error.code).toBe('LLM_MALFORMED');
   });
 
   it('AC-030 — 응답 어디에도 OPENAI_API_KEY 값이 노출되지 않는다', async () => {
@@ -339,5 +419,19 @@ describe('POST /api/mediate', () => {
     const body = await response.json();
 
     expect(body.source).toBe('cache');
+  });
+
+  it('C1·C4가 live여도 C2가 fallback이면 응답 source는 fallback을 따른다(AC-041, 세 스텝 모두 대상)', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+    mockCreateClient.mockReturnValue(
+      fakeLlm({ urgencySource: 'live', toneSource: 'fallback', backTranslationSource: 'live' }),
+    );
+
+    const response = await POST(
+      postRequest({ text: 'hello', context: { languageDirection: 'ko-en', channel: 'web' } }),
+    );
+    const body = await response.json();
+
+    expect(body.source).toBe('fallback');
   });
 });

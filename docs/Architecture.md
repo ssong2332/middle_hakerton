@@ -2,8 +2,9 @@
 
 Owner: architect (see AGENTS.md). Others read-only.
 Major decisions are logged in DECISIONS.md; details in adr/.
-Based on PRD Version: v3.2 · Based on UX Version: 6.0 · Last Updated: 2026-08-04
-(2026-08-04 3차 패스 — **PRD·UX 버전 갱신 없음**(v3.2 / 6.0 그대로, 버전 격차 0). 이 패스가 바꾼 것: **① Next.js 15 → 16**(사용자 결정, DECISIONS #37) **② F1-c 신설**(계약 불변식 강제, DECISIONS #38 · ADR-0006) **③ 문서 정정 4건**(Conventions 12 / F1-b 시그니처 / 폴더 트리 / ADR-0004 Follow-up 3))
+Based on PRD Version: v3.2 · Based on UX Version: 6.0 · Last Updated: 2026-08-05
+(2026-08-05 4차 패스 — **PRD·UX 버전 갱신 없음**(v3.2 / 6.0 그대로, 버전 격차 0). 이 패스가 바꾼 것: **① 존댓말 레벨 결정 규칙 신설**(Data Flow 1-a — AC-046 ②의 "규약 우선" 절을 MVP 구현 대상에서 제외하고, 빈 프로필에 기본 레벨을 지정하지 않는다. DECISIONS #39·#40 · ADR-0007) **② Conventions 14 신설** **③ `docs/Database.md`·`docs/API.md` 의 AC-073 ② 오인용 정정**)
+(2026-08-04 3차 패스 — 이 패스가 바꾼 것: **① Next.js 15 → 16**(사용자 결정, DECISIONS #37) **② F1-c 신설**(계약 불변식 강제, DECISIONS #38 · ADR-0006) **③ 문서 정정 4건**(Conventions 12 / F1-b 시그니처 / 폴더 트리 / ADR-0004 Follow-up 3))
 
 > ✅ **승인 게이트 — 기술 기반 6개 항목은 2026-08-04 사용자 결정으로 전부 승인되었다(architect 권고안 그대로).**
 > **따라서 "승인 전 T2·T3·T17·T45 착수 금지" 조항은 해제되었다.** 아래는 확정된 기반이며 권고안이 아니다.
@@ -528,7 +529,10 @@ core/pipeline.run(input, deps)                         ← 순서 고정 (AC-032
    ②  CRITICAL 이면 예약·지연 경로를 건너뛰고 톤 정제만 (AC-005)
    ③ C3 프로필 조회  ← profiles / profile_learned_items
         └ 프로필이 비었으면(skipped) **건너뛴다. 추측 기본값을 넣지 않는다** (AC-059②③)
-   ④ 쌍방 규약 조회  ← pair_protocols   (충돌 시 규약 우선 — Planning Decision #26)
+        └ 존댓말 레벨(en-ko)의 결정 규칙은 아래 **1-a** 가 단일 출처다
+   ④ 쌍방 규약 조회  ← pair_protocols   (4축 한정 — 충돌 시 규약 우선, Planning Decision #26)
+        └ 🔴 **4축 = 직설 허용 / 이모지 / 호칭 / 마감 표현.** 존댓말 레벨은 이 4축에 없으므로
+          규약 우선 규칙이 적용되지 않는다 — 근거와 판정은 **1-a**(DECISIONS #39 · ADR-0007)
    ⑤ C5 용어사전 주입 ← deps.data.dictionary (프롬프트에 주입, 별도 LLM 호출 아님 · F1-b)
         └ core가 조회하지 않는다 — 위에서 이미 조회된 것을 인자로 받는다 (AC-028)
    ⑥ C2 톤 변환 ─── 🔴 한 번의 LLM 호출로 transformed / preserved / warnings /
@@ -545,6 +549,45 @@ core/pipeline.run(input, deps)                         ← 순서 고정 (AC-032
    ▼
 sent_messages 1행 (mock-send) + diff_records 1행 (AI 제안문 vs 최종문, AC-012)
 ```
+
+### 1-a) 존댓말 레벨 결정 규칙 (EN→KO, AC-046) — 이 절이 단일 출처다
+
+**소비처**: UX-004(2패널 중재) · UX-016(층 1 패널) · UX-009(프로필 표시) / **구현 위치**: `packages/core/src/steps/c2.ts` · `packages/core/src/prompts/c2.ts` / **태스크**: T10 · T11
+**배경**: T10 리뷰에서 발견된 명세 모순 2건에 대한 판정이다(DECISIONS **#39**·**#40**, ADR-0007). implementer·reviewer는 이 표만 읽으면 된다.
+
+#### 판정표 (이 표에 없는 케이스는 임의 판단하지 말고 architect에게 되돌린다)
+
+| # | 입력 상태 | 프롬프트에 실리는 것 | 근거 |
+|---|---|---|---|
+| 1 | `languageDirection === 'ko-en'` | 존댓말 레벨을 **싣지 않는다** | 영어 출력에 합쇼체/해요체 구분이 없다 |
+| 2 | `sender.profile.honorificLevel === 'hapsyo' \| 'haeyo'` | **그 값**을 명시 지정 | AC-046 ② 프로필 절 |
+| 3 | `sender.profile.honorificLevel === null` (미응답·`skipped`·`not_started`) | 🔴 **레벨을 지정하지 않는다.** "한 메시지 안에서 하나의 종결어미 레벨을 끝까지 유지하라"는 **일관성 지시만** 싣는다 | AC-046 ① 은 개인화와 무관하게 항상 요구되고, AC-059 ②③ 은 빈 프로필에 값을 채우는 것을 금지한다. **둘을 동시에 만족하는 유일한 형태가 "레벨 미지정 + 일관성 요구"** 다 |
+| 4 | 해당 상대에게 쌍방 규약(`PairProtocol`)이 있다 | **행 2·3의 결과가 그대로 유지된다** — 규약은 존댓말 레벨에 관여하지 않는다 | 아래 "AC-046 ②의 규약 절" 참조 |
+| 5 | 출력에 레벨 혼용이 실제로 발생 | `warnings[]` 에 `honorificLevelMixed` (AC-046 ③) | 행 1~4와 독립. 어느 행에서도 검사한다 |
+
+#### 🔴 행 3 — 빈 프로필에 기본 레벨을 지정하지 않는 이유 (DECISIONS #40)
+
+기각한 대안은 **"프로필이 비면 `haeyo`(해요체)를 기본값으로 지정한다"** 이다. AC-046 ①만 보면 성립하지만 셋이 걸린다.
+
+1. **명세 문장과 어긋난다.** `docs/UX.md` UX-004 Business Rules(:430): *"C3 profile lookup (**skipped entirely if the sender's profile is empty/skipped, AC-059③ — never substituted with guessed defaults**)"*. 이 문서 Data Flow ③ 도 같은 문장을 쓴다. 값을 지정하는 순간 "건너뛴다"가 사실이 아니게 된다.
+2. 🔴 **캐시 키가 두 상태를 구분하지 못한다.** cacheKey는 `canonicalJSON(payload)` 를 포함한다(Data Flow 2). 기본값을 채우면 **"프로필 비어 있음"과 "프로필=해요체"의 payload가 완전히 같아져** 같은 키가 되고, 로그·테스트 출력·캐시 어디에서도 두 경우를 구분할 수 없다. 이것은 F1-a가 `signal_absent`/`undetermined` 를 분리하고 AC-063 ②가 "화면은 같아도 내부 상태는 구분"을 요구한 것과 **정확히 같은 문제**다.
+3. **판정 근거가 없다.** 해요체를 고른 근거는 implementer 스스로 "측정되지 않음(추정)"이라고 적었고, `docs/TestCases.md` AC-046 10건의 판정 절차는 *"프로필=합쇼체 / 프로필=해요체 두 조건으로 실행"* 이라 **빈 프로필 케이스가 0건**이다(measured — `docs/TestCases.md:125`). 즉 이 기본값은 어떤 AC도 요구하지 않고 어떤 케이스도 검증하지 않는다. Conventions 9("없는 값을 지어내지 않는다")의 대상이다.
+
+**행 3이 AC-046 ①을 어떻게 만족하는가**: AC-046 ①이 요구하는 것은 *"한 메시지 안의 혼용 0건"* 이지 *"특정 레벨"* 이 아니다. 프롬프트가 레벨을 고르지 않아도 "하나를 골라 끝까지 유지하라"는 지시로 충족된다. 메시지 **간** 레벨이 달라지는 것은 AC-046이 금지하지 않는다.
+**대가(숨기지 않는다)**: 빈 프로필 사용자의 출력 레지스터가 호출마다 달라질 수 있다. 일관된 레지스터가 필요하면 그것은 **온보딩을 완료하는 것**(AC-059 ④, UX-009의 "온보딩 완료하기")이지 시스템이 대신 고르는 것이 아니다.
+
+#### 🔴 AC-046 ②의 규약 절 — MVP 구현 대상에서 제외 (DECISIONS #39 · ADR-0007)
+
+AC-046 ②는 *"해당 상대에 대한 #24 쌍방 규약이 있으면 **규약 값이 우선**"* 을 요구한다. **그 값을 담을 자리가 규약에 없다**(measured 2026-08-05 — `docs/Database.md` `pair_protocols` 컬럼 목록 · `packages/core/src/contract.ts` `PairProtocol` · `docs/API.md` `PUT /api/protocol` Request 전부에서 "honorific"·"존댓말" 매치 0건).
+
+- **축을 5개로 늘리지 않는다.** 4축은 **AC-037이 열거**했고 `docs/UX.md` UX-011도 *"the 4 items"* 로 고정했다. 축을 늘리는 것은 AC-037의 정의를 바꾸는 일이라 **planner 소관**이며 architect가 단독으로 할 수 없다(AGENTS.md — "No agent invents requirements").
+- **기존 축 재해석도 하지 않는다.** `address_form`(호칭)은 *2인칭 호칭 표기*(`김 대리님` / `Sujin Kim` — AC-047, UX-010)이고 존댓말 레벨은 *종결어미 레지스터*다. 겹쳐 담으면 한 컬럼이 두 의미를 갖고, AC-083 ①의 대조 축(*호칭 ↔ 실제 호명 방식*)이 무엇을 비교하는지 판정 불가가 된다.
+- **판정 수단도 없다.** `docs/TestCases.md` AC-046 10건에 규약 조건 케이스가 **0건**이다(measured, :125). 지금 구현해도 통과를 증명할 케이스가 없다.
+
+**따라서 AC-046은 ①(혼용 0건) + ②의 프로필 절 + ③(경고)로 종결 가능하며, ②의 규약 절만 미구현으로 남는다.** 이 사실은 T10 완료 보고에 명시한다 — 조용히 통과시키면 AC-034 계열("없는 것을 있는 것처럼")이 된다.
+**재논의 시점**: T41·T42(규약 UI) 착수 시. 그때도 architect가 아니라 **planner가 AC-037/AC-046 ②의 정합을 먼저 결정**해야 한다(ADR-0007 Follow-up).
+
+---
 
 ### 2) LLM 호출 3단 해석 (AC-041 — Decision #29가 architect에게 넘긴 설계)
 
@@ -717,6 +760,7 @@ implementer가 지켜야 할 아키텍처 규칙. 위반은 reviewer의 Major �
 11. **DB 조회물은 core 밖에서 조회해 `deps.data` 로 넘긴다.** core 안에 조회 함수·조회 인터페이스를 만들지 않는다(조회 *결과*만 받는다 — F1-b). 새 조회물이 생기면 F1-b의 판정표에 행을 추가한 뒤 반영하고, 임의로 `MediationInput` 에 필드를 늘리지 않는다. 위반 판정: `packages/core` 안에 `Promise` 를 반환하는 저장소성 인자가 새로 생긴 diff(예외: `LLMClient`).
 12. **네이밍/디렉터리/스타일 세부 규칙은 `docs/CodingRules.md`(User 소유)** — architect는 편집하지 않는다. <br>🔴 **2026-08-04 정정**: 이 항목은 *"Naming/Directory/Style 표가 비어 있어 DoD Gate 'Lint passes'가 실행 불가"* 라고 적고 있었다. **결론(당시 실행 불가)은 맞았지만 원인이 틀렸다.** `docs/CodingRules.md` 는 **이미 채워져 있다**(measured — architect가 2026-08-04 전문 열람, 126줄. Naming 12행 / Directory Rules 11행 / Style 6항목 / Error Handling 7행 / Tests 표 6행 + "채우지 않은 칸" 5행이 모두 값과 판정 방법을 갖고 있다. DECISIONS #34로 architect가 초안을 작성했다). 진짜 원인은 **설정 파일이 T2 산출물이었다는 것**이며, 그 사실은 `docs/CodingRules.md:7`·:81 이 이미 조건부로 명시하고 있었다. <br>✅ **그 조건도 해소됐다** — T2가 `eslint.config.js` · `.prettierrc` · `vitest.config.ts` · `.github/workflows/ci.yml` 을 생성했다(measured — 2026-08-04 리포에 파일 존재 확인). **"Lint passes"는 이제 실행 가능하며 사용자 승인 skip이 필요하지 않다.**
 13. 🔴 **불변식은 주석이 아니라 타입으로 쓴다(F1-c).** `TicketOption` · `TicketResult`(`decisionAuthority`) · `DecisionItem`(`authorityStatus`)의 짝은 **판별 유니온**이며, 값을 만들 때는 `rules/ticket-gate.ts` 의 `ticketOptionFrom()` 과 `rules/decision-authority.ts` 의 `resolveAuthority()` **만** 쓴다. <br>**위반 판정**: ① 이 세 타입을 `boolean`/평 enum + 별도 필드로 되돌리는 diff ② 짝을 객체 리터럴로 손수 조립하는 diff(생성자 우회) ③ 이 타입들을 `z.object({...})` 로 표현한 zod 스키마(불법 조합을 되살린다 — `z.discriminatedUnion` 을 쓴다) ④ `contract.test.ts` 의 `@ts-expect-error` 를 지우거나 `@ts-ignore` 로 바꾸는 diff(`@ts-ignore` 는 조합이 합법이 돼도 조용히 통과한다).
+14. 🔴 **존댓말 레벨은 Data Flow 1-a 판정표대로만 결정한다.** 프로필이 비면 **레벨을 지정하지 않고 일관성만 지시**하며(행 3), 쌍방 규약은 존댓말 레벨에 관여하지 않는다(행 4). <br>**위반 판정**: ① `DEFAULT_HONORIFIC_LEVEL` 류의 기본 레벨 상수를 두거나 `?? '해요체'` 로 채우는 diff ② `pair_protocols`/`PairProtocol`/`PUT /api/protocol` 에 5번째 축(존댓말 등)을 추가하는 diff ③ `address_form` 에 종결어미 레벨을 실어 보내는 diff ④ "규약에 존댓말 축이 추가되면"을 전제로 하는 코드·주석(금지된 경로를 후속 지시로 남기는 것 — DECISIONS #39).
 
 ---
 

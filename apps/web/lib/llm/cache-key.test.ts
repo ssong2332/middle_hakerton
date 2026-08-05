@@ -5,6 +5,7 @@
  * 정규화 = 앞뒤 공백 제거 + 개행 통일. `docs/Database.md:260` "user_id 를 키에 넣지 않는다".
  */
 import { describe, expect, it } from 'vitest';
+import { C2_PROMPT_VERSION, runToneTransform, type LLMClient } from '@cross-border/core';
 import { buildCacheKey, canonicalJson } from './cache-key';
 
 describe('buildCacheKey', () => {
@@ -75,5 +76,57 @@ describe('canonicalJson', () => {
     const a = canonicalJson({ list: [1, 2, 3] });
     const b = canonicalJson({ list: [3, 2, 1] });
     expect(a).not.toBe(b);
+  });
+});
+
+/**
+ * C2(T10) 존댓말 레벨 — `honorificLevel: null`(빈 프로필)과 명시값의 캐시 키 구분(DECISIONS #40,
+ * `docs/adr/0007-honorific-level-resolution-boundary.md` D2). 🔴 이전 구현은 `steps/c2.ts`에서
+ * `honorificLevel ?? DEFAULT_HONORIFIC_LEVEL`로 빈 프로필을 'haeyo'로 미리 채웠다 — 그 결과
+ * "프로필 없음"과 "프로필=해요체"의 payload가 완전히 같아져 같은 cacheKey가 됐다(ADR-0007이
+ * 지적한 실패). 이 블록은 `runToneTransform`이 `LLMClient.complete()`에 실제로 넘기는 payload를
+ * 캡처해 그 문제가 고쳐졌는지 검증한다.
+ */
+describe('C2 톤 변환 — honorificLevel:null(빈 프로필) vs 명시값의 캐시 키 구분', () => {
+  async function capturePayload(honorificLevel: 'hapsyo' | 'haeyo' | null): Promise<unknown> {
+    let captured: unknown;
+    const llm: LLMClient = {
+      complete: async (_step, _promptVersion, payload) => {
+        captured = payload;
+        return {
+          content: JSON.stringify({ transformed: 'x', reason: 'y', preserved: [], misreadRisks: [] }),
+          source: 'live',
+        };
+      },
+    };
+    await runToneTransform(
+      { text: 'hi', languageDirection: 'en-ko', honorificLevel, referenceDate: '2026-08-05' },
+      llm,
+    );
+    return captured;
+  }
+
+  it('honorificLevel:null과 honorificLevel:"haeyo"가 서로 다른 payload를 낳는다(기본값으로 채워지지 않는다)', async () => {
+    const nullPayload = await capturePayload(null);
+    const haeyoPayload = await capturePayload('haeyo');
+
+    expect(canonicalJson(nullPayload)).not.toBe(canonicalJson(haeyoPayload));
+  });
+
+  it('위 두 payload가 서로 다른 cacheKey를 낳는다(같은 model/promptVersion/step 기준)', async () => {
+    const nullPayload = await capturePayload(null);
+    const haeyoPayload = await capturePayload('haeyo');
+
+    const keyForNull = buildCacheKey('gpt-4o-mini', C2_PROMPT_VERSION, 'c2', nullPayload);
+    const keyForHaeyo = buildCacheKey('gpt-4o-mini', C2_PROMPT_VERSION, 'c2', haeyoPayload);
+
+    expect(keyForNull).not.toBe(keyForHaeyo);
+  });
+
+  it('honorificLevel:null일 때 payload.instruction에 특정 레벨 문자열(합쇼체/해요체)이 지정되지 않는다', async () => {
+    const nullPayload = (await capturePayload(null)) as { instruction: string };
+
+    expect(nullPayload.instruction).not.toContain('output: 합쇼체');
+    expect(nullPayload.instruction).not.toContain('output: 해요체');
   });
 });

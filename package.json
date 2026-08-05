@@ -15,7 +15,8 @@
     "build": "npm run build --workspace apps/web",
     "build:ext": "npm run build --workspace apps/extension",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:regression-c2": "vitest run tests/regression-c2.live.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

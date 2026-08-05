@@ -209,7 +209,7 @@ UX-011(UF-008) / AC-037, AC-075
 | Request | GET: `?counterpart=<email>` / PUT: `{ counterpart, directnessAllowed?, emojiPolicy?, addressForm?, deadlineStyle? }` |
 | Response 200 | `{ pairKey, counterpart, directnessAllowed \| null, emojiPolicy \| null, addressForm \| null, deadlineStyle \| null, authorshipState: 'untouched'\|'inference_draft'\|'sender_confirmed'\|'counterpart_authored', updatedAt }` <br>🔴 `authorshipState` 는 UX-011의 "누가 정한 규칙인가" 배지의 유일한 입력(AC-075④) |
 | Errors | 400 · 401 |
-| 서버 규칙 | 🔴 **저장 시 규약 값과 `authorshipState` 를 같은 UPDATE 로 함께 쓴다**(UX-011 Data Operations). 저장 주체가 `party_a`/`party_b` 중 상대편이면 `counterpart_authored`, 발신자 본인이면 `sender_confirmed` <br>🔴 **축을 5개로 늘리는 요청은 400 으로 거부**한다(AC-073②: 5번째 필드가 물리적으로 존재할 수 없어야 한다) |
+| 서버 규칙 | 🔴 **저장 시 규약 값과 `authorshipState` 를 같은 UPDATE 로 함께 쓴다**(UX-011 Data Operations). 저장 주체가 `party_a`/`party_b` 중 상대편이면 `counterpart_authored`, 발신자 본인이면 `sender_confirmed` <br>🔴 **축을 5개로 늘리는 요청은 400 으로 거부**한다 — 요청 body의 미지 키는 무시가 아니라 거부다(zod `.strict()`). <br>🔴 **2026-08-05 정정**: 이 행은 근거를 *"AC-073②: 5번째 필드가 물리적으로 존재할 수 없어야 한다"* 로 적고 있었으나 **PRD에 그 문장은 없다**(measured — `docs/PRD.md:591` 의 AC-073 ②는 **스타일 제안의 축**을 규약 4항목으로 묶는 조항이다). **결론은 유지하되 근거를 교체한다**: ⓐ **AC-037이 4항목을 열거**하므로 축 추가는 planner 소관이고 ⓑ `docs/UX.md` UX-011이 4개 입력으로 화면을 고정했으며 ⓒ AC-073 ②의 "축 이름 대조" 판정이 4축 전제 위에서만 성립한다. 상세는 `docs/Database.md` `pair_protocols` 정정 노트. <br>🔴 **존댓말 레벨(AC-046 ②)은 이 라우트의 필드가 아니다** — 규약에 담을 자리가 없어 MVP 구현 대상에서 제외했다(`docs/Architecture.md` Data Flow 1-a · DECISIONS #39 · ADR-0007). `honorificLevel` 을 body에 추가하는 diff는 반려한다 |
 
 #### POST /api/protocol/confirm-inference
 UX-018 Stage 4(UF-018) / AC-074 — **P2, #34와 함께 컷**
