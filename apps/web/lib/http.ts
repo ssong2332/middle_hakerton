@@ -42,6 +42,12 @@ export interface WithApiOptions<TInput> {
   schema?: ZodType<TInput>;
   /** `/api/health` 등 인증 불필요 라우트만 `false`. 기본값 `true`(`docs/API.md` Conventions "인증"). */
   requireAuth?: boolean;
+  /**
+   * 성공 응답 HTTP 상태 코드. 기본값 `200`. 🔴 T14 — `POST /api/messages`는 리소스를 생성하므로
+   * `docs/API.md` "POST /api/messages" Response가 `201`을 명시한다. 이 옵션이 없으면 새 리소스를
+   * 만드는 라우트도 전부 200으로 나가 계약과 어긋난다.
+   */
+  successStatus?: number;
 }
 
 export interface ApiHandlerArgs<TInput> {
@@ -139,6 +145,7 @@ export function withApi<TInput, TOutput>(
   handler: (args: ApiHandlerArgs<TInput>) => Promise<TOutput>,
 ): (request: Request) => Promise<NextResponse<TOutput | ApiErrorBody>> {
   const requireAuth = options.requireAuth ?? true;
+  const successStatus = options.successStatus ?? 200;
 
   return async (request: Request): Promise<NextResponse<TOutput | ApiErrorBody>> => {
     try {
@@ -149,7 +156,7 @@ export function withApi<TInput, TOutput>(
 
       const input = await parseInput(request, options.schema);
       const output = await handler({ input, request, session });
-      return NextResponse.json(output);
+      return NextResponse.json(output, { status: successStatus });
     } catch (error) {
       return errorResponseFrom(error);
     }

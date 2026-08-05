@@ -85,6 +85,21 @@ describe('withApi', () => {
     });
   });
 
+  // T14 — `POST /api/messages`는 201을 반환해야 한다(`docs/API.md` "POST /api/messages" Response
+  // 201). 기본값은 여전히 200(기존 라우트 전부 무변경)이며, `successStatus` 옵션을 준 라우트만
+  // 바뀐 상태 코드를 쓴다.
+  it('successStatus 옵션을 주면 그 상태 코드로 성공 응답을 반환한다(T14, 기본값 200 유지)', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+    const handler = vi.fn().mockResolvedValue({ created: true });
+    const route = withApi({ requireAuth: true, successStatus: 201 }, handler);
+
+    const response = await route(jsonRequest({}));
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body).toEqual({ created: true });
+  });
+
   it('핸들러가 CoreError를 던지면 그 code/retryable에 맞는 HTTP 상태로 매핑한다 (Route Handler 본문의 try/catch를 대신한다)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
     const handler = vi.fn().mockRejectedValue(new NotFoundError('없음'));
