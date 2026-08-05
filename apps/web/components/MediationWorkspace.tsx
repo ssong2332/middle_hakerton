@@ -108,6 +108,11 @@ export function MediationWorkspace() {
   // 승인 대상 최종문 — 중재 성공 시 result.transformed로 초기화되고, 승인 전 편집 가능하다
   // (`docs/UX.md` UX-004 Secondary Actions "Edit transformed text before approving").
   const [finalText, setFinalText] = useState('');
+  // 🔴 Major 2(reviewer REJECTED → 수정) — `handleRunMediation`이 finalText를 프로그램적으로
+  // 채우거나(live/cache) 비울(fallback) 때마다 그 값을 기록한다. 재실행(재시도) 응답이 오면 이
+  // ref와 현재 `finalText`를 비교해 "그 사이 사용자가 직접 편집했는지"를 판정한다 — 사용자가
+  // 폴백 뒤 직접 쓴 영문 발송문은 다음 재실행이 다시 폴백이어도 덮어써서 지우면 안 된다.
+  const lastAutoFilledFinalTextRef = useRef<string>('');
   // Critical — 승인 대상 스냅샷. 성공 시점에만 갱신되고, 이후 편집 중인 라이브 state와는 별개다.
   const [approvalSnapshot, setApprovalSnapshot] = useState<ApprovalSnapshot | null>(null);
   const [approveStatus, setApproveStatus] = useState<ApproveStatus>('idle');
@@ -189,7 +194,37 @@ export function MediationWorkspace() {
       }
       const body = (await response.json()) as MediationResult;
       setResult(body);
-      setFinalText(body.transformed);
+      // 🔴 Critical(reviewer REJECTED → 수정, 사용자 결정 2026-08-06) — `cache`는 `fallback`과
+      // 다르다. `fallback`은 사용자가 쓴 원문과 무관한 고정 시나리오 문구지만
+      // (`packages/core/src/data/fallback-responses.ts`), `cache`는 **같은 입력에 대해 예전에
+      // 실제로 성공한 LLM 응답**을 그대로 재사용한 것이다(`apps/web/lib/llm/openai.ts:245-254`가
+      // 캐시 적중 시 반환하는 `cacheHit.response`는 과거 실호출의 결과이고, `cache-key.ts:58-68`의
+      // 캐시 키는 정규화된 입력의 해시라 다른 입력이 우연히 같은 캐시를 맞는 경로가 없다). 이
+      // 리포는 발표 중 API 호출을 줄이려고 캐시를 의도적으로 쓰므로(`docs/PRD.md:914`, Planning
+      // Decision #29), `cache`를 `fallback`과 동일하게 취급해 비우면 리허설 한 번만으로 발표 본
+      // 실행이 캐시 히트가 되어 발송문 입력창이 매번 비고 승인이 막히는 회귀가 된다. `finalText`는
+      // `fallback`일 때만 비우고, `live`/`cache`는 둘 다 채운다. 빈 발송문 승인 비활성화(MJ-3,
+      // `RecipientPanel.tsx`의 `isFinalTextEmpty`)가 이미 있어 fallback 상태에서는 자연스럽게
+      // 승인이 막힌다. C2 출처 판정은 `SenderPanel.tsx`의 `result.stepSources?.c2 ?? result.source`
+      // 패턴을 그대로 따른다(정보를 지어내지 않는다 — `stepSources`가 없으면 구 계약 필드인 집계
+      // `source`로 degrade).
+      const c2Source = body.stepSources?.c2 ?? body.source;
+      if (c2Source === 'fallback') {
+        // Major 2 — 직전 자동 채움 값과 현재 finalText가 다르면(=사용자가 그 사이 직접 편집)
+        // 폴백이 다시 와도 사용자가 쓴 원문을 지우지 않는다.
+        //
+        // MJ-A(reviewer 2라운드 경고 → 수정) — 클로저로 캡처된 `finalText`(이 함수가 시작된
+        // 시점의 값)와 비교하면, 재실행이 진행되는 동안(`isRunning`이어도 최종 발송문 textarea는
+        // 비활성화되지 않는다 — `RecipientPanel.tsx`는 `disabled={isDelivered}`뿐) 사용자가 그
+        // 사이 편집한 값이 무시되고 "재실행 시작 시점"의 옛 값으로 "편집 안 했다"고 오판정해
+        // 방금 입력한 텍스트를 지울 수 있었다. 함수형 업데이트로 항상 응답이 도착한 시점의
+        // 실제 최신 state(prev)와 비교한다 — stale closure가 개입할 여지가 없다.
+        setFinalText((prev) => (prev === lastAutoFilledFinalTextRef.current ? '' : prev));
+        lastAutoFilledFinalTextRef.current = '';
+      } else {
+        setFinalText(body.transformed);
+        lastAutoFilledFinalTextRef.current = body.transformed;
+      }
       // Critical — 이 실행이 실제로 검토·승인 가능한 대상이 되는 유일한 지점. text/recipient는
       // 이 요청을 만든 값 그대로, urgency는 서버가 반영한 값 그대로 고정한다.
       setApprovalSnapshot({
@@ -234,6 +269,19 @@ export function MediationWorkspace() {
         body: JSON.stringify({
           originalText: approvalSnapshot.text,
           finalText,
+          // Major 3(reviewer 재검토 → 판단 유지, 수정 안 함) — `approvalSnapshot`이 어느 스텝
+          // 출처(live/cache/fallback)에서 나왔는지 담지 않으므로, fallback 승인 시 `transformed`가
+          // 사용자가 쓴 `finalText`와 무관한 폴백 시나리오 문구일 수 있다는 지적은 사실이다. 다만
+          // `messagesRequestSchema.aiSuggestedText`(`apps/web/app/api/messages/route.ts:39`)는
+          // `z.string().min(1)`로 필수이고 `diff_records` 스키마(`docs/Database.md`)에는 이
+          // diff가 fallback에서 나왔는지 표시할 필드가 없다 — 그런 필드를 새로 만드는 것은 API
+          // 계약·DB 스키마 변경이라 architect 소관이다(add 시 `docs/DECISIONS.md` 등재 필요).
+          // 현재로선 이 diff를 실제로 소비하는 로직(T20 패턴 분류, AC-012/013)이 아직 `todo`이고
+          // `diff_records.pattern_key`는 그 이전까지 항상 `null`로 저장되므로(`storage.ts` 참조)
+          // 지금 당장 이 값으로 오염되는 다운스트림 판정은 없다. `transformed`를 다른 값(빈
+          // 문자열·정적 마커 등)으로 바꾸면 오히려 "그 시점에 사용자에게 실제로 보였던 제안문"이라는
+          // 사실성을 잃는다. 스키마에 출처 필드(예: `c2_source`)를 추가해 T20이 fallback 유래 diff를
+          // 제외할 수 있게 하는 것을 architect에게 권고한다 — 이번 태스크 범위에서는 변경하지 않는다.
           aiSuggestedText: approvalSnapshot.transformed,
           urgency: approvalSnapshot.urgency,
           recipient: approvalSnapshot.recipient,
