@@ -44,13 +44,25 @@ export class ValidationError extends CoreError {
   readonly retryable = false as const;
 }
 
-/** `docs/API.md` `LLM_UNAVAILABLE`(503) — 폴백조차 없을 때(`LLMClient.complete()` 실패 계약 표 참조). */
+/**
+ * `docs/API.md` `LLM_UNAVAILABLE`(503) — 폴백조차 없고, **원인이 실제 호출 실패**(네트워크·5xx·
+ * 응답이 `LLM_MALFORMED`로 검증 실패)일 때(`LLMClient.complete()` 실패 계약 표 참조).
+ * `retryable: true` — 재시도하면 성공할 수도 있다. 🔴 원인이 요청 상한 초과(OpenAI를 아예
+ * 호출하지 않음)라면 이 에러가 아니라 `QuotaExceededError`다(2026-08-04 정정 — 아래 참조).
+ */
 export class LLMUnavailableError extends CoreError {
   readonly code = 'LLM_UNAVAILABLE' as const;
   readonly retryable = true as const;
 }
 
-/** `docs/API.md` `QUOTA_EXCEEDED` — 🔴 실제로는 200 + `source:'fallback'`이 우선이며(AC-041), 이 에러는 폴백조차 없을 때의 잔여 경로다. */
+/**
+ * `docs/API.md` `QUOTA_EXCEEDED` — 🔴 실제로는 200 + `source:'fallback'`이 우선이며(AC-041),
+ * 이 에러는 **요청 상한 초과로 OpenAI를 아예 호출하지 않았고 폴백도 없을 때**의 잔여 경로다
+ * (`LLMClient.complete()` 실패 계약 표 참조). `retryable: false` — 상한은 오늘 안에 재시도해도
+ * 동일하게 실패한다. 호출 자체가 실패한 경우(네트워크·5xx·응답 검증 실패)는 `LLMUnavailableError`다
+ * — 이 구분은 2026-08-04에 정정됐다(이전에는 `client.ts`가 두 원인 모두 `LLMUnavailableError`
+ * 하나로 뭉뚱그려 이 JSDoc과 모순됐다).
+ */
 export class QuotaExceededError extends CoreError {
   readonly code = 'QUOTA_EXCEEDED' as const;
   readonly retryable = false as const;

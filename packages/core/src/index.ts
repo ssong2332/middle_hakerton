@@ -11,3 +11,4 @@ export * from './llm/client';
 export * from './errors';
 export * from './rules/decision-authority';
 export * from './rules/ticket-gate';
+export * from './data/fallback-responses';

@@ -31,5 +31,5 @@ export function withApi<TInput, TOutput>(
   _options: WithApiOptions<TInput>,
   _handler: (input: TInput, request: Request) => Promise<TOutput>,
 ): (request: Request) => Promise<NextResponse<TOutput | ApiErrorBody>> {
-  throw new Error('Not implemented — T4에서 채운다');
+  throw new Error('Not implemented — T5에서 채운다');
 }
