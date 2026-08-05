@@ -393,6 +393,49 @@ export type TicketOption =
   | { offered: true; basis: 'signal_present' }
   | { offered: false; basis: 'signal_absent' | 'undetermined' };
 
+/**
+ * 🔴 **F1-e (2026-08-05 · DECISIONS #48 · ADR-0009) — 스텝별 출처(provenance).**
+ * `POST /api/mediate` 한 번은 LLM을 **3회** 호출하며(C1 긴급도 · C2 톤 변환 · C4 역번역,
+ * `docs/Architecture.md` Data Flow 1의 고정 순서 — AC-032), **출처는 호출마다 따로 결정된다**:
+ * `apps/web/lib/llm/openai.ts` 의 `complete()` 안에서 `:253`(cache) · `:323`(live) ·
+ * `:335`(fallback)가 판정되고, 스텝 자신도 스키마 검증 실패 시 폴백으로 강등한다
+ * (`steps/c1.ts:92` · `steps/c2.ts:172` · `steps/c4.ts:102`). 즉 **세 값이 같다는 보장이 없다.**
+ *
+ * ## 🔴 단일 `source` 만으로는 표시가 불가능한 이유 (이 필드를 만든 근거)
+ *
+ * 1. **AC-041이 요구하는 것은 "폴백 중임을 화면에 표시"이고, `docs/UX.md` Interaction Patterns
+ *    (:920)는 그 라벨을 *"near the result"* 에 두라고 규정한다.** 결과가 세 영역(등급 / 변환문 /
+ *    역번역)으로 나뉘어 렌더되므로, 어느 영역이 통조림인지 모르면 라벨을 어디에도 정확히 붙일 수 없다.
+ * 2. **두 방향의 오표시가 실재한다(measured).** `combineSource`(`apps/web/app/api/mediate/route.ts:82`)
+ *    가 "가장 신뢰도 낮은 쪽이 이긴다"로 합치므로 ⓐ C2 live + C4 fallback → 라이브 변환문 옆에
+ *    폴백 배지가 뜰 수 있고 ⓑ C2 fallback + C4 live → 통조림 변환문에 배지가 붙지 않을 수 있다.
+ *    2026-08-05 라운드의 `ComparisonView.tsx` 배지 추가가 ⓐ 때문에 원복된 것이 이 필드의 발단이다.
+ * 3. 🔴 **가장 큰 손실은 배지가 아니라 AC-001/AC-002다.** 폴백 c4 문구는 **폴백 c2 문구를
+ *    역번역해 만든 고정 문자열**이다(`data/fallback-responses.ts:58~62`·`:96~100`). 따라서
+ *    C2 live + C4 fallback이면 `backTranslation` 은 **화면에 보이는 `transformed` 의 역번역이 아니다** —
+ *    "역번역으로 큰 오역을 걸러낸다"는 안전장치가 조용히 무력화된다. 이 상태를 화면이 알아채려면
+ *    스텝별 값이 필요하다.
+ *
+ * ## 이 형식을 택한 이유
+ *
+ * - **`source` 를 없애지 않고 덧붙인다.** 화면 레벨 단일 배지(`docs/UX.md` UX-004 States "Fallback")
+ *   에는 합쳐진 한 값이 여전히 정확한 입력이고, 없애면 기존 소비처·목 데이터·확장 어댑터가 한꺼번에
+ *   깨진다(F1-a가 `ticketOption` 을 12번째로 **덧붙인** 것과 같은 방식).
+ * - **선택적(`?`) 프로퍼티를 쓰지 않는다.** 세 스텝은 AC-032 고정 순서상 `POST /api/mediate` 에서
+ *   **항상 실행**되므로 "값이 없는 스텝"이 존재하지 않는다(파일 헤더 "선택적 프로퍼티를 쓰지 않는 이유").
+ * - 🔴 **C6·C7을 여기에 넣지 않는다.** 둘은 별도 엔드포인트이고 각각 **LLM 호출이 1회**라
+ *   `TicketResultBase.source` · `SummaryResult.source` 의 단일 값이 이미 정확하다. 합치는 순간
+ *   "합쳐서 잃는 정보"가 없던 곳에까지 이 구조를 퍼뜨리게 된다.
+ */
+export interface StepSources {
+  /** C1 긴급도 분류(`runUrgencyClassification`)의 출처. 산출물: `urgency`(판정분) · `urgencyReason`. */
+  c1: ResponseSource;
+  /** C2 톤 변환(`runToneTransform`)의 출처. 산출물: `transformed` · `reason` · `preserved[]` · `misreadRisks[]`. */
+  c2: ResponseSource;
+  /** C4 역번역(`runBackTranslation`)의 출처. 산출물: `backTranslation`. */
+  c4: ResponseSource;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 응답 (Result) — 주 경로
 // ─────────────────────────────────────────────────────────────────────────────
@@ -454,10 +497,30 @@ export interface MediationResult {
    */
   personalizationApplied: boolean;
   /**
-   * 🔴 이 응답의 출처 (AC-041). `'fallback'` 이면 UI가 "폴백 응답 사용 중" 배지를 렌더한다
-   * — `ResponseSource` 주석 참조.
+   * 🔴 이 응답 **전체**의 출처 (AC-041). `'live'` 가 아니면 UI가 화면 레벨 "폴백 응답 사용 중"
+   * 배지를 렌더한다 — `ResponseSource` 주석 참조.
+   *
+   * 🔴 **`stepSources` 에서 파생되는 값이다(F1-e 불변식)**: `source` 는 `stepSources` 의 세 값 중
+   * **가장 신뢰도가 낮은 것**과 같다(우선순위 `fallback` > `cache` > `live`). 이 규칙은
+   * `apps/web/app/api/mediate/route.ts:82` 의 `combineSource` 가 명세 없이 쓰고 있던 것을
+   * F1-e가 계약으로 승격한 것이다 — **어느 영역에 배지를 붙일지**는 이 필드가 아니라
+   * `stepSources` 가 결정한다.
    */
   source: ResponseSource;
+  /**
+   * 🔴 **13번째 필드** (2026-08-05 추가 — DECISIONS #48 · ADR-0009 · `docs/Architecture.md` F1-e).
+   * 스텝별 출처. `StepSources` 주석이 이 필드가 필요한 이유 3가지를 담고 있다.
+   *
+   * 🔴 **앞의 12개 필드는 이 추가로 바뀌지 않았다** — 순서·이름·타입·값 어휘 모두 그대로이고
+   * 13번째로 덧붙었을 뿐이다(F1-a가 `ticketOption` 을 덧붙인 것과 같은 성격의 변경).
+   *
+   * 🔴 **불변식은 타입으로 강제되지 않는다 — 판별 유니온으로 표현할 수 없기 때문이다.**
+   * F1-c의 기법은 *짝* 제약(`offered` ⟺ `basis`)에만 통하고, 여기 불변식은 **세 값의 집계**라
+   * 유니온으로 쓰면 3³ = 27조합이 된다(가독성이 무너지고 지키려는 것보다 더 큰 사고 표면이 생긴다).
+   * 대신 ① 파생을 **함수 하나**로만 하고 ② 그 함수의 테스트가 불변식의 근거가 된다 — 짝을 손으로
+   * 조립하지 않는다는 Conventions 13의 취지와 같다.
+   */
+  stepSources: StepSources;
   /**
    * 🔴 **12번째 필드** (2026-08-04 추가 — DECISIONS #35 · `docs/Architecture.md` F1-a).
    * C6 티켓 옵션 게이트 판정 (AC-058). `TicketOption` 주석 참조.

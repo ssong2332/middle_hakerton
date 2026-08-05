@@ -108,6 +108,7 @@ describe('SenderPanel', () => {
       holidayConflicts: [],
       personalizationApplied: true,
       source: 'live',
+      stepSources: { c1: 'live', c2: 'live', c4: 'live' },
       ticketOption: { offered: false, basis: 'signal_absent' },
     } as never;
 
@@ -139,6 +140,7 @@ describe('SenderPanel', () => {
       holidayConflicts: [],
       personalizationApplied: true,
       source: 'live',
+      stepSources: { c1: 'live', c2: 'live', c4: 'live' },
       ticketOption: { offered: false, basis: 'signal_absent' },
     } as never;
 
@@ -174,6 +176,9 @@ describe('SenderPanel', () => {
       holidayConflicts: [],
       personalizationApplied: true,
       source: 'fallback',
+      // 🔴 F1-e — `source: 'fallback'`만으로는 더 이상 배지가 뜨지 않는다(`ComparisonView`가 이제
+      // `stepSources.c2`를 본다). C2를 fallback으로 지정해 비교 뷰 배지를 켠다.
+      stepSources: { c1: 'live', c2: 'fallback', c4: 'live' },
       ticketOption: { offered: false, basis: 'signal_absent' },
     } as never;
 
@@ -212,6 +217,7 @@ describe('SenderPanel', () => {
       holidayConflicts: [],
       personalizationApplied: true,
       source: 'live',
+      stepSources: { c1: 'live', c2: 'live', c4: 'live' },
       ticketOption: { offered: false, basis: 'signal_absent' },
     } as never;
 

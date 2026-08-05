@@ -3,6 +3,7 @@
 Owner: architect (see AGENTS.md). Others read-only.
 Major decisions are logged in DECISIONS.md; details in adr/.
 Based on PRD Version: v3.2 · Based on UX Version: 6.0 · Last Updated: 2026-08-05
+(2026-08-05 **6차 패스** — **PRD·UX 버전 갱신 없음**(v3.2 / 6.0 그대로, 버전 격차 0 — architect가 `docs/PRD.md`·`docs/UX.md` 의 Document Version 헤더를 직접 재확인). 이 패스가 바꾼 것은 **F1 확장 1건뿐**이다: **F1-e 신설 — `MediationResult` 에 스텝별 출처 `stepSources` 13번째 필드 추가**(DECISIONS #48 · ADR-0009). T15/T16 라운드에서 implementer가 architect로 라우팅한 Open Question(*"부분 폴백 시 어느 스텝이 통조림인지 화면이 구분할 수 없다"* — `apps/web/components/ComparisonView.tsx:33~39`)의 처리다. 🔴 **이 커밋은 계약만 확정한다** — `route.ts`·UI 컴포넌트를 채우는 작업은 implementer 다음 라운드이며 목록은 F1-e 절의 이월 표에 있다)
 (2026-08-05 **5차 패스** — **PRD·UX 버전 갱신 없음**(v3.2 / 6.0 그대로, 버전 격차 0 — architect가 두 문서의 Document Version 헤더를 직접 재확인). 이 패스가 바꾼 것은 **누적된 정정 5건 + 결정 기록 1건**이다: **① 라우트 이름 6건을 `docs/UX.md` IA(:890)에 맞춰 정정 + 루트 `/` 리다이렉트 확정**(DECISIONS #43) **② 로컬 env 파일 표기 `.env.local` → `.env`**(#44) **③ `POST /api/deadline/check` 에 `urgency` 추가 — AC-005 지연 절반의 서버 게이트**(#45, `docs/API.md`) **④ F1-d 신설 — 기준일을 `MediationDeps` 로**(#46 · ADR-0008) **⑤ RLS 소유자 컬럼명 정정**(#47, `docs/Database.md`) **⑥ T15 AC-028 확장 절반 이월의 사용자 승인 기록**(#42) **⑦ 설계 제1원칙의 진척 수치 갱신** — `docs/UpdateRequests.md` #2 resolved)
 (2026-08-05 4차 패스 — **PRD·UX 버전 갱신 없음**(v3.2 / 6.0 그대로, 버전 격차 0). 이 패스가 바꾼 것: **① 존댓말 레벨 결정 규칙 신설**(Data Flow 1-a — AC-046 ②의 "규약 우선" 절을 MVP 구현 대상에서 제외하고, 빈 프로필에 기본 레벨을 지정하지 않는다. DECISIONS #39·#40 · ADR-0007) **② Conventions 14 신설** **③ `docs/Database.md`·`docs/API.md` 의 AC-073 ② 오인용 정정**)
 (2026-08-04 3차 패스 — 이 패스가 바꾼 것: **① Next.js 15 → 16**(사용자 결정, DECISIONS #37) **② F1-c 신설**(계약 불변식 강제, DECISIONS #38 · ADR-0006) **③ 문서 정정 4건**(Conventions 12 / F1-b 시그니처 / 폴더 트리 / ADR-0004 Follow-up 3))
@@ -225,7 +226,9 @@ apps/web/components/*    apps/extension/src/layer2/*  (선택)
 
 **F1이 늦어지면 4명 전원이 멈춘다.** `docs/Tasks.md` Rules 첫 줄이 이미 이 규칙을 명시하고 있다("T1 완료 전 T5 이후 착수 금지").
 
-**F1 동결 후의 변경 이력** — 동결은 "절대 안 바꾼다"가 아니라 **"ADR 없이는 못 바꾼다"** 이다. 지금까지 **4건**이며 **넷 다 와이어 형식(JSON)을 바꾸지 않았다**: **F1-a**(`ticketOption` 12번째 필드 추가 — DECISIONS #35 · ADR-0005) · **F1-b**(파이프라인 시그니처 — #36 · ADR-0004) · **F1-c**(불변식 3개를 판별 유니온으로 — #38 · ADR-0006) · **F1-d**(기준일이 `MediationDeps` 로 들어온다 — #46 · ADR-0008). [FE]의 목 데이터가 깨지는 변경은 **0건**이다.
+**F1 동결 후의 변경 이력** — 동결은 "절대 안 바꾼다"가 아니라 **"ADR 없이는 못 바꾼다"** 이다. 지금까지 **5건**이다: **F1-a**(`ticketOption` 12번째 필드 추가 — DECISIONS #35 · ADR-0005) · **F1-b**(파이프라인 시그니처 — #36 · ADR-0004) · **F1-c**(불변식 3개를 판별 유니온으로 — #38 · ADR-0006) · **F1-d**(기준일이 `MediationDeps` 로 들어온다 — #46 · ADR-0008) · **F1-e**(`stepSources` 13번째 필드 추가 — #48 · ADR-0009).
+
+**기존 필드를 바꾼 변경은 여전히 0건**이다 — 다섯 건 모두 이름·타입·값 어휘를 유지한 채 덧붙이거나 조합 제약만 좁혔고, [FE]의 목 데이터가 **읽던** 값이 달라진 적은 없다. 🔴 다만 **필드를 추가하는 변경(F1-a·F1-e)은 `MediationResult` 타입으로 선언된 객체 리터럴의 필수 프로퍼티를 늘리므로 그 리터럴들이 컴파일 오류가 된다** — "와이어 형식은 그대로"와 "코드가 그대로"는 다른 말이며, 이 문서는 앞으로 둘을 구분해 적는다. F1-e의 영향 지점 목록은 아래 F1-e 절의 이월 표에 있다.
 
 ### F1 — 코어 I/O 계약 (T1이 확정할 형태)
 
@@ -249,8 +252,9 @@ export interface MediationResult {
   misreadRisks: MisreadRisk[];           // 🔴 전용 필드 — 원문이 어떻게 읽히는지 (AC-043, Decision #49)
   holidayConflicts: HolidayConflict[];   // AC-057
   personalizationApplied: boolean;       // AC-059③ / AC-066③ — 개인화 미적용 표시의 근거
-  source: 'live' | 'cache' | 'fallback'; // 🔴 AC-041 — 폴백 중임을 화면에 표시하는 근거
+  source: 'live' | 'cache' | 'fallback'; // 🔴 AC-041 — 폴백 중임을 화면에 표시하는 근거 (화면 레벨 단일 배지)
   ticketOption: TicketOption;            // 🔴 12번째 필드 (2026-08-04 추가, DECISIONS #35) — AC-058 게이트
+  stepSources: StepSources;              // 🔴 13번째 필드 (2026-08-05 추가, DECISIONS #48) — 어느 영역이 폴백인지 (F1-e)
 }
 ```
 
@@ -544,6 +548,62 @@ export interface MediationDeps {
 
 ---
 
+### F1-e — 스텝별 출처(`stepSources`) (DECISIONS #48 · ADR-0009)
+
+UX-004(UF-003) · UX-016(UF-011/012/014/015) / **AC-041**(폴백 표시) · **AC-001·AC-002**(역번역 안전장치)
+
+```ts
+// packages/core/src/contract.ts  — 🔒 Freeze Point 1
+export interface StepSources {
+  c1: ResponseSource;   // 산출물: urgency(판정분) · urgencyReason
+  c2: ResponseSource;   // 산출물: transformed · reason · preserved[] · misreadRisks[]
+  c4: ResponseSource;   // 산출물: backTranslation
+}
+
+export interface MediationResult {
+  /* …12개 필드 그대로… */
+  source: ResponseSource;        // 화면 레벨 단일 배지 (기존 필드 — 유지)
+  stepSources: StepSources;      // 🔴 13번째 필드
+}
+```
+
+**불변식(F1-c와 달리 타입으로 강제하지 않는다)**: `source` = `stepSources` 세 값 중 **가장 신뢰도가 낮은 것**(`fallback` > `cache` > `live`). 판별 유니온으로 쓰면 3³ = 27조합이 되어 지키려는 것보다 큰 사고 표면이 생긴다 — F1-c의 기법은 *짝* 제약에만 통한다. 대신 **파생 함수 하나**(아래 이월 표 #2)와 그 테스트가 근거가 된다.
+
+**소비 매핑 — 배지를 어디에 붙이는가**
+
+| 값 | 판정 대상 | 화면 영역 (현재 컴포넌트) | 근거 |
+|---|---|---|---|
+| `stepSources.c1` | `urgency`(판정분)·`urgencyReason` | 긴급도 패널(`UrgencyPanel.tsx`) | AC-041 + `docs/UX.md` Interaction Patterns(:920) *"near the result"* |
+| `stepSources.c2` | `transformed`·`reason`·`preserved[]`·`misreadRisks[]` | 비교 뷰(`ComparisonView.tsx`) | 동일 |
+| `stepSources.c4` | `backTranslation` | 역번역 프리뷰(`BackTranslationPreview.tsx`) | 동일 |
+| `source`(기존) | 응답 전체 | 화면 레벨 1개 | `docs/UX.md` UX-004 States "Fallback" |
+
+🔴 **이 표는 계약이 무엇을 가능하게 하는지를 적은 것이며, 최종 시각 표현(배지를 3개 다 띄울지, 화면 레벨 1개 + 문제 영역만 띄울지)은 ux-design 소관이다.** architect가 고정하는 것은 *"어느 값이 어느 영역의 진실인가"* 까지다.
+
+**이 필드를 만든 근거 3가지 (전부 measured — architect가 2026-08-05 직접 열람)**
+
+1. **출처는 스텝마다 따로 결정된다.** `apps/web/lib/llm/openai.ts` 의 `complete()` 안에서 `:253`(cache)·`:323`(live)·`:335`(fallback)가 판정되고, 이 함수는 C1·C2·C4마다 **한 번씩** 호출된다(`route.ts:96`·`:118`·`:131`). 스텝 자신도 스키마 검증 실패 시 폴백으로 강등한다(`steps/c1.ts:92`·`c2.ts:172`·`c4.ts:102`). **부분 폴백은 가설이 아니라 코드 경로다** — 요청 상한 판정(`openai.ts:261~281`)도 호출마다 이뤄지므로 한 요청의 C1과 C2 사이에서 상한이 넘어갈 수 있다.
+2. **오표시가 양방향으로 실재한다.** `combineSource`(`route.ts:82`)가 "가장 신뢰도 낮은 쪽이 이긴다"로 합치므로 ⓐ C2 live + C4 fallback → **라이브 변환문에 폴백 배지**, ⓑ C2 fallback + C4 live → **통조림 변환문에 배지 없음**. 2026-08-05 라운드에서 `ComparisonView.tsx` 배지가 ⓐ 때문에 원복됐고(reviewer 2라운드 확인), 그 원복이 남긴 Open Question이 이 절이다.
+3. 🔴 **가장 큰 손실은 배지가 아니라 AC-001/AC-002다.** 폴백 c4 문구는 **폴백 c2 문구를 역번역해 작성된 고정 문자열**이다(`packages/core/src/data/fallback-responses.ts:58~62`·`:96~100`). 따라서 C2 live + C4 fallback이면 `backTranslation` 은 화면에 보이는 `transformed` 의 역번역이 **아니며**, "큰 오역을 걸러내는 1차 안전장치"가 조용히 무력화된다. 세 값이 함께 폴백일 때만 성립하도록 통일해 둔 것(같은 파일 `:38~44`)이 부분 폴백에서 깨진다.
+
+**"단일 `source` 유지 + 구분 불가를 제약으로 문서화"를 택하지 않은 이유**: 그 안은 AC-041의 요구를 *배지가 뜬다*로만 읽는다(그 최소 요구는 지금도 충족된다 — QA 확인). 그러나 근거 3이 보여주듯 문제는 표시가 아니라 **정확성**이고, "어느 영역이 통조림인지 모른다"를 제약으로 확정하면 UX.md:920의 *near the result* 를 영구히 지킬 수 없다고 선언하는 셈이 된다. 비용도 근거가 되지 못한다 — `route.ts:135` 가 **이미 세 값을 손에 들고 있고** 합치기만 한다.
+
+**보안 체크리스트 재실행(이 패스)**: 신규 의존성 0 · 신규 환경변수 0 · 신규 엔드포인트/포트 0 · `stepSources` 는 **enum 3값 × 3**이라 사용자 콘텐츠·개인정보를 담지 않는다 · 저장·로그 대상 아님(`POST /api/mediate` 는 저장하지 않으며 구조화 로그 필드 목록은 DECISIONS #27 불변) · **abuse case 없음**(응답을 만든 쪽의 신뢰도를 낮게 말하는 방향으로만 쓰이며, 높게 위장하는 조합은 불변식이 금지한다). Security 절의 어떤 행도 이 패스로 바뀌지 않는다.
+
+**이월 — 이 커밋은 계약만 확정한다(코드 채우기는 implementer 다음 라운드)**
+
+| # | 항목 | 담당 | 근거 위치 |
+|---|---|---|---|
+| 1 | `route.ts` 가 `stepSources: { c1: classification.source, c2: toneSource, c4: backTranslationSource }` 를 채운다 | implementer | `route.ts:135` 가 이미 세 값을 갖고 있다 |
+| 2 | `combineSource` 의 규칙(`fallback` > `cache` > `live`)을 **파생 함수 한 곳**으로 옮긴다 — 웹·확장이 각자 다시 구현하지 않도록 `packages/core/src/rules/` 가 자연스러운 자리다(architect 권고, 파일명은 implementer 재량) | implementer | `route.ts:81~84` |
+| 3 | `ComparisonView.tsx:33~39` 의 **Open Question 주석을 이 절 참조로 갱신**하고 배지를 `stepSources.c2` 기준으로 되살린다. `SenderPanel.tsx:119~122` 의 원복 사유 주석도 같이 갱신 | implementer | 원복 이력이 그 주석에 있다 |
+| 4 | `BackTranslationPreview` 의 배지 입력을 `source` → `stepSources.c4` 로 바꾼다 | implementer | `BackTranslationPreview.tsx:53` |
+| 5 | 🔴 **필수 프로퍼티가 늘어 컴파일이 깨지는 지점**(추정 — TypeScript 필수 프로퍼티 규칙에 따른 예상. 확인 방법: `npm run typecheck`): `apps/web/app/api/mediate/route.ts:145` · `apps/web/components/SenderPanel.test.tsx:109`·`:140`·`:175`·`:213` · `apps/web/components/MediationWorkspace.test.tsx:24` 인근 `mediateSuccessResponse` | implementer | grep 결과 |
+| 6 | `apps/web/app/api/mediate/route.test.ts:146~170` 의 **"12개 필드" 키 집합 단언을 13개로** 갱신(테스트 이름 포함) | implementer | 해당 테스트가 정확한 키 집합을 단언한다 |
+| 7 | 배지 표현(3개 병렬 vs 화면 레벨 1개 + 문제 영역)을 UX-004 States/Interaction Patterns에 확정 | ux-design (선택) | 위 소비 매핑 표의 🔴 |
+
+---
+
 ### F4 — 층 2 어댑터 계약 (`registry.ts`)
 
 ```ts
@@ -660,7 +720,7 @@ core/steps/*  →  LLMClient.complete(step, promptVersion, payload)
 | **저장 위치** | **Postgres `llm_cache` 테이블** | Vercel Function은 호출마다 프로세스가 다를 수 있어 **인메모리 LRU는 발표 중 적중하지 않는다.** Vercel KV를 쓰면 무료 티어 한도가 하나 더 늘어난다 — 이미 있는 Postgres가 가장 싸다 |
 | **요청 상한** | `llm_call_log` 를 세어 **① 사용자·일 단위** `MAX_LLM_CALLS_PER_USER_PER_DAY` **② 전역·일 단위** `MAX_LLM_CALLS_GLOBAL_PER_DAY` 두 겹 | 사용자 단위만 두면 심사위원 계정이 여러 개일 때 전역 크레딧이 그대로 소진된다 |
 | **폴백 경로** | `packages/core/src/data/fallback-responses.ts` — 리포 내 정적 데이터. `docs/TestCases.md`·`docs/DemoScript.md` 의 시연 입력에 대응하는 응답을 **동일 cacheKey 로 미리 계산해** 담는다 | 발표 중 크레딧이 소진돼도 **대본에 있는 장면은 정상 동작한다.** 대본 밖 입력은 시나리오 기본값 + 폴백 배지 |
-| **폴백 표시** | `MediationResult.source === 'fallback'` 을 UI가 읽어 배지 렌더 | AC-041 "폴백 중임을 화면에 표시(실제 LLM 결과인 것처럼 보이지 않게)" |
+| **폴백 표시** | **화면 레벨**은 `MediationResult.source`(합쳐진 값)를, **영역별**은 `MediationResult.stepSources.{c1,c2,c4}` 를 읽는다(2026-08-05 F1-e · DECISIONS #48) | AC-041 "폴백 중임을 화면에 표시(실제 LLM 결과인 것처럼 보이지 않게)" + `docs/UX.md` Interaction Patterns(:920) *"near the result"*. 🔴 이 표의 ①②③ 판정이 **스텝마다 따로** 일어나므로 합쳐진 한 값으로는 어느 영역이 통조림인지 말할 수 없다 — 근거는 F1-e 절 |
 
 ### 3) 확장 층 1 (UF-015 / UX-016)
 

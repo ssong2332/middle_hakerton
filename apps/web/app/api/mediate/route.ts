@@ -34,6 +34,7 @@
  */
 import { z } from 'zod';
 import {
+  combineSource,
   honorificMixedWarning,
   resolveEffectiveUrgency,
   runBackTranslation,
@@ -42,7 +43,6 @@ import {
   ticketOptionFrom,
   type LanguageCode,
   type MediationResult,
-  type ResponseSource,
   type Warning,
 } from '@cross-border/core';
 import { withApi } from '../../../lib/http';
@@ -67,21 +67,12 @@ function senderLanguageOf(direction: 'ko-en' | 'en-ko'): LanguageCode {
   return direction === 'ko-en' ? 'ko' : 'en';
 }
 
-/**
- * 🔴 이 라우트가 지금 실제로 LLM을 세 번 호출한다(C1·C2·C4 — T10에서 C2가 추가돼 둘에서
- * 셋으로 늘었다) — `MediationResult.source`는 단일 필드라 세 호출의 출처를 하나로 합쳐야 한다.
- * `docs/Architecture.md`·`docs/API.md` 어디에도 "복수 스텝의 source를 어떻게 합치는가"에 대한
- * 명시가 없어(T28 파이프라인 오케스트레이션의 범위로 보인다), 여기서는 AC-041의 취지("실제 LLM
- * 결과인 것처럼 보이면 안 된다")를 따라 **가장 신뢰도가 낮은 쪽이 이긴다**(fallback > cache >
- * live)로 보수적으로 합친다 — 세 스텝 중 하나라도 폴백이었다면 전체 응답을 "폴백 응답 사용 중"으로
- * 표시하는 쪽이, 조용히 `live`로 보이는 쪽보다 AC-041 위반 위험이 낮다. `combineSource`를 2-인자
- * 함수로 유지하고 `reduce`로 여러 개를 접는다 — T28이 실제 파이프라인을 조립할 때 이 판단을
- * 재검토해야 한다(합치는 스텝이 더 늘어날 수 있다).
- */
-const SOURCE_PRIORITY: Record<ResponseSource, number> = { fallback: 2, cache: 1, live: 0 };
-function combineSource(a: ResponseSource, b: ResponseSource): ResponseSource {
-  return SOURCE_PRIORITY[a] >= SOURCE_PRIORITY[b] ? a : b;
-}
+// 🔴 (2026-08-05 갱신 — F1-e, DECISIONS #48 · ADR-0009) 이 라우트가 LLM을 세 번 호출한다는
+// 사실(C1·C2·C4)과 "복수 스텝의 source를 어떻게 합치는가"라는 질문은 그대로이지만, 그 답은 더
+// 이상 이 파일의 지역 판단이 아니다 — `MediationResult`가 이제 `stepSources: { c1, c2, c4 }`를
+// 계약으로 노출하고, `source = worst(stepSources)`(fallback > cache > live) 불변식과 그 유일한
+// 구현(`combineSource`)은 `packages/core/src/rules/response-source.ts`로 승격됐다(웹·확장
+// 어댑터가 각자 재구현하지 않도록). 이 라우트는 그 함수를 세 값과 함께 호출만 한다.
 
 export const POST = withApi<MediateRequest, MediationResult>(
   { schema: mediateRequestSchema, requireAuth: true },
@@ -132,7 +123,11 @@ export const POST = withApi<MediateRequest, MediationResult>(
       { text: transformed, targetLanguage: senderLanguage },
       llm,
     );
-    const source = [classification.source, toneSource, backTranslationSource].reduce(combineSource);
+    // 🔴 F1-e — 세 스텝의 출처를 계약 필드(`stepSources`)로 먼저 채우고, 화면 레벨 단일 `source`는
+    // 그 세 값에서 파생시킨다(`source = worst(stepSources)`, `combineSource` 참조). 합치는 지역
+    // 규칙을 다시 만들지 않는다 — `packages/core`가 유일한 구현이다.
+    const stepSources = { c1: classification.source, c2: toneSource, c4: backTranslationSource };
+    const source = combineSource(stepSources.c1, stepSources.c2, stepSources.c4);
 
     // AC-046③ — EN→KO 변환문의 종결어미 레벨 혼용 감지. C2가 실제 한국어 변환문을 채우므로
     // 이제 정상적으로 트리거된다.
@@ -167,6 +162,9 @@ export const POST = withApi<MediateRequest, MediationResult>(
       // 이 역시 현재 상태의 정확한 값이다(AC-059③/AC-066③).
       personalizationApplied: false,
       source,
+      // 🔴 13번째 필드(F1-e, DECISIONS #48 · ADR-0009) — 스텝별 출처. `source`는 이 값에서
+      // 파생된다(위 `combineSource` 호출 참조). 세 키 모두 AC-032 고정 순서상 항상 채워진다.
+      stepSources,
       // 🔴 C6 게이트(T24) 대기 — 판정 근거를 얻지 못했으므로 fail-closed(undetermined)가
       // 정답이다(AC-058, `ticketOptionFrom`은 이 조합만 만드는 유일한 통로).
       ticketOption: ticketOptionFrom('undetermined'),

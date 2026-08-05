@@ -12,6 +12,12 @@ export interface BackTranslationPreviewProps {
    * 있어야 한다("a pre-scripted/cached response *instead of a live LLM result*" — cache도
    * live가 아니므로 대상이다). `source:'cache'`는 `apps/web/lib/llm/openai.ts:253`으로 실제
    * 도달 가능한 값이다.
+   *
+   * 🔴 (2026-08-05 갱신 — F1-e, DECISIONS #48 · ADR-0009 D3) 호출부(`SenderPanel.tsx`)는 이제
+   * `MediationResult.source`(세 스텝 합산값)가 아니라 **`MediationResult.stepSources.c4`**를
+   * 넘긴다 — 이 컴포넌트가 보여주는 `backTranslation`은 C4 산출물이므로 "이 영역의 진실"은
+   * C4의 출처뿐이다(ADR-0009 D3 매핑표 "c4 → backTranslation"). 이 컴포넌트 자체의 prop 이름·
+   * 렌더 로직은 바뀌지 않는다 — 무엇을 넘기는지만 바뀐다.
    */
   source: ResponseSource;
 }
