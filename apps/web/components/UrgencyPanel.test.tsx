@@ -84,4 +84,51 @@ describe('UrgencyPanel', () => {
 
     expect((screen.getByLabelText('긴급도 조정') as HTMLSelectElement).value).toBe('LOW');
   });
+
+  // Minor(사용자 지시 유지보수 라운드) — `source` prop의 live/cache/fallback 단위 테스트가 0건
+  // 이었다(형제 컴포넌트 ComparisonView.test.tsx/BackTranslationPreview.test.tsx는 각각 3건씩
+  // 있다). 특히 'cache' 경로는 어디에서도 테스트되지 않았다. 판별력은 `UrgencyPanel.tsx`의
+  // `{source !== 'live' && ...}` 렌더 분기를 일시적으로 주석 처리해 재실행 → 실패(red) → 원복 →
+  // 재실행 → 통과(green)로 확인했다(구현 보고서 참조).
+  it('AC-041 — source가 live면 "폴백 응답 사용 중" 배지를 표시하지 않는다', () => {
+    render(
+      <UrgencyPanel
+        urgency="NORMAL"
+        urgencyReason="근거"
+        isOverridden={false}
+        onOverride={vi.fn()}
+        source="live"
+      />,
+    );
+
+    expect(screen.queryByText('폴백 응답 사용 중')).toBeNull();
+  });
+
+  it('AC-041 — source가 cache면 "폴백 응답 사용 중" 배지를 표시한다(캐시도 live가 아니다)', () => {
+    render(
+      <UrgencyPanel
+        urgency="NORMAL"
+        urgencyReason="근거"
+        isOverridden={false}
+        onOverride={vi.fn()}
+        source="cache"
+      />,
+    );
+
+    expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
+  });
+
+  it('AC-041 — source가 fallback이면 "폴백 응답 사용 중" 배지를 표시한다', () => {
+    render(
+      <UrgencyPanel
+        urgency="NORMAL"
+        urgencyReason="근거"
+        isOverridden={false}
+        onOverride={vi.fn()}
+        source="fallback"
+      />,
+    );
+
+    expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
+  });
 });

@@ -163,4 +163,17 @@ describe('FALLBACK_RESPONSES — T16이 채운 시나리오 기본값(c1/c2/c4)'
       "I need this by EOD today. Please confirm if that's not feasible.",
     );
   });
+
+  // Minor(사용자 지시 유지보수 라운드) — c2 폴백의 `preserved`는 항상 `[]`라 `ComparisonView`의
+  // "보존된 항목" 블록 자체가 렌더되지 않는다(Major 5). 그런데 `reason` 문구는 여전히 "아래
+  // 변환문·보존 항목은 예시"라고 말해, 화면에 없는 UI("보존 항목" 블록)를 가리키고 있었다.
+  it('Minor — c2 폴백 reason은 "보존 항목"을 언급하지 않는다(preserved가 항상 []이라 그 블록이 렌더되지 않는다)', () => {
+    const c2Entry = FALLBACK_RESPONSES.find((e) => e.step === 'c2' && e.cacheKey === undefined)!;
+    const c2Parsed = JSON.parse(c2Entry.content) as { reason: string };
+
+    expect(c2Parsed.reason).not.toMatch(/보존 항목/);
+    // "폴백이라 실제 입력을 확인하지 못했다"는 사실 고지 자체는 MJ-A/C-1과 동일하게 유지되어야
+    // 한다 — 이 수정이 그 불변식을 깨지 않았는지 함께 확인한다.
+    expect(c2Parsed.reason).toMatch(/폴백 응답이라 실제 입력을 확인하지 못했습니다/);
+  });
 });

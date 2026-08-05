@@ -716,4 +716,64 @@ describe('MediationWorkspace', () => {
       (within(recipientPanel).getByRole('button', { name: /승인/ }) as HTMLButtonElement).disabled,
     ).toBe(false);
   });
+
+  // Major(비차단, 사용자 지시 유지보수 라운드) — `crypto.randomUUID`는 secure context가 아닌
+  // 환경(http:// + non-localhost, 예: LAN IP로 접속하는 로컬 데모)에서 `undefined`라 호출하면
+  // 던진다. 그 상태에서 승인을 누르면 예외가 나고, 재시도해도 같은 환경이므로 승인이 영구
+  // 실패한다. `crypto.randomUUID`가 없는 환경에서도 승인이 성공해야 한다.
+  it('Major(비차단) — crypto.randomUUID가 없는 환경(secure context 아님)에서도 승인이 실패하지 않고 Idempotency-Key를 생성한다', async () => {
+    const originalCrypto = globalThis.crypto;
+    // secure context가 아닌 브라우저에서 `crypto.randomUUID`가 없는 상태를 재현한다 — `crypto`
+    // 자체는 남아 있지만(getRandomValues 등은 여전히 쓸 수 있는 환경도 있다) `randomUUID`만 없다.
+    vi.stubGlobal('crypto', { ...originalCrypto, randomUUID: undefined });
+
+    try {
+      const fetchMock = vi.fn().mockImplementation((url: string) => {
+        if (url === '/api/mediate') return Promise.resolve(mediateSuccessResponse());
+        if (url === '/api/messages') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              messageId: 'msg-1',
+              diffId: 'diff-1',
+              sentAt: '2026-08-05T10:00:00Z',
+              patternKey: null,
+              learnedApplied: false,
+            }),
+          });
+        }
+        throw new Error(`unexpected url: ${url}`);
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      render(<MediationWorkspace />);
+      fillAndRun();
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+      });
+
+      const recipientPanel = screen.getByLabelText('수신자 패널');
+      const approveButton = within(recipientPanel).getByRole('button', { name: /승인/ });
+      fireEvent.click(approveButton);
+
+      await waitFor(() => {
+        const messagesCalls = fetchMock.mock.calls.filter(([url]) => url === '/api/messages');
+        expect(messagesCalls).toHaveLength(1);
+      });
+
+      const [, requestInit] = fetchMock.mock.calls.find(([url]) => url === '/api/messages')!;
+      const idempotencyKey = new Headers((requestInit as RequestInit).headers).get(
+        'Idempotency-Key',
+      );
+      expect(idempotencyKey).toBeTruthy();
+      expect(idempotencyKey!.length).toBeGreaterThan(0);
+
+      await waitFor(() => {
+        expect(within(recipientPanel).getByText(/발송됨/)).toBeTruthy();
+      });
+    } finally {
+      vi.stubGlobal('crypto', originalCrypto);
+    }
+  });
 });

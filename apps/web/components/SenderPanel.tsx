@@ -116,7 +116,11 @@ export function SenderPanel({
               urgencyReason={result.urgencyReason}
               isOverridden={isOverridden}
               onOverride={onOverride}
-              source={result.stepSources.c1}
+              // Minor(방어적, 사용자 지시 유지보수 라운드) — 계약(F1)상 `stepSources`는 필수
+              // 필드지만, 유일한 생산자(`route.ts`) 밖의 경로(배포 스큐, 향후 확장 어댑터 스텁 등)
+              // 가 이 필드를 채우지 못한 응답을 보낼 가능성까지 방어한다. 없으면 'live'로 취급해
+              // 배지가 뜨지 않는 쪽으로 degrade한다 — 화면이 TypeError로 깨지는 것보다 안전하다.
+              source={result.stepSources?.c1 ?? 'live'}
             />
           )}
           {/* AC-008 — 원문/변환문/변환 이유 3열 비교 + AC-007 보존 항목 표시.
@@ -131,7 +135,8 @@ export function SenderPanel({
             transformed={result.transformed}
             reason={result.reason}
             preserved={result.preserved}
-            source={result.stepSources.c2}
+            // Minor(방어적) — SenderPanel.tsx의 UrgencyPanel 배선과 같은 이유·같은 폴백.
+            source={result.stepSources?.c2 ?? 'live'}
           />
           {/* AC-043 — 오해 사전 경고. 승인(Approve & Send, RecipientPanel) 이전 단계인 이 화면에서
               항상 먼저 렌더된다. 빈 배열이면 컴포넌트 자체가 아무것도 그리지 않는다.
@@ -153,7 +158,8 @@ export function SenderPanel({
             originalText={originalTextSnapshot}
             backTranslation={result.backTranslation}
             warnings={result.warnings}
-            source={result.stepSources.c4}
+            // Minor(방어적) — SenderPanel.tsx의 UrgencyPanel 배선과 같은 이유·같은 폴백.
+            source={result.stepSources?.c4 ?? 'live'}
           />
           {result.personalizationApplied === false && (
             <p role="status">개인화 미적용 — 기본 변환만 적용되었습니다</p>

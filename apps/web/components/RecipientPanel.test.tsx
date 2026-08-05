@@ -239,4 +239,38 @@ describe('RecipientPanel', () => {
     const button = screen.getByRole('button', { name: /승인/ }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
   });
+
+  // Minor(사용자 지시 유지보수 라운드) — MJ-3은 버튼만 끄고 인라인 사유 문구가 없어서 "죽은
+  // 버튼"처럼 보였다. `isStale`과 같은 패턴(role="status" 안내)으로 이유를 알려준다.
+  it('Minor — 최종 발송문이 비어 있으면 승인 버튼이 비활성화된 이유를 안내하는 문구가 보인다', () => {
+    render(
+      <RecipientPanel
+        hasResult={true}
+        isStale={false}
+        finalText=""
+        onFinalTextChange={vi.fn()}
+        onApprove={vi.fn()}
+        approveStatus="idle"
+        sentAt={null}
+      />,
+    );
+
+    expect(screen.getByText('최종 발송문을 입력해야 승인할 수 있습니다.')).toBeTruthy();
+  });
+
+  it('Minor — 최종 발송문이 채워지면 빈 값 안내 문구가 사라진다', () => {
+    render(
+      <RecipientPanel
+        hasResult={true}
+        isStale={false}
+        finalText="Please confirm by tomorrow."
+        onFinalTextChange={vi.fn()}
+        onApprove={vi.fn()}
+        approveStatus="idle"
+        sentAt={null}
+      />,
+    );
+
+    expect(screen.queryByText('최종 발송문을 입력해야 승인할 수 있습니다.')).toBeNull();
+  });
 });

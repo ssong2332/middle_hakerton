@@ -1,6 +1,7 @@
 'use client';
 
 import type { ResponseSource, UrgencyLevel } from '@cross-border/core';
+import { NON_LIVE_NOTICE } from '../lib/non-live-notice';
 
 export interface UrgencyPanelProps {
   /** 화면에 표시할 등급 — 부모가 override(있으면)와 C1 판정 중 무엇을 보일지 계산해 넘긴다. */
@@ -26,9 +27,6 @@ export interface UrgencyPanelProps {
 }
 
 const URGENCY_LEVELS: UrgencyLevel[] = ['CRITICAL', 'NORMAL', 'LOW'];
-
-/** `docs/UX.md:920` — live가 아닌 응답에 상시 노출하는 고정 문구(다른 결과 영역과 동일 문구). */
-const NON_LIVE_NOTICE = '폴백 응답 사용 중';
 
 /**
  * C1 긴급도 결과 표시 + override UI(`docs/UX.md` UX-004 "urgency badge ... and an override

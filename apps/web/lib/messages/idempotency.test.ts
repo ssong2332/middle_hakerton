@@ -12,6 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getIdempotentResponse,
   saveIdempotentResponse,
+  getIdempotencyStoreSize,
+  clearIdempotencyStoreForTesting,
   IDEMPOTENCY_TTL_MS,
 } from './idempotency';
 
@@ -70,6 +72,40 @@ describe('idempotency store', () => {
       // 한다. "만료 판정은 하지만 실제로는 옛 값이 계속 반환된다" 같은 결함을 이 단언이 잡는다.
       saveIdempotentResponse('user-ttl', 'key-ttl-2', { messageId: 'second' });
       expect(getIdempotentResponse('user-ttl', 'key-ttl-2')).toEqual({ messageId: 'second' });
+    });
+  });
+
+  // Minor(사용자 지시 유지보수 라운드) — `saveIdempotentResponse`는 쓰기 시점에 정리를 하지
+  // 않아서, 성공한 전송 1건당 절대 다시 읽히지 않는 항목 1개가 프로세스 수명 동안 계속 쌓였다
+  // (재시도분은 read 시점에 정리되지만 성공분은 read가 다시 일어나지 않는다). 저장 시점에도
+  // 만료 항목을 정리해 무한정 누적을 막는다 — read를 한 번도 호출하지 않고 저장만 반복해도
+  // 순증분이 늘지 않아야 한다.
+  describe('쓰기 시점 정리(sweep)', () => {
+    beforeEach(() => {
+      // 이 파일의 다른 테스트가 (모듈 레벨로 공유되는) store에 남긴 항목과 섞이지 않도록
+      // 격리한다 — 이 describe만 정확한 크기 단언을 하기 때문에 필요하다.
+      clearIdempotencyStoreForTesting();
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('만료된 항목을 read로 조회한 적이 없어도, 다음 저장(쓰기) 시점에 정리되어 순증분이 늘지 않는다', () => {
+      const start = 5_000_000_000_000;
+      vi.setSystemTime(start);
+
+      saveIdempotentResponse('user-sweep', 'key-sweep-old', { messageId: 'old' });
+      expect(getIdempotencyStoreSize()).toBe(1);
+
+      vi.setSystemTime(start + IDEMPOTENCY_TTL_MS + 1);
+      // read(getIdempotentResponse)를 호출하지 않고 바로 저장한다 — 이미 있는 read 시점 정리가
+      // 아니라 "쓰기 시점 정리"가 실제로 동작하는지를 검증한다.
+      saveIdempotentResponse('user-sweep', 'key-sweep-new', { messageId: 'new' });
+
+      // old 항목이 쓰기 시점에 정리됐다면, new 1건만 남아야 한다(정리가 없다면 old+new 2건).
+      expect(getIdempotencyStoreSize()).toBe(1);
     });
   });
 });

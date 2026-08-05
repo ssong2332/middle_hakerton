@@ -1,13 +1,15 @@
 'use client';
 
 import type { ResponseSource, Warning } from '@cross-border/core';
+import { NON_LIVE_NOTICE } from '../lib/non-live-notice';
 
 export interface BackTranslationPreviewProps {
   originalText: string;
   backTranslation: string;
   warnings: Warning[];
   /**
-   * 🔴 Major 3(reviewer 5차 REJECTED → 수정) — `docs/UX.md:918` "Fallback/cached response
+   * 🔴 Major 3(reviewer 5차 REJECTED → 수정) — `docs/UX.md:920`(Minor, 사용자 지시 유지보수
+   * 라운드로 :918에서 정정 — 문구 실제 위치가 옮겨졌다) "Fallback/cached response
    * indicator": live가 아닌 응답(cache/fallback)에는 항상 "폴백 응답 사용 중" 라벨이 근처에
    * 있어야 한다("a pre-scripted/cached response *instead of a live LLM result*" — cache도
    * live가 아니므로 대상이다). `source:'cache'`는 `apps/web/lib/llm/openai.ts:253`으로 실제
@@ -24,9 +26,6 @@ export interface BackTranslationPreviewProps {
 
 /** AC-002 — 상시 노출되는 한계 문구. 조건부 렌더 금지("완전한 검증"으로 오해될 수 있어서다). */
 const LIMITATION_NOTICE = '완전한 검증이 아니라 큰 오역을 걸러내는 1차 안전장치입니다.';
-
-/** `docs/UX.md:918` — live가 아닌 응답에 상시 노출하는 고정 문구. */
-const NON_LIVE_NOTICE = '폴백 응답 사용 중';
 
 /**
  * C4 역번역 미리보기(`docs/UX.md` UX-004에 흡수, AC-001/AC-002/AC-041/AC-046③).

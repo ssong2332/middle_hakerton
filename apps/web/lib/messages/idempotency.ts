@@ -38,7 +38,33 @@ export function getIdempotentResponse<T>(userId: string, idempotencyKey: string)
   return entry.body as T;
 }
 
+// Minor(사용자 지시 유지보수 라운드) — `saveIdempotentResponse`가 쓰기 시점에 정리를 하지 않으면,
+// 성공한 전송 1건당 절대 다시 읽히지 않는 항목 1개가 프로세스 수명 동안 계속 쌓인다(재시도분은
+// `getIdempotentResponse`가 읽을 때 정리하지만, 성공분은 다시 읽히는 일이 없으므로 그 정리 경로를
+// 타지 않는다). 저장할 때마다 만료된 항목을 스캔·삭제해 store 크기가 "최근 TTL 윈도 안의 활성
+// 항목 수"에 비례하도록 상한을 둔다.
+function sweepExpired(now: number): void {
+  for (const [key, entry] of store) {
+    if (entry.expiresAt < now) store.delete(key);
+  }
+}
+
 /** (userId, idempotencyKey) 조합으로 응답을 저장한다 — 이후 같은 조합의 재요청은 이 값을 재사용한다. */
 export function saveIdempotentResponse<T>(userId: string, idempotencyKey: string, body: T): void {
-  store.set(keyFor(userId, idempotencyKey), { expiresAt: Date.now() + IDEMPOTENCY_TTL_MS, body });
+  const now = Date.now();
+  sweepExpired(now);
+  store.set(keyFor(userId, idempotencyKey), { expiresAt: now + IDEMPOTENCY_TTL_MS, body });
+}
+
+// Minor(사용자 지시 유지보수 라운드) — 테스트가 store 크기를 관찰할 수 있도록 export한다(store
+// 자체는 캡슐화된 채로 둔다). 프로덕션 코드는 이 값을 쓰지 않는다.
+export function getIdempotencyStoreSize(): number {
+  return store.size;
+}
+
+// Minor(사용자 지시 유지보수 라운드) — 테스트 격리용. 모듈 레벨 `store`는 테스트 파일 전체에서
+// 공유되므로, 정확한 크기 단언이 필요한 테스트가 이전 테스트의 잔여 항목과 섞이지 않도록
+// 초기화한다. 프로덕션 코드는 쓰지 않는다.
+export function clearIdempotencyStoreForTesting(): void {
+  store.clear();
 }

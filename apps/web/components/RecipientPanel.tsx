@@ -58,9 +58,13 @@ export function RecipientPanel({
 }: RecipientPanelProps) {
   const isDelivered = approveStatus === 'sent';
   // MJ-3(사용자 지시 유지보수 라운드) — 최종 발송문이 비어 있으면(공백만 있는 경우 포함) 승인
-  // 버튼을 비활성화한다. 서버(`messagesRequestSchema.finalText: z.string().min(1)`,
-  // `apps/web/app/api/messages/route.ts`)가 이미 빈 값을 400으로 거부하지만, 그때까지는 클라이언트가
-  // 막지 않아 사용자가 실패 응답을 받고서야 알게 됐다 — 여기서 먼저 막는다(2차 방어선은 서버).
+  // 버튼을 비활성화한다. 🔴 Minor(사용자 지시 유지보수 라운드, 코멘트 정정) — 서버
+  // (`messagesRequestSchema.finalText: z.string().min(1)`, `apps/web/app/api/messages/route.ts`)의
+  // `z.string().min(1)`은 `""`만 거부하고 `.trim()`을 하지 않으므로 공백뿐인 값("   ")은 서버
+  // 검증을 그대로 통과한다 — "서버가 이미 빈 값을 400으로 거부한다"는 문자열 빈 값(`""`)에만
+  // 참이다. 아래 `.trim()`으로 공백뿐인 값까지 클라이언트에서 먼저 막으므로(1차 방어선), 이
+  // 컴포넌트가 서버보다 더 엄격한 판정을 한다 — 서버는 여전히 2차 방어선이지만 공백뿐인 값에
+  // 대해서는 사실상 걸러줄 것이 없다(서버 쪽 완화는 이 태스크 범위 밖).
   const isFinalTextEmpty = finalText.trim() === '';
 
   return (
@@ -87,6 +91,12 @@ export function RecipientPanel({
             <p role="status">
               메시지, 수신자 또는 긴급도가 변경되었습니다 — 다시 실행한 뒤 승인할 수 있습니다.
             </p>
+          )}
+          {/* Minor(사용자 지시 유지보수 라운드) — MJ-3은 버튼만 비활성화하고 인라인 사유가 없어
+              "죽은 버튼"처럼 보였다. `isStale`과 같은 패턴(role="status")으로 이유를 알려준다.
+              isStale과 동시에 뜰 수 있으므로 서로 다른 문구로 별도 렌더한다. */}
+          {!isDelivered && !isStale && isFinalTextEmpty && (
+            <p role="status">최종 발송문을 입력해야 승인할 수 있습니다.</p>
           )}
           {isDelivered ? (
             <p role="status">발송됨 — {sentAt}</p>
