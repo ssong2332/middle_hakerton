@@ -339,7 +339,12 @@ describe('POST /api/mediate', () => {
     expect(body.misreadRisks).toEqual(misreadRisks);
   });
 
-  it('C2 응답이 스키마 검증에 실패하면 502 LLM_MALFORMED를 반환한다', async () => {
+  // 🔴 T16 — `packages/core/src/data/fallback-responses.ts`의 `FALLBACK_RESPONSES`가 비어 있던
+  // 시절에는 step 스키마 검증 실패가 곧 "폴백도 없음"과 같아 502로 직행했다. 이제 c1/c2/c4 각각
+  // 시나리오 기본값이 있으므로(각 step이 `NO_STEP_CACHE_KEY`로 조회, `steps/c2.ts` 참조), 스키마
+  // 검증 실패는 502가 아니라 **200 + source:'fallback'**으로 정상 응답한다(AC-041 "오류 응답보다
+  // 폴백 200이 우선" — `docs/API.md:48`). 이 테스트는 그 동작 변경을 고정한다.
+  it('C2 응답이 스키마 검증에 실패해도 실 FALLBACK_RESPONSES로 폴백해 200을 반환한다(T16, AC-041)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
     mockCreateClient.mockReturnValue(fakeLlm({ toneContent: '유효하지 않은 JSON' }));
 
@@ -348,8 +353,10 @@ describe('POST /api/mediate', () => {
     );
     const body = await response.json();
 
-    expect(response.status).toBe(502);
-    expect(body.error.code).toBe('LLM_MALFORMED');
+    expect(response.status).toBe(200);
+    expect(body.source).toBe('fallback');
+    expect(typeof body.transformed).toBe('string');
+    expect(body.transformed.length).toBeGreaterThan(0);
   });
 
   it('AC-030 — 응답 어디에도 OPENAI_API_KEY 값이 노출되지 않는다', async () => {
@@ -367,7 +374,7 @@ describe('POST /api/mediate', () => {
     process.env.OPENAI_API_KEY = previous;
   });
 
-  it('C1 응답이 스키마 검증에 실패하면 502 LLM_MALFORMED를 반환한다', async () => {
+  it('C1 응답이 스키마 검증에 실패해도 실 FALLBACK_RESPONSES로 폴백해 200을 반환한다(T16, AC-041)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
     mockCreateClient.mockReturnValue(fakeLlm({ urgencyContent: '유효하지 않은 JSON' }));
 
@@ -376,11 +383,12 @@ describe('POST /api/mediate', () => {
     );
     const body = await response.json();
 
-    expect(response.status).toBe(502);
-    expect(body.error.code).toBe('LLM_MALFORMED');
+    expect(response.status).toBe(200);
+    expect(body.source).toBe('fallback');
+    expect(['CRITICAL', 'NORMAL', 'LOW']).toContain(body.urgency);
   });
 
-  it('C4 응답이 스키마 검증에 실패하면 502 LLM_MALFORMED를 반환한다', async () => {
+  it('C4 응답이 스키마 검증에 실패해도 실 FALLBACK_RESPONSES로 폴백해 200을 반환한다(T16, AC-041)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
     mockCreateClient.mockReturnValue(fakeLlm({ backTranslationContent: '유효하지 않은 JSON' }));
 
@@ -389,8 +397,10 @@ describe('POST /api/mediate', () => {
     );
     const body = await response.json();
 
-    expect(response.status).toBe(502);
-    expect(body.error.code).toBe('LLM_MALFORMED');
+    expect(response.status).toBe(200);
+    expect(body.source).toBe('fallback');
+    expect(typeof body.backTranslation).toBe('string');
+    expect(body.backTranslation.length).toBeGreaterThan(0);
   });
 
   it('C1이 fallback이고 C4가 live면 응답 source는 신뢰도가 낮은 쪽(fallback)을 따른다(AC-041)', async () => {

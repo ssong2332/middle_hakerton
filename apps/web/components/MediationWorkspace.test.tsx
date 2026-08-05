@@ -249,7 +249,9 @@ describe('MediationWorkspace', () => {
       expect(screen.getByText('CRITICAL', { selector: 'strong' })).toBeTruthy();
     });
 
-    approveButton = within(recipientPanel).getByRole('button', { name: /승인/ }) as HTMLButtonElement;
+    approveButton = within(recipientPanel).getByRole('button', {
+      name: /승인/,
+    }) as HTMLButtonElement;
     expect(approveButton.disabled).toBe(false);
     fireEvent.click(approveButton);
 
@@ -301,10 +303,49 @@ describe('MediationWorkspace', () => {
     expect(approveButton.disabled).toBe(false);
   });
 
+  // 🔴 M-2(2026-08-05, reviewer REJECTED → 수정) — 위 Major 1 테스트는 수신자 패널(승인 가능
+  // 여부)만 확인했다. 발신자 패널의 결과 블록은 `status==='success'` 단독 조건에 묶여 있어서,
+  // 재실행이 실패하면 "폴백 응답 사용 중" 라벨까지 함께 사라진 채로 승인 가능한 상태가 될 수
+  // 있었다(AC-041 위반 — 승인 직전에 폴백 표시가 사라짐). 승인 가능한 스냅샷(hasResult)이 있으면
+  // 발신자 패널의 결과 블록도 status와 무관하게 유지되어야 한다.
+  it('M-2 — 재실행이 실패해도 직전 성공 결과의 폴백 배지가 발신자 패널에서 사라지지 않는다', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(mediateSuccessResponse({ source: 'fallback' }))
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({
+          error: { code: 'INTERNAL', message: '처리 중 오류', retryable: true },
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+    expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
+
+    // 원문을 바꾸지 않고 재실행 → 실패
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('처리에 실패했습니다')).toBeTruthy();
+    });
+
+    const senderPanel = screen.getByLabelText('발신자 패널');
+    expect(within(senderPanel).getByText('폴백 응답 사용 중')).toBeTruthy();
+    expect(within(senderPanel).getByText('Please confirm by tomorrow.')).toBeTruthy();
+  });
+
   // Major 3(reviewer REJECTED → 수정) — 삭제된 `MediationDemoForm.test.tsx`의 커버리지를
   // `MediationWorkspace.test.tsx`로 이식한다.
   it('Major 3① — personalizationApplied가 false면 개인화 미적용 안내를 표시한다(AC-059③/AC-066③)', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mediateSuccessResponse({ personalizationApplied: false }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(mediateSuccessResponse({ personalizationApplied: false }));
     vi.stubGlobal('fetch', fetchMock);
 
     render(<MediationWorkspace />);
@@ -342,10 +383,16 @@ describe('MediationWorkspace', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
-        mediateSuccessResponse({ urgency: 'NORMAL', urgencyReason: '일반 업무 요청으로 보입니다.' }),
+        mediateSuccessResponse({
+          urgency: 'NORMAL',
+          urgencyReason: '일반 업무 요청으로 보입니다.',
+        }),
       )
       .mockResolvedValueOnce(
-        mediateSuccessResponse({ urgency: 'CRITICAL', urgencyReason: '일반 업무 요청으로 보입니다.' }),
+        mediateSuccessResponse({
+          urgency: 'CRITICAL',
+          urgencyReason: '일반 업무 요청으로 보입니다.',
+        }),
       );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -492,7 +539,8 @@ describe('MediationWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: '실행' }));
 
     await waitFor(() => {
-      expect(screen.getByText('처리 중…')).toBeTruthy();
+      // T16(AC-029) — 단일 "처리 중…" 문구가 단계 라벨 진행 표시로 대체됐다.
+      expect(screen.getByText('분류 중 → 변환 중 → 역번역 중')).toBeTruthy();
     });
 
     const approveButton = within(recipientPanel).getByRole('button', {

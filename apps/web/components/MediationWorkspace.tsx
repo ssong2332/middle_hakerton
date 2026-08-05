@@ -53,6 +53,29 @@ const panelColumnStyle = { flex: '1 1 0%', minWidth: 0 } as const;
  *
  * 🔴 AC-010 — `POST /api/messages`를 호출하는 코드 경로는 `handleApprove`(승인 버튼 클릭 핸들러)
  * 하나뿐이다. `handleRunMediation`이나 다른 어떤 effect도 이 함수를 자동 호출하지 않는다.
+ *
+ * ## T16 — 진행 표시 방식(판단 근거, 2026-08-05)
+ * `docs/UX.md` UX-004 States "Loading"·Visual Design Brief(`docs/UX.md:1013`)이 요구하는
+ * "단계 라벨 진행 표시"를 `SenderPanel`이 로딩 중 렌더한다(`분류 중 → 변환 중 → 역번역 중`,
+ * UX.md의 예시 문구를 그대로 씀). 이 라우트(`POST /api/mediate`)는 서버에서 C1→C2→C4를 순차
+ * 실행한 뒤 **한 번에** 응답하므로(`apps/web/app/api/mediate/route.ts`), 클라이언트는 서버가
+ * 지금 어느 단계인지 알 방법이 **물리적으로 없다**(SSE·폴링 같은 새 실시간 인프라를 도입하지
+ * 않는다 — `docs/Architecture.md` "실시간이 필요 없는 이유", 이 태스크 지시사항).
+ *
+ * 두 방식을 검토했다:
+ * - **(채택) 정적 전체 문구** — 로딩 중 내내 `"분류 중 → 변환 중 → 역번역 중"`을 그대로 보여준다.
+ * - **(기각) 타이머 기반 의사(pseudo) 진행** — `setInterval`로 일정 시간마다 표시 단계를
+ *   "분류 중" → "변환 중" → "역번역 중" 순으로 바꾼다.
+ *
+ * 정적 문구를 택한 이유: ① `docs/UX.md:1013`의 예시가 문자 그대로 이 조인 문자열이라 가장
+ * 직접적인 근거다. ② 의사 타이머는 실제 서버 진행과 무관하게 시간만으로 단계를 넘기므로, 예를
+ * 들어 C2(톤 변환)가 예상보다 오래 걸리는 동안 화면은 이미 "역번역 중"을 보여줄 수 있다 —
+ * 이것은 실제 상태를 지어내 보여주는 것과 같은 종류의 문제다(`docs/CodingRules.md` Error
+ * Handling "없는 값을 지어내지 않는다"를 UI 상태에도 같은 정신으로 적용). ③ 정적 문구는 스피너가
+ * 아니므로 "멈춰 보이지 않는다"(AC-029)는 요구를 이미 만족한다 — 스피너가 "멈춰 보이는" 것은
+ * 애니메이션이 멎기 때문이고, 애초에 애니메이션이 없는 서술형 문구에는 "멎는 순간"이 없다.
+ * ④ 새 타이머·정리(cleanup) 로직이 없어 컴포넌트가 더 단순하고, 테스트에 fake timer가 필요 없다.
+ * 서버가 실제 단계별 진행을 노출하게 되면(향후 범위 밖) 그때 실제 값 기반으로 교체한다.
  */
 export function MediationWorkspace() {
   const [text, setText] = useState('');
@@ -141,7 +164,12 @@ export function MediationWorkspace() {
       setFinalText(body.transformed);
       // Critical — 이 실행이 실제로 검토·승인 가능한 대상이 되는 유일한 지점. text/recipient는
       // 이 요청을 만든 값 그대로, urgency는 서버가 반영한 값 그대로 고정한다.
-      setApprovalSnapshot({ text, recipient, urgency: body.urgency, transformed: body.transformed });
+      setApprovalSnapshot({
+        text,
+        recipient,
+        urgency: body.urgency,
+        transformed: body.transformed,
+      });
       setAppliedOverride(requestOverride);
       setUrgencyOverride(null);
       setStatus('success');
@@ -206,6 +234,7 @@ export function MediationWorkspace() {
             isOverridden={isOverridden}
             displayedUrgency={displayedUrgency}
             onRunMediation={handleRunMediation}
+            hasResult={hasResult}
           />
         </div>
         <div style={panelColumnStyle}>

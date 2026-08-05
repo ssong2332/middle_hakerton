@@ -49,11 +49,16 @@ describe('runBackTranslation', () => {
     expect(result.source).toBe('fallback');
   });
 
+  // 🔴 T16 — `FALLBACK_RESPONSES`가 채워지기 전에는 `fallbackLookup`을 생략해도 "폴백 없음"과
+  // 같았다. 이제 기본값에 실 c4 데이터가 있으므로, 아래 3건은 "폴백조차 없을 때"의 던지기 경로를
+  // 독립적으로 검증하려면 `fallbackLookup: () => undefined`로 명시적으로 꺼야 한다.
   it('content가 유효한 JSON이 아니면 LLMMalformedResponseError를 던진다', async () => {
     const llm = fakeLlm({ content: '이것은 JSON이 아닙니다', source: 'live' });
 
     await expect(
-      runBackTranslation({ text: 'hi', targetLanguage: 'ko' }, llm),
+      runBackTranslation({ text: 'hi', targetLanguage: 'ko' }, llm, {
+        fallbackLookup: () => undefined,
+      }),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
   });
 
@@ -61,7 +66,9 @@ describe('runBackTranslation', () => {
     const llm = fakeLlm({ content: JSON.stringify({ unexpected: 'field' }), source: 'live' });
 
     await expect(
-      runBackTranslation({ text: 'hi', targetLanguage: 'ko' }, llm),
+      runBackTranslation({ text: 'hi', targetLanguage: 'ko' }, llm, {
+        fallbackLookup: () => undefined,
+      }),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
   });
 
@@ -69,7 +76,9 @@ describe('runBackTranslation', () => {
     const llm = fakeLlm({ content: JSON.stringify({ backTranslation: '' }), source: 'live' });
 
     await expect(
-      runBackTranslation({ text: 'hi', targetLanguage: 'ko' }, llm),
+      runBackTranslation({ text: 'hi', targetLanguage: 'ko' }, llm, {
+        fallbackLookup: () => undefined,
+      }),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
   });
 
@@ -96,5 +105,16 @@ describe('runBackTranslation', () => {
       runBackTranslation({ text: 'hi', targetLanguage: 'ko' }, llm, { fallbackLookup }),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
     expect(fallbackLookup).toHaveBeenCalled();
+  });
+
+  // T16(AC-041) — `fallbackLookup`을 주입하지 않으면 기본값(`../data/fallback-responses`의 실제
+  // `FALLBACK_RESPONSES`)이 쓰인다. T16이 채운 실 데이터가 이 스텝의 스키마를 통과하는지 증명한다.
+  it('T16 — fallbackLookup 미주입 시 실 FALLBACK_RESPONSES의 c4 기본값으로 정상 폴백한다', async () => {
+    const llm = fakeLlm({ content: '이것은 JSON이 아닙니다', source: 'live' });
+
+    const result = await runBackTranslation({ text: '아무 원문', targetLanguage: 'ko' }, llm);
+
+    expect(result.source).toBe('fallback');
+    expect(result.backTranslation.length).toBeGreaterThan(0);
   });
 });
