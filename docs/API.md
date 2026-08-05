@@ -8,6 +8,10 @@ Based on PRD Version: v3.2 · Based on UX Version: 6.0
 >
 > ✅ **프레임워크·호스팅은 2026-08-04 사용자 결정으로 승인되었다**(`docs/Architecture.md` 상단 게이트 표 · `docs/DECISIONS.md` #31). Route Handler 기반 경로 설계가 확정 스택 위에서 그대로 유효하다. 프레임워크 버전은 **Next.js 16**으로 갱신됐다(DECISIONS #37) — **경로·계약에는 영향이 없다.**
 >
+> 🔴 **2026-08-05 F2 변경 1건 — `POST /api/deadline/check` 요청에 `urgency` 필드가 추가됐다**(DECISIONS #45). AC-005의 "지연 경로 자기 배제"를 **서버에서** 집행하기 위한 것이며, 그 계약이 없어 T39가 착수 불가 상태였다. **다른 라우트의 요청·응답은 변경 0건이다.**
+>
+> ✅ **2026-08-05 F1-d 반영 — 이 문서의 와이어 형식은 변경 0건이다.** `MediationDeps` 에 `referenceDate` 가 추가됐지만(DECISIONS #46 · ADR-0008) 그것은 **서버 내부에서 core로 넘기는 값**이며 `POST /api/mediate` 의 요청 body에 들어가지 않는다 — 클라이언트가 기준일을 보내지 않는다(보내면 캐시 키를 클라이언트가 조종할 수 있다).
+>
 > ✅ **2026-08-04 F1-c 반영 — 이 문서의 와이어 형식은 변경 0건이다.** `packages/core/src/contract.ts` 의 `TicketOption`·`TicketResult`·`DecisionItem` 이 판별 유니온이 되었지만(DECISIONS #38 · ADR-0006) **필드 이름·순서·값 어휘·JSON 예시가 전부 그대로**다. 추가된 것은 세 라우트 Response 행의 **"어떤 조합이 존재하지 않는가"** 한 줄씩이다 — 목 서버·목 데이터는 그 조합을 쓰고 있지 않은 한 손댈 것이 없다.
 
 ## Conventions
@@ -251,15 +255,17 @@ UX-012(UF-009) / AC-023
 | Errors | 400 · 401 |
 
 #### POST /api/deadline/check
-UX-005(UF-003) / AC-036, AC-057
+UX-005(UF-003) / AC-036, AC-057, **AC-005**
 
 | Item | Value |
 |---|---|
 | Purpose | 발신자 희망 기한이 수신자 근무시간 기준으로 실현 가능한지 판정 + 대체 기한 역제안 |
 | Auth | required |
-| Request | `{ neededBy: string, recipient: { timezone, workStart, workEnd, country?: 'KR'\|'US'\|'JP'\|'CN' } }` |
+| Request | `{ urgency: 'CRITICAL'\|'NORMAL'\|'LOW', neededBy: string, recipient: { timezone, workStart, workEnd, country?: 'KR'\|'US'\|'JP'\|'CN' } }` <br>🔴 **`urgency` 는 2026-08-05 추가된 필드다**(DECISIONS #45) — 없으면 서버가 CRITICAL 여부를 알 수 없어 아래 서버 규칙을 집행할 수 없다. `POST /api/messages` 의 `urgency`(:115)와 **같은 어휘**이며 새 enum을 만들지 않는다 |
 | Response 200 | `{ feasible: boolean, reason, counterOffers: [{ date, rationale }] }` <br>🔴 대체 기한 후보는 **수신자 국가 공휴일을 제외**한다(UX-005 Business Rules) <br>🔴 **자동으로 기한을 바꾸지 않는다** — 역제안만 반환하고 선택은 사용자가 한다(AC-036c) |
+| Response 200 (CRITICAL) | 🔴 `{ feasible: true, skipped: 'critical_immediate', reason, counterOffers: [] }` — **역제안을 계산하지 않는다**(AC-005). `counterOffers` 는 항상 빈 배열이다 |
 | Errors | 400 · 401 |
+| 서버 규칙 | 🔴 **`urgency === 'CRITICAL'` 이면 역제안 로직을 실행하지 않는다**(AC-005 "예약·지연 경로를 거치지 않는다"의 **지연 절반**). **클라이언트를 믿지 않는다** — `POST /api/messages`(:118)·`PATCH /api/messages/{id}`(:141)가 **예약 절반**에 대해 하는 것과 같은 형태이며, 같은 조항이 경로에 따라 다르게 집행되지 않게 하는 것이 이 규칙의 목적이다(DECISIONS #45). <br>🔴 판정은 `resolveDeliveryPath(urgency) === 'immediate'`(`packages/core/src/rules/urgency-routing.ts:23`) **하나**를 쓴다 — 긴급도 판정 로직을 이 라우트가 다시 구현하지 않는다. <br>🔴 **400이 아니라 200 + `skipped` 다** — CRITICAL에서의 호출은 오류가 아니라 **정상적으로 건너뛰는 경로**다(AC-005는 "거부"가 아니라 "거치지 않는다"). 400을 내면 UX.md에 없는 오류 상태를 UX-004가 렌더해야 한다. <br>⚠️ **이 서버 게이트가 T40의 UI 미렌더 확인을 대체하지 않는다** — 두 겹이며 택일이 아니다(`docs/Tasks.md` T39·T40) |
 | 데이터 | 공휴일은 `packages/core/src/data/holidays-2026.ts`(KR/US/JP/CN) — 🔴 **외부 API 호출 0**(AC-048①/Planning Decision #52) |
 
 ---
