@@ -4,7 +4,11 @@
  * 구현 보고서에 남긴다(오탐/누락 가능성 존재를 알고 쓴다).
  */
 import { describe, expect, it } from 'vitest';
-import { detectHonorificMixing, honorificMixedWarning } from './honorific';
+import {
+  detectHonorificMixing,
+  hasClassifiableHonorificSentence,
+  honorificMixedWarning,
+} from './honorific';
 
 describe('detectHonorificMixing', () => {
   it('합쇼체와 해요체가 한 메시지에 섞이면 true (AC-046①)', () => {
@@ -88,6 +92,29 @@ describe('detectHonorificMixing', () => {
   // 문장이 이 규칙 때문에 잘못 쪼개져 다른 레벨을 만들어내지 않는지 회귀 방지.
   it('"습니다만"처럼 합쇼체 종결어미 뒤에 조사가 곧장 이어지면 그 자리에서 나누지 않는다(전부 합쇼체 유지)', () => {
     expect(detectHonorificMixing('결정했습니다만 확정 통보는 별도로 드리겠습니다.')).toBe(false);
+  });
+});
+
+// 🔴 reviewer 후속 Major 1(T11, `docs/Tasks.md` T11) — `detectHonorificMixing`은 분류 가능한
+// 문장이 0~1개면 항상 `false`(=혼용 아님)를 반환하므로, T11 러너가 이것만으로 AC-046을 판정하면
+// 변환이 통째로 실패해 영어 원문이 그대로 반환된 경우도 "혼용 없음"으로 통과시킨다. 이 함수는
+// 그 가드(`tests/regression-c2.ts`의 `judgeHonorificCase`)가 "한국어 문장이 실제로 산출됐는가"를
+// 별도로 확인할 수 있게 노출한다.
+describe('hasClassifiableHonorificSentence', () => {
+  it('합쇼체 문장 하나만 있어도 true', () => {
+    expect(hasClassifiableHonorificSentence('확인 부탁드립니다.')).toBe(true);
+  });
+
+  it('해요체 문장 하나만 있어도 true', () => {
+    expect(hasClassifiableHonorificSentence('확인해 주세요.')).toBe(true);
+  });
+
+  it('분류 가능한 한국어 종결어미 문장이 없으면 false(예: 변환 실패로 영어 원문이 그대로 남은 경우)', () => {
+    expect(hasClassifiableHonorificSentence('Can you check this by Friday?')).toBe(false);
+  });
+
+  it('빈 문자열은 false', () => {
+    expect(hasClassifiableHonorificSentence('')).toBe(false);
   });
 });
 

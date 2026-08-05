@@ -9,7 +9,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LLMClient, LLMResponse } from '../llm/client';
 import { LLMMalformedResponseError } from '../errors';
-import { DEFAULT_HONORIFIC_LEVEL } from '../prompts/c2';
 import { runToneTransform } from './c2';
 
 function fakeLlm(response: LLMResponse): LLMClient {
@@ -28,7 +27,12 @@ describe('runToneTransform', () => {
     const llm = fakeLlm({ content: VALID_CONTENT, source: 'live' });
 
     const result = await runToneTransform(
-      { text: '금요일까지 부탁드립니다', languageDirection: 'ko-en', honorificLevel: null },
+      {
+        text: '금요일까지 부탁드립니다',
+        languageDirection: 'ko-en',
+        honorificLevel: null,
+        referenceDate: '2026-08-05',
+      },
       llm,
     );
 
@@ -45,7 +49,7 @@ describe('runToneTransform', () => {
     const llm = fakeLlm({ content: VALID_CONTENT, source: 'live' });
 
     await runToneTransform(
-      { text: 'hello', languageDirection: 'en-ko', honorificLevel: 'hapsyo' },
+      { text: 'hello', languageDirection: 'en-ko', honorificLevel: 'hapsyo', referenceDate: '2026-08-05' },
       llm,
     );
 
@@ -56,15 +60,18 @@ describe('runToneTransform', () => {
     );
   });
 
-  it('honorificLevel이 null이면 DEFAULT_HONORIFIC_LEVEL로 채워 payload에 싣는다(AC-046②, 규약 축 부재 시 규칙 기본값)', async () => {
+  it('honorificLevel이 null이면 null을 그대로 payload에 싣는다(기본값으로 채우지 않는다 — DECISIONS #40, ADR-0007)', async () => {
     const llm = fakeLlm({ content: VALID_CONTENT, source: 'live' });
 
-    await runToneTransform({ text: 'hi', languageDirection: 'en-ko', honorificLevel: null }, llm);
+    await runToneTransform(
+      { text: 'hi', languageDirection: 'en-ko', honorificLevel: null, referenceDate: '2026-08-05' },
+      llm,
+    );
 
     expect(llm.complete).toHaveBeenCalledWith(
       'c2',
       expect.any(String),
-      expect.objectContaining({ honorificLevel: DEFAULT_HONORIFIC_LEVEL }),
+      expect.objectContaining({ honorificLevel: null }),
     );
   });
 
@@ -72,7 +79,7 @@ describe('runToneTransform', () => {
     const llm = fakeLlm({ content: VALID_CONTENT, source: 'live' });
 
     await runToneTransform(
-      { text: 'hi', languageDirection: 'en-ko', honorificLevel: 'hapsyo' },
+      { text: 'hi', languageDirection: 'en-ko', honorificLevel: 'hapsyo', referenceDate: '2026-08-05' },
       llm,
     );
 
@@ -87,7 +94,12 @@ describe('runToneTransform', () => {
     const llm = fakeLlm({ content: VALID_CONTENT, source: 'fallback' });
 
     const result = await runToneTransform(
-      { text: 'hi', languageDirection: 'ko-en', honorificLevel: null },
+      {
+        text: 'hi',
+        languageDirection: 'ko-en',
+        honorificLevel: null,
+        referenceDate: '2026-08-05',
+      },
       llm,
     );
 
@@ -98,7 +110,12 @@ describe('runToneTransform', () => {
     const llm = fakeLlm({ content: '이것은 JSON이 아닙니다', source: 'live' });
 
     await expect(
-      runToneTransform({ text: 'hi', languageDirection: 'ko-en', honorificLevel: null }, llm, {
+      runToneTransform({
+        text: 'hi',
+        languageDirection: 'ko-en',
+        honorificLevel: null,
+        referenceDate: '2026-08-05',
+      }, llm, {
         fallbackLookup: () => undefined,
       }),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
@@ -111,7 +128,12 @@ describe('runToneTransform', () => {
     });
 
     await expect(
-      runToneTransform({ text: 'hi', languageDirection: 'ko-en', honorificLevel: null }, llm, {
+      runToneTransform({
+        text: 'hi',
+        languageDirection: 'ko-en',
+        honorificLevel: null,
+        referenceDate: '2026-08-05',
+      }, llm, {
         fallbackLookup: () => undefined,
       }),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
@@ -129,7 +151,12 @@ describe('runToneTransform', () => {
     });
 
     await expect(
-      runToneTransform({ text: 'hi', languageDirection: 'ko-en', honorificLevel: null }, llm, {
+      runToneTransform({
+        text: 'hi',
+        languageDirection: 'ko-en',
+        honorificLevel: null,
+        referenceDate: '2026-08-05',
+      }, llm, {
         fallbackLookup: () => undefined,
       }),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
@@ -147,7 +174,12 @@ describe('runToneTransform', () => {
     });
 
     await expect(
-      runToneTransform({ text: 'hi', languageDirection: 'ko-en', honorificLevel: null }, llm, {
+      runToneTransform({
+        text: 'hi',
+        languageDirection: 'ko-en',
+        honorificLevel: null,
+        referenceDate: '2026-08-05',
+      }, llm, {
         fallbackLookup: () => undefined,
       }),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
@@ -160,7 +192,12 @@ describe('runToneTransform', () => {
     });
 
     const result = await runToneTransform(
-      { text: 'hi', languageDirection: 'ko-en', honorificLevel: null },
+      {
+        text: 'hi',
+        languageDirection: 'ko-en',
+        honorificLevel: null,
+        referenceDate: '2026-08-05',
+      },
       llm,
     );
 
@@ -168,12 +205,77 @@ describe('runToneTransform', () => {
     expect(result.misreadRisks).toEqual([]);
   });
 
+  it('preserved 항목의 transformedText가 실제 transformed 문자열에 없으면(자기신고 불일치) 그 항목을 제외한다(reviewer 후속 Major 3, 교차 검증)', async () => {
+    const llm = fakeLlm({
+      content: JSON.stringify({
+        transformed: 'Please confirm the payment issue.',
+        reason: 'x',
+        preserved: [
+          // 날조 — 'by Friday'는 transformed 어디에도 없다.
+          { kind: 'deadline', sourceText: '금요일까지', transformedText: 'by Friday' },
+        ],
+        misreadRisks: [],
+      }),
+      source: 'live',
+    });
+
+    const result = await runToneTransform(
+      {
+        text: '금요일까지 부탁드립니다',
+        languageDirection: 'ko-en',
+        honorificLevel: null,
+        referenceDate: '2026-08-05',
+      },
+      llm,
+    );
+
+    expect(result.preserved).toEqual([]);
+  });
+
+  it('preserved 항목 중 실제 transformed에 있는 것만 남기고 없는 것만 제외한다(부분 불일치)', async () => {
+    const llm = fakeLlm({
+      content: JSON.stringify({
+        transformed: 'Please confirm the payment API issue by Friday.',
+        reason: 'x',
+        preserved: [
+          { kind: 'deadline', sourceText: '금요일까지', transformedText: 'by Friday' }, // 실제로 있음
+          {
+            kind: 'action',
+            sourceText: '확인 부탁드립니다',
+            transformedText: 'not present anywhere',
+          }, // 날조
+        ],
+        misreadRisks: [],
+      }),
+      source: 'live',
+    });
+
+    const result = await runToneTransform(
+      {
+        text: '금요일까지 결제 API 확인 부탁드립니다',
+        languageDirection: 'ko-en',
+        honorificLevel: null,
+        referenceDate: '2026-08-05',
+      },
+      llm,
+    );
+
+    expect(result.preserved).toEqual([
+      { kind: 'deadline', sourceText: '금요일까지', transformedText: 'by Friday' },
+    ]);
+  });
+
   it('step 레벨 스키마 검증 실패 시에도 폴백을 먼저 조회해 200 + source:fallback을 반환한다(docs/API.md:48, c1/c4 Major 1과 동일 패턴)', async () => {
     const llm = fakeLlm({ content: JSON.stringify({ unexpected: 'field' }), source: 'live' });
     const fallbackLookup = vi.fn().mockReturnValue({ step: 'c2', content: VALID_CONTENT });
 
     const result = await runToneTransform(
-      { text: 'hi', languageDirection: 'ko-en', honorificLevel: null },
+      {
+        text: 'hi',
+        languageDirection: 'ko-en',
+        honorificLevel: null,
+        referenceDate: '2026-08-05',
+      },
       llm,
       { fallbackLookup },
     );
@@ -193,10 +295,52 @@ describe('runToneTransform', () => {
     const fallbackLookup = vi.fn().mockReturnValue(undefined);
 
     await expect(
-      runToneTransform({ text: 'hi', languageDirection: 'ko-en', honorificLevel: null }, llm, {
+      runToneTransform({
+        text: 'hi',
+        languageDirection: 'ko-en',
+        honorificLevel: null,
+        referenceDate: '2026-08-05',
+      }, llm, {
         fallbackLookup,
       }),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
     expect(fallbackLookup).toHaveBeenCalled();
+  });
+
+  /**
+   * 🔴 QA 정적 분석 후속 — `docs/TestCases.md` P-03/P-09/D-01/D-03/D-06(연도 없는 원문에 연도
+   * 포함 출력을 요구)이 payload에서 연도 정보를 실제로 받는지 검증한다(실 LLM 호출 없이,
+   * `LLMClient`를 모킹해 `runToneTransform`이 넘기는 payload만 캡처 — 헤더 주석의 경계와 동일).
+   */
+  describe('referenceDate → payload.referenceYear(QA 정적 분석 후속)', () => {
+    async function capturePayload(referenceDate: string): Promise<unknown> {
+      let captured: unknown;
+      const llm: LLMClient = {
+        complete: vi.fn().mockImplementation((_step, _promptVersion, payload) => {
+          captured = payload;
+          return Promise.resolve({ content: VALID_CONTENT, source: 'live' });
+        }),
+      };
+      await runToneTransform(
+        { text: 'hi', languageDirection: 'ko-en', honorificLevel: null, referenceDate },
+        llm,
+      );
+      return captured;
+    }
+
+    it('P-03 원문("8월 12일 14시")처럼 연도 없는 날짜가 있는 케이스도 payload.referenceYear를 받는다', async () => {
+      const payload = (await capturePayload('2026-08-05')) as { referenceYear: string };
+      expect(payload.referenceYear).toBe('2026');
+    });
+
+    it('referenceDate의 연도가 그대로 payload.referenceYear로 전달된다(월/일은 버려진다)', async () => {
+      const payload = (await capturePayload('2027-01-31')) as { referenceYear: string };
+      expect(payload.referenceYear).toBe('2027');
+    });
+
+    it('instruction에 실제 기준 연도가 반영된다(하드코딩된 연도가 아니다)', async () => {
+      const payload = (await capturePayload('2030-05-01')) as { instruction: string };
+      expect(payload.instruction).toContain('2030');
+    });
   });
 });

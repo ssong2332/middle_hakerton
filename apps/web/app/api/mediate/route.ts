@@ -16,10 +16,12 @@
  * 🔴 **T10 배선 — 발신자 프로필이 아직 없다.** C2의 존댓말 레벨 입력(`honorificLevel`)은
  * `sender.profile.honorificLevel`에서 와야 하지만(AC-046②), 그 값을 채우는 C3 온보딩(T19)과
  * 그것을 저장하는 스키마(T18)가 아직 `todo`다 — 이 라우트는 세션에서 프로필을 조회하지 않고
- * 항상 `null`을 넘긴다. `runToneTransform`이 그 경우 `DEFAULT_HONORIFIC_LEVEL`(`prompts/c2.ts`)로
- * 대체한다(`packages/core/src/steps/c2.ts` `RunToneTransformInput.honorificLevel` 주석 —
- * 쌍방 규약(#24)에도 존댓말 축 자체가 없어 "규약 우선" 조각은 지금 표현 불가능하다는 판단 포함).
- * T19·T18이 붙으면 이 자리를 실제 프로필 조회로 교체한다.
+ * 항상 `null`을 넘긴다. `runToneTransform`은 그 경우 특정 레벨을 지어내지 않고 "하나의
+ * 종결어미 레벨을 일관되게 유지하라"는 지시만 프롬프트에 싣는다(`docs/adr/0007-honorific-level
+ * -resolution-boundary.md` D2 — 기본값을 채우면 캐시 키가 "프로필 없음"과 "프로필=해요체"를
+ * 구분 못 하게 된다). 쌍방 규약(#24)에도 존댓말 축 자체가 없어 "규약 우선" 조각은 지금 표현
+ * 불가능하다(`docs/DECISIONS.md` #39, ADR-0007 D1). T19·T18이 붙으면 이 자리를 실제 프로필
+ * 조회로 교체한다.
  *
  * 🔴 **T9(AC-005) 분기점 안내.** `docs/Architecture.md` Data Flow "① 웹앱 중재" ②는 "CRITICAL이면
  * 예약·지연 경로를 건너뛰고 톤 정제만"을 요구한다. 이 저장소에는 아직 예약 발송(UX-006)·기한
@@ -114,6 +116,10 @@ export const POST = withApi<MediateRequest, MediationResult>(
         text: input.text,
         languageDirection: input.context.languageDirection,
         honorificLevel: null,
+        // 🔴 QA 정적 분석 후속(2026-08-05) — 서버 현재 시각 기준. 원문에 연도가 없는 날짜
+        // (`8월 12일`, `8/8` 등)를 모델이 지어내지 않고 채울 수 있게 하는 값이다
+        // (`packages/core/src/prompts/c2.ts` `C2Payload.referenceYear` 주석 참조).
+        referenceDate: new Date().toISOString().slice(0, 10),
       },
       llm,
     );

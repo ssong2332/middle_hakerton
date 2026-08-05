@@ -17,8 +17,10 @@
  * ## `docs/Tasks.md` T10 ⓐⓑⓒ 프롬프트 규칙 3종의 반영 지점
  * - ⓐ KO→EN 어미 긴급도 복원(AC-045) — `KO_EN_RULES`.
  * - ⓑ EN→KO 종결어미 레벨 고정(AC-046) — `enKoRules()`.
- * - ⓒ 날짜·숫자 비모호 정규화(AC-049) — `DATE_NUMBER_RULES`(양방향 공통 — H-10 케이스가 en-ko
+ * - ⓒ 날짜·숫자 비모호 정규화(AC-049) — `dateNumberRules()`(양방향 공통 — H-10 케이스가 en-ko
  *   방향에서도 날짜 정규화를 요구한다, `docs/TestCases.md` AC-046 표 H-10 "날짜 정규화(AC-049)와 교차").
+ *   🔴 QA 정적 분석 후속(2026-08-05) — 연도 없는 원문(`8월 12일`, `8/8`)의 연도를 채우려면 기준
+ *   연도가 필요해 `C2Payload.referenceYear`를 추가했다(아래 해당 필드 주석 참조).
  *
  * 🔴 국가·국민성 서술을 넣지 않는다 — 아래 규칙은 전부 **언어쌍(KO↔EN) 구조 규칙**이며 국적·문화를
  * 언급하지 않는다(Planning Decision #50·#6, `docs/Architecture.md` Conventions 7).
@@ -26,38 +28,41 @@
 import type { LanguageDirection } from '../contract';
 
 /** 🔴 프롬프트 문구를 바꾸면 이 값을 올린다. */
-export const C2_PROMPT_VERSION = 'c2-v1';
+export const C2_PROMPT_VERSION = 'c2-v3';
 
 /** `contract.ts`의 `CommunicationProfile.honorificLevel`과 같은 어휘. 여기서 다시 export한다 —
  * `rules/honorific.ts`의 동명 타입은 export되지 않아(그 파일 소유 태스크가 다르다) 재사용하지 않는다. */
 export type HonorificLevel = 'hapsyo' | 'haeyo';
-
-/**
- * 🔴 프로필·규약 어디에도 값이 없을 때 en-ko 변환이 쓰는 기본 존댓말 레벨.
- *
- * ## 왜 필요한가
- * AC-046①("한 메시지 안의 종결어미 레벨 혼용이 0건")은 **개인화 여부와 무관하게 항상** 요구된다
- * — 프로필이 비어 있어도 출력 자체는 하나의 레지스터로 일관되어야 한다. 이것은 "빈 프로필을
- * 추측으로 채운다"(AC-059 금지 대상)와는 다르다 — 발신자의 성향을 추정하는 것이 아니라, 시스템이
- * 어떤 경우에도 선택해야 하는 **출력 레지스터의 기본값**이다.
- *
- * ## 왜 `haeyo`(해요체)인가 (implementer 판단 — `docs/Tasks.md` T10 "판단 과정과 대안들을
- * 보고서에 남겨라" 반영)
- * 대안: `hapsyo`(합쇼체, 더 격식 있음) vs `haeyo`(해요체, 정중하되 덜 위계적). 현대 한국어
- * 업무 채팅(Slack 등)에서 해요체가 합쇼체보다 넓게 쓰이는 기본 정중체이고, 합쇼체는 상급자·격식
- * 문서 맥락에 더 치우친다 — 상대와의 관계가 전혀 알려지지 않은 상태(cold start)에서 과도한
- * 위계를 함의하지 않는 쪽을 기본값으로 택했다. 🔴 **이 판단은 측정되지 않았다(추정)** — 사용자
- * 스팟체크 또는 T35 리허설에서 재확인이 필요하면 이 상수만 바꾸면 된다(한 곳에 격리됨).
- */
-export const DEFAULT_HONORIFIC_LEVEL: HonorificLevel = 'haeyo';
 
 export interface C2Payload {
   instruction: string;
   text: string;
   languageDirection: LanguageDirection;
   /** en-ko 방향에서만 의미가 있다. ko-en 방향에도 항상 실어 보낸다 — payload 형태를 방향별로
-   * 분기하지 않는 편이 캐시 키 계산·스키마를 단순하게 유지한다. */
-  honorificLevel: HonorificLevel;
+   * 분기하지 않는 편이 캐시 키 계산·스키마를 단순하게 유지한다.
+   * 🔴 프로필이 비어 있으면(`skipped`·미응답) `null` — 기본 레벨을 채우지 않는다(`docs/Architecture.md`
+   * Data Flow 1-a, DECISIONS #40, ADR-0007). 기본값을 채우면 "프로필 없음"과 "프로필=특정값"의
+   * payload가 같아져 캐시 키가 두 상태를 구분하지 못하게 된다. */
+  honorificLevel: HonorificLevel | null;
+  /**
+   * 🔴 QA 정적 분석 후속 — 기준 연도(`YYYY`, 예: "2026"). `docs/TestCases.md` P-03/P-09/D-01/
+   * D-03/D-06의 "필수 포함"이 연도를 요구하는데(예: "Aug 12, 2026"), 원문에는 연도가 없다
+   * (`8월 12일`, `8/8` 등 월/일뿐). 이 값이 없으면 "원문에 없는 사실을 지어내지 마라"(위
+   * instruction 첫 문장)와 "연도를 채워라"가 동시에 성립할 수 없다 — 모델이 연도를 채우려면
+   * 지어내야 한다. `buildC2Payload`가 `referenceDate`(전체 ISO 날짜, 호출자의 "오늘")에서
+   * **연도만** 뽑아 여기 싣는다.
+   *
+   * **연도만 싣고 전체 날짜(`referenceDate`)를 payload에 싣지 않는 이유(캐시 키 설계 결정)**:
+   * cacheKey는 `sha256(model ∥ promptVersion ∥ step ∥ canonicalJSON(payload))`다
+   * (`docs/Architecture.md` Data Flow "2) LLM 호출 3단 해석"). payload에 실리는 값이 그대로
+   * 캐시 무효화 단위가 된다 — 전체 날짜(`YYYY-MM-DD`)를 실으면 **매일** 캐시가 깨진다. 그런데
+   * 위 5건이 요구하는 것은 전부 "연도"뿐이다(월/일/시각은 원문에 이미 있다 — 8월 12일/14시,
+   * 8/8, 8/4, 9/1 10시 등). "오늘이 정확히 며칠인지"는 어느 케이스도 요구하지 않는다(`today`류
+   * 상대 표현은 AC-045 케이스라 리터럴 "today"만 요구하며 실제 날짜 계산이 필요 없다,
+   * `docs/TestCases.md:88` U-01). 따라서 **연 단위 무효화**(실용적 — 데모 리허설·발표는 같은 해
+   * 안에서 일어난다, `docs/Architecture.md` "폴백 경로" 항목)로 캐시 키 설계 원칙과 이 요구사항이
+   * 동시에 성립한다. */
+  referenceYear: string;
 }
 
 const RESPONSE_FORMAT_RULE =
@@ -94,8 +99,26 @@ const KO_EN_RULES =
   'should be condensed to at most one apology sentence in the English output — keep the politeness ' +
   'but do not let it bury or replace the actual request.';
 
-/** ⓑ EN→KO 종결어미 레벨 고정(AC-046). */
-function enKoRules(honorificLevel: HonorificLevel): string {
+/**
+ * ⓑ EN→KO 종결어미 레벨 고정(AC-046).
+ *
+ * 🔴 `honorificLevel === null`(프로필이 비어 있음·`skipped`·미응답)일 때는 특정 레벨을 지정하지
+ * 않는다 — `docs/Architecture.md` Data Flow **1-a** 판정표 행 3(DECISIONS #40, ADR-0007 D2)이
+ * 단일 출처다. 대신 "하나의 일관된 종결어미 레벨을 끝까지 유지하라"는 일관성 지시만 싣는다.
+ * AC-046①("한 메시지 안의 혼용 0건")의 판정 단위는 "한 메시지 안"이라 이 지시만으로 충족된다 —
+ * 메시지 **간** 레벨이 달라지는 것은 AC-046이 금지하지 않는다.
+ */
+function enKoRules(honorificLevel: HonorificLevel | null): string {
+  if (honorificLevel === null) {
+    return (
+      'The original is English; produce Korean. The sender has no recorded honorific preference, ' +
+      'so do NOT assume or guess a specific register. Instead, pick ONE sentence-final honorific ' +
+      'register — either 합쇼체 (-습니다/-습니까/-십시오) or 해요체 (-아요/-어요/-네요/-예요) — and use that ' +
+      'SAME register consistently for every sentence in the output. Do not mix the two registers ' +
+      'within one message, and do not switch registers between sentences even for emphasis or a ' +
+      'quoted phrase.'
+    );
+  }
   const label =
     honorificLevel === 'hapsyo'
       ? '합쇼체 (sentence endings like -습니다/-습니까/-십시오)'
@@ -107,27 +130,47 @@ function enKoRules(honorificLevel: HonorificLevel): string {
   );
 }
 
-/** ⓒ 날짜·숫자 비모호 형식 정규화(AC-049). 방향 공통. */
-const DATE_NUMBER_RULES =
-  'Normalize every date to an unambiguous written form in the output language (e.g. "Aug 4, 2026" ' +
-  'for English output, "2026년 8월 4일" for Korean output) but NEVER change the underlying date, time, ' +
-  'or numeric value itself. Keep currency amounts and measurement units exactly as written in the ' +
-  'original — never convert currencies or units on your own (e.g. do not turn KRW into USD, or ms ' +
-  'into seconds).';
+/**
+ * ⓒ 날짜·숫자 비모호 형식 정규화(AC-049). 방향 공통.
+ *
+ * 🔴 QA 정적 분석 후속 — `referenceYear`가 없던 이전 버전은 예시 문구에 "2026"을 하드코딩해
+ * 두고 실제 기준 연도를 알려주는 필드가 없었다(payload에 `referenceDate`/`currentDate` 류
+ * grep 0건이었다) — 원문에 연도가 없는 케이스(P-03/P-09/D-01/D-03/D-06)에서 모델이 연도를
+ * 채우려면 지어내야 하는데 "지어내지 마라"는 지시와 모순됐다. 이제 실제 기준 연도를 명시한다.
+ */
+function dateNumberRules(referenceYear: string): string {
+  return (
+    `The reference year is ${referenceYear} — treat it as the current year "today". Normalize ` +
+    'every date to an unambiguous written form in the output language (e.g. ' +
+    `"Aug 4, ${referenceYear}" for English output, "${referenceYear}년 8월 4일" for Korean output) ` +
+    'but NEVER change the underlying date, time, or numeric value itself. If the original date has ' +
+    `no year written, fill in ${referenceYear} — do NOT guess a different year and do NOT drop the ` +
+    'year from the output. If the original text itself states a year, keep that stated year instead ' +
+    'of the reference year. Keep currency amounts and measurement units exactly as written in the ' +
+    'original — never convert currencies or units on your own (e.g. do not turn KRW into USD, or ms ' +
+    'into seconds).'
+  );
+}
 
 /**
  * C2 톤 변환 요청 payload를 만든다.
  *
  * @param text 변환할 원문.
  * @param languageDirection 변환 방향(`ko-en` | `en-ko`).
- * @param honorificLevel en-ko 방향에서 적용할 존댓말 레벨. 호출부가 `sender.profile.honorificLevel`이
- *   `null`이면 `DEFAULT_HONORIFIC_LEVEL`로 미리 채워 넘긴다(이 함수는 그 판단을 하지 않는다).
+ * @param honorificLevel en-ko 방향에서 적용할 존댓말 레벨. `sender.profile.honorificLevel`을 그대로
+ *   받는다 — 프로필이 비어 있으면(`null`) 이 함수도 기본값을 채우지 않고 `null`을 그대로 payload에
+ *   싣는다(`docs/Architecture.md` Data Flow 1-a, DECISIONS #40, ADR-0007).
+ * @param referenceDate 호출 시점의 기준일(ISO, `YYYY-MM-DD` — 호출자의 "오늘", 보통
+ *   `new Date().toISOString().slice(0, 10)`). 이 함수는 **연도만** 뽑아 payload에 싣는다
+ *   (`C2Payload.referenceYear` 주석 — 캐시 키 무효화를 연 단위로 제한하기 위함).
  */
 export function buildC2Payload(
   text: string,
   languageDirection: LanguageDirection,
-  honorificLevel: HonorificLevel,
+  honorificLevel: HonorificLevel | null,
+  referenceDate: string,
 ): C2Payload {
+  const referenceYear = referenceDate.slice(0, 4);
   const directionRules = languageDirection === 'ko-en' ? KO_EN_RULES : enKoRules(honorificLevel);
   const instruction = [
     'You are transforming the tone of a cross-border professional work message while preserving ' +
@@ -135,9 +178,9 @@ export function buildC2Payload(
       'invent facts that are not in the original.',
     PRESERVATION_AND_MISREAD_RULE,
     directionRules,
-    DATE_NUMBER_RULES,
+    dateNumberRules(referenceYear),
     RESPONSE_FORMAT_RULE,
   ].join(' ');
 
-  return { instruction, text, languageDirection, honorificLevel };
+  return { instruction, text, languageDirection, honorificLevel, referenceYear };
 }

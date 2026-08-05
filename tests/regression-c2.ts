@@ -18,6 +18,7 @@
  */
 import {
   detectHonorificMixing,
+  hasClassifiableHonorificSentence,
   type LanguageDirection,
   type MisreadRisk,
   type PreservedItem,
@@ -38,7 +39,9 @@ export interface C2Invoker {
   transform(input: {
     text: string;
     languageDirection: LanguageDirection;
-    /** AC-046 판정 절차: "①프로필=합쇼체 ②프로필=해요체 두 조건으로 각각 실행"(`docs/TestCases.md:125`). */
+    /** AC-046 판정 절차: "①프로필=합쇼체 ②프로필=해요체 두 조건으로 각각 실행"(`docs/TestCases.md:125`).
+     * 🔴 `judgeHonorificCase`는 이 표에 없는 **③ `null`(빈 프로필) 조건**도 함께 실행한다
+     * (ADR-0007 Follow-up 2 — 케이스 정의가 아니라 실행 조건 추가, planner 소유 미침범). */
     honorificLevel: 'hapsyo' | 'haeyo' | null;
   }): Promise<{ transformed: string; preserved: PreservedItem[]; misreadRisks: MisreadRisk[] }>;
 }
@@ -114,18 +117,39 @@ function judgeTextCase(
   return { id, ac, verdict: 'pass', detail: '필수 포함 전부 존재 AND 금지 전부 부재' };
 }
 
+/**
+ * 🔴 reviewer 후속 Major 2(T11, `docs/Tasks.md` T11) — `quote`가 `kase.input`에 실제로
+ * (정규화 후 부분 문자열로) 포함되는지 확인한다. AC-043①이 요구하는 "원문에서의 인용 구간"은
+ * LLM이 지어낸 임의 문자열이 아니라 원문의 실제 부분이어야 한다 — 대소문자만 무시하고
+ * 문자열 완전일치가 아닌 부분 문자열 매칭을 쓴다(`matchesRequired`의 `normalize`와 동일 근사).
+ */
+function isQuoteFromInput(input: string, quote: string): boolean {
+  return normalize(input).includes(normalize(quote));
+}
+
 function judgeMisreadRiskCase(kase: MisreadRiskCase, misreadRisks: MisreadRisk[]): CaseResult {
   const wellFormed = misreadRisks.filter(
     (r) => r.quote.length > 0 && r.misreading.length > 0 && r.evidence.length > 0,
   );
 
   if (kase.expectRisk) {
+    const fabricatedQuotes = wellFormed.filter((r) => !isQuoteFromInput(kase.input, r.quote));
+    if (fabricatedQuotes.length > 0) {
+      return {
+        id: kase.id,
+        ac: kase.ac,
+        verdict: 'fail',
+        detail: `quote가 원문에 없음(날조 의심, AC-043① 위반): ${fabricatedQuotes
+          .map((r) => `"${r.quote}"`)
+          .join(', ')}`,
+      };
+    }
     return wellFormed.length > 0
       ? {
           id: kase.id,
           ac: kase.ac,
           verdict: 'pass',
-          detail: `위험 ${wellFormed.length}건 산출됨(3요소 충족)`,
+          detail: `위험 ${wellFormed.length}건 산출됨(3요소 충족 + quote가 원문 부분 문자열)`,
         }
       : {
           id: kase.id,
@@ -150,21 +174,53 @@ function judgeMisreadRiskCase(kase: MisreadRiskCase, misreadRisks: MisreadRisk[]
  * 않는다 — `rules/honorific.ts`가 문장 레벨 분류 결과를 외부로 노출하지 않기 때문이다(그 파일은
  * `detectHonorificMixing(): boolean`만 export한다). `docs/TestCases.md` "미확정 항목"의
  * "존댓말 레벨 혼용의 기계적 판정 규칙 … 검증 안 됨(추정)"과 같은 성격의 한계다.
+ *
+ * 🔴 reviewer 후속 Major 1(T11) — `detectHonorificMixing`만으로는 분류 가능한 문장이 0~1개인
+ * 응답(변환이 통째로 실패해 영어 원문이 그대로 반환된 경우 등)도 "혼용 없음"으로 통과한다.
+ * `hasClassifiableHonorificSentence`로 "한국어 종결어미 문장이 실제로 1개 이상 산출됐는가"를
+ * 먼저 확인하고, 0개면 혼용 여부와 무관하게 `fail`로 판정한다 — "구조 검사만으로 통과 처리하지
+ * 않는다"(`docs/CodingRules.md` Tests)를 이 축에도 적용한다.
+ *
+ * 🔴 ADR-0007 Follow-up 2(`docs/adr/0007-honorific-level-resolution-boundary.md` Consequences
+ * "확인 수단") — 합쇼체·해요체 두 실행 조건에 **`honorificLevel: null`(빈 프로필) 조건을 추가**한다.
+ * 케이스 신설이 아니라 기존 케이스(H-01~10)의 실행 조건 추가다 — `docs/TestCases.md`(planner 소유)의
+ * 케이스 정의는 바뀌지 않는다. 빈 프로필에서도 AC-046①(혼용 0건)이 실행 출력으로 증명되어야
+ * DECISIONS #40의 "레벨 미지정 + 일관성 지시만으로 혼용이 0건이 된다"는 가정이 확인된다.
  */
 async function judgeHonorificCase(kase: HonorificCase, invoker: C2Invoker): Promise<CaseResult> {
-  const levels: Array<'hapsyo' | 'haeyo'> = ['hapsyo', 'haeyo'];
+  const levels: Array<'hapsyo' | 'haeyo' | null> = ['hapsyo', 'haeyo', null];
   const mixedFor: string[] = [];
+  const noKoreanFor: string[] = [];
   for (const level of levels) {
+    const label = level ?? 'null(빈 프로필)';
     const { transformed } = await invoker.transform({
       text: kase.input,
       languageDirection: kase.direction,
       honorificLevel: level,
     });
-    if (detectHonorificMixing(transformed)) mixedFor.push(level);
+    if (!hasClassifiableHonorificSentence(transformed)) {
+      noKoreanFor.push(label);
+      continue;
+    }
+    if (detectHonorificMixing(transformed)) mixedFor.push(label);
+  }
+
+  if (noKoreanFor.length > 0) {
+    return {
+      id: kase.id,
+      ac: kase.ac,
+      verdict: 'fail',
+      detail: `한국어 종결어미 문장이 검출되지 않음(프로필=${noKoreanFor.join(', ')}) — 변환 실패 의심`,
+    };
   }
 
   return mixedFor.length === 0
-    ? { id: kase.id, ac: kase.ac, verdict: 'pass', detail: '합쇼체·해요체 두 실행 모두 혼용 0건' }
+    ? {
+        id: kase.id,
+        ac: kase.ac,
+        verdict: 'pass',
+        detail: '합쇼체·해요체·null(빈 프로필) 세 실행 모두 혼용 0건, 한국어 종결어미 검출됨',
+      }
     : {
         id: kase.id,
         ac: kase.ac,
@@ -234,9 +290,19 @@ function tallyByAc(results: CaseResult[]): AcTally[] {
   });
 }
 
+/** 예외를 사람이 읽을 수 있는 한 줄로 만든다(`error.name: error.message`, 이름 없는 값은 `String()`). */
+function describeError(error: unknown): string {
+  return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+}
+
 /**
  * 53건(표 A 46건 + 표 B T-P 7건) 전체를 실행하고 하나의 실행 출력으로 판정한다.
  * `cases`를 생략하면 `C2_REGRESSION_CASES`(전체 53건)를 쓴다 — 테스트에서는 부분집합을 넘길 수 있다.
+ *
+ * 🔴 reviewer 후속 Major 4(T11) — 케이스 1건이 예외를 던져도(`LLMUnavailableError`·
+ * `QuotaExceededError` 등, 실제 `LLMClient`를 물린 라이브 실행에서 발생할 수 있다) 전체 53건
+ * 실행이 중단되지 않는다. 케이스 단위 `try/catch`로 잡아 해당 케이스만 `verdict:'fail'` + 예외
+ * 사유를 기록하고 나머지 케이스는 계속 실행한다 — 삼키지 않는다(사유가 `detail`에 그대로 남는다).
  */
 export async function runC2Regression(
   invoker: C2Invoker,
@@ -244,7 +310,16 @@ export async function runC2Regression(
 ): Promise<C2RegressionReport> {
   const results: CaseResult[] = [];
   for (const kase of cases) {
-    results.push(await judgeCase(kase, invoker));
+    try {
+      results.push(await judgeCase(kase, invoker));
+    } catch (error) {
+      results.push({
+        id: kase.id,
+        ac: kase.ac,
+        verdict: 'fail',
+        detail: `케이스 실행 중 예외 발생(삼키지 않고 fail로 기록): ${describeError(error)}`,
+      });
+    }
   }
   return {
     results,

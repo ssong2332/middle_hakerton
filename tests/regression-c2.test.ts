@@ -182,6 +182,120 @@ describe('runC2Regression — 오답 인보커(고의로 틀린 응답)', () => 
   });
 });
 
+describe('runC2Regression — reviewer 후속 Major 1(AC-046 한국어 미검출 가드)', () => {
+  it('한국어 종결어미 문장이 0개면(변환 실패로 영어 원문이 그대로 반환된 경우) pass가 아니다', async () => {
+    const h01 = C2_REGRESSION_CASES.find((c) => c.id === 'H-01')!;
+    const untranslatedInvoker: C2Invoker = {
+      transform: async () => ({
+        transformed: 'Can you check this by Friday?', // 변환 실패 — 영어 원문 그대로
+        preserved: [],
+        misreadRisks: [],
+      }),
+    };
+    const report = await runC2Regression(untranslatedInvoker, [h01]);
+    expect(report.results[0].verdict).not.toBe('pass');
+  });
+});
+
+describe('runC2Regression — reviewer 후속 Major 2(AC-043 날조된 quote 가드)', () => {
+  it('quote가 원문에 실제로 없는 날조된 인용이면 fail이다(AC-043① "원문에서의 인용 구간")', async () => {
+    const m01 = C2_REGRESSION_CASES.find((c) => c.id === 'M-01')!;
+    const fabricatedInvoker: C2Invoker = {
+      transform: async () => ({
+        transformed: 'ok',
+        preserved: [],
+        misreadRisks: [
+          { quote: '이 문장은 원문에 없는 날조된 인용이다', misreading: 'y', evidence: 'z' },
+        ],
+      }),
+    };
+    const report = await runC2Regression(fabricatedInvoker, [m01]);
+    expect(report.results[0].verdict).toBe('fail');
+  });
+
+  it('quote가 원문의 실제 부분 문자열이면(대소문자 무시) 정상 pass다', async () => {
+    const m01 = C2_REGRESSION_CASES.find((c) => c.id === 'M-01')!;
+    const realQuoteInvoker: C2Invoker = {
+      transform: async () => ({
+        transformed: 'ok',
+        preserved: [],
+        misreadRisks: [{ quote: m01.input, misreading: 'y', evidence: 'z' }],
+      }),
+    };
+    const report = await runC2Regression(realQuoteInvoker, [m01]);
+    expect(report.results[0].verdict).toBe('pass');
+  });
+});
+
+describe('runC2Regression — reviewer 후속 Major 4(케이스 단위 예외 격리)', () => {
+  it('한 케이스가 예외를 던져도 나머지 케이스는 계속 실행되고, 실패한 케이스는 fail로 기록된다(삼키지 않는다)', async () => {
+    const d01 = C2_REGRESSION_CASES.find((c) => c.id === 'D-01')!;
+    const d02 = C2_REGRESSION_CASES.find((c) => c.id === 'D-02')!;
+    const throwingInvoker: C2Invoker = {
+      transform: async ({ text }) => {
+        if (text === d01.input) throw new Error('LLMUnavailableError: 모의 실호출 실패');
+        return { transformed: 'Aug 4, 2026', preserved: [], misreadRisks: [] };
+      },
+    };
+    const report = await runC2Regression(throwingInvoker, [d01, d02]);
+    expect(report.totalCases).toBe(2);
+    expect(report.results[0]).toMatchObject({ id: 'D-01', verdict: 'fail' });
+    expect(report.results[0].detail).toContain('LLMUnavailableError');
+    expect(report.results[1]).toMatchObject({ id: 'D-02', verdict: 'pass' });
+  });
+});
+
+describe('runC2Regression — ADR-0007 Follow-up 2(AC-046, 빈 프로필 honorificLevel:null 실행 조건 추가)', () => {
+  it('AC-046 케이스 실행 시 honorificLevel:null 조건도 함께 실행한다(합쇼체/해요체 외 세 번째 조건)', async () => {
+    const h01 = C2_REGRESSION_CASES.find((c) => c.id === 'H-01')!;
+    const requestedLevels: Array<'hapsyo' | 'haeyo' | null> = [];
+    const recordingInvoker: C2Invoker = {
+      transform: async ({ honorificLevel }) => {
+        requestedLevels.push(honorificLevel);
+        const transformed = honorificLevel === 'hapsyo' ? '확인 부탁드립니다.' : '확인 부탁드려요.';
+        return { transformed, preserved: [], misreadRisks: [] };
+      },
+    };
+
+    await runC2Regression(recordingInvoker, [h01]);
+
+    expect(requestedLevels).toContain(null);
+  });
+
+  it('honorificLevel:null 조건에서 혼용이 발생하면 fail이다(빈 프로필도 혼용 0건을 요구, AC-046①)', async () => {
+    const h01 = C2_REGRESSION_CASES.find((c) => c.id === 'H-01')!;
+    const mixedOnlyWhenNullInvoker: C2Invoker = {
+      transform: async ({ honorificLevel }) => {
+        if (honorificLevel === null) {
+          return {
+            transformed: '확인 부탁드립니다. 편하실 때 연락 주세요.', // 합쇼체 + 해요체 혼용
+            preserved: [],
+            misreadRisks: [],
+          };
+        }
+        const transformed = honorificLevel === 'hapsyo' ? '확인 부탁드립니다.' : '확인 부탁드려요.';
+        return { transformed, preserved: [], misreadRisks: [] };
+      },
+    };
+
+    const report = await runC2Regression(mixedOnlyWhenNullInvoker, [h01]);
+
+    expect(report.results[0].verdict).toBe('fail');
+    expect(report.results[0].detail).toContain('혼용');
+  });
+
+  it('honorificLevel:null 조건에서도 혼용이 없으면 pass다(빈 프로필 혼용 0건 확인)', async () => {
+    const h01 = C2_REGRESSION_CASES.find((c) => c.id === 'H-01')!;
+    const alwaysConsistentInvoker: C2Invoker = {
+      transform: async () => ({ transformed: '확인 부탁드려요.', preserved: [], misreadRisks: [] }),
+    };
+
+    const report = await runC2Regression(alwaysConsistentInvoker, [h01]);
+
+    expect(report.results[0].verdict).toBe('pass');
+  });
+});
+
 describe('formatReport', () => {
   it('AC별 요약과 합계, 문제 케이스 세부를 포함한 문자열을 만든다', async () => {
     const d01 = C2_REGRESSION_CASES.find((c) => c.id === 'D-01')!;

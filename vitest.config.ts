@@ -3,11 +3,25 @@
  * 근거: `docs/Architecture.md` Tech Stack "테스트" 행 · `docs/DECISIONS.md` #13 —
  * T11(회귀 검증셋 26건)이 "하나의 실행 출력"을 요구하므로 러너가 갈리면 안 된다.
  */
+import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 // Vitest 4에서 `environmentMatchGlobs`가 제거되었다(마이그레이션 가이드 대체제: `projects`).
 // 컴포넌트 테스트(`apps/web/**/*.test.tsx`)만 jsdom이 필요하다. 나머지는 순수 로직이라 node로 충분하고 더 빠르다.
 const sharedExclude = ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/build/**'];
+
+// 🔴 reviewer 후속 Major B(`docs/Tasks.md` T11) — Vitest 4는 `.env`를 자동으로 `process.env`에
+// 로드하지 않는다(measured: `node_modules/vitest/dist`에 `loadEnv` 0건, `package-lock.json`에
+// `dotenv` 없음). `tests/regression-c2.live.test.ts` 헤더가 안내하는 절차("`.env`에 채운 뒤
+// `npm run test:regression-c2`")가 실제로 동작하려면 이 설정 파일이 직접 `.env`를 읽어야 한다.
+// 새 의존성을 추가하지 않고 `vitest`가 이미 의존하는 `vite`의 내장 `loadEnv`를 쓴다 — 세 번째
+// 인자를 `''`(빈 prefix)로 주면 기본값인 `VITE_` 접두사 필터링 없이 전체 키를 로드한다. 이미
+// `process.env`에 설정된 값(CI 환경변수, 셸 export 등)은 덮어쓰지 않는다 — `.env`는 로컬 기본값
+// 역할만 한다. `.env`가 없는 워크트리에서는 `loadEnv`가 빈 객체를 반환해 부작용이 없다.
+const dotEnv = loadEnv('test', process.cwd(), '');
+for (const [key, value] of Object.entries(dotEnv)) {
+  if (process.env[key] === undefined) process.env[key] = value;
+}
 
 export default defineConfig({
   // 🔴 T5/T6이 처음 추가한다 — `apps/web/**/*.test.tsx`(컴포넌트 테스트, jsdom 프로젝트)가

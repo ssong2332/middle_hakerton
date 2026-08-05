@@ -130,6 +130,18 @@ export function detectHonorificMixing(text: string): boolean {
 }
 
 /**
+ * 텍스트에 합쇼체/해요체로 분류 가능한 문장이 하나라도 있는지 확인한다.
+ * 🔴 reviewer 후속 Major 1(T11, `docs/Tasks.md` T11) — `detectHonorificMixing`은 서로 다른
+ * 레벨이 2개 이상 검출된 경우만 `true`를 반환하므로, 분류 가능한 문장이 0~1개인 입력(예: 변환이
+ * 통째로 실패해 영어 원문이 그대로 반환된 경우)도 조용히 `false`(=혼용 아님)로 통과한다. T11
+ * 러너(`tests/regression-c2.ts`의 `judgeHonorificCase`)가 "한국어 문장이 실제로 산출됐는가"를
+ * `detectHonorificMixing`과 별도로 확인할 수 있도록 이 판정을 노출한다.
+ */
+export function hasClassifiableHonorificSentence(text: string): boolean {
+  return splitSentences(text).some((sentence) => classifySentence(sentence) !== null);
+}
+
+/**
  * 혼용이 감지되면 `warnings[]`에 넣을 `Warning`을 만든다(AC-046③). 감지되지 않으면 `null`
  * — "경고가 없으면 아무것도 표시하지 않는다"(`docs/Tasks.md` T6)를 호출부가 그대로 반영할 수 있게 한다.
  * 🔴 문구에 국가·국민성 서술을 넣지 않는다(`docs/Architecture.md` Conventions 7 — 언어쌍(KO↔EN)
