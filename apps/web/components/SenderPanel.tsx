@@ -20,6 +20,15 @@ export interface SenderPanelProps {
   displayedUrgency: UrgencyLevel | null;
   /** 🔴 부모(`MediationWorkspace`)가 실제 `/api/mediate` 호출을 담당한다 — 이 컴포넌트는 클릭만 알린다. */
   onRunMediation: () => void;
+  /**
+   * 🔴 M-2(2026-08-05, reviewer REJECTED → 수정) — 승인 가능한 스냅샷(`approvalSnapshot`)이
+   * 있는지. 결과 블록(등급/비교/오해 위험/역번역, 특히 폴백 배지)의 표시 여부를 `status==='success'`
+   * 단독으로 판정하면, 재실행이 실패했을 때(`status==='error'`) 직전 성공 결과가 남아 있어도
+   * 블록 전체가 사라진다 — `RecipientPanel`은 이미 `hasResult`(스냅샷 존재)로 승인 가능 여부를
+   * 판정하므로, 그 사이에 "폴백 응답 사용 중" 라벨만 사라진 채로 승인 가능한 상태가 될 수 있었다
+   * (AC-041 위반). `MediationWorkspace`의 `hasResult`(=`approvalSnapshot !== null`)를 그대로 받는다.
+   */
+  hasResult: boolean;
 }
 
 /**
@@ -40,6 +49,7 @@ export function SenderPanel({
   isOverridden,
   displayedUrgency,
   onRunMediation,
+  hasResult,
 }: SenderPanelProps) {
   const trimmedRecipient = recipient.trim();
   const recipientFormatInvalid = trimmedRecipient !== '' && !isValidEmailFormat(trimmedRecipient);
@@ -68,13 +78,22 @@ export function SenderPanel({
         onChange={(event) => onTextChange(event.target.value)}
       />
 
+      {/* T16(AC-029, docs/UX.md:1015) — 실패 상태에서는 같은 버튼이 "다시 시도"로 바뀐다. 별도
+          버튼을 추가하지 않는 이유: 핸들러(onRunMediation)가 동일하고("재시도 = 재실행"), 버튼을
+          하나 더 두면 실패 상태에서 "실행"과 "다시 시도" 두 개가 동시에 보여 혼란을 준다. */}
       <button type="button" onClick={onRunMediation} disabled={!canRun}>
-        실행
+        {status === 'error' ? '다시 시도' : '실행'}
       </button>
-      {status === 'loading' && <p role="status">처리 중…</p>}
+      {/* T16(AC-029, docs/UX.md:1013) — 단계 라벨 진행 표시. `docs/UX.md`의 예시 문구를 그대로
+          쓰는 정적 텍스트다(타이머로 단계를 전환하지 않는다) — 판단 근거는
+          `MediationWorkspace.tsx` 헤더 주석 "T16 — 진행 표시 방식" 참조. */}
+      {status === 'loading' && <p role="status">분류 중 → 변환 중 → 역번역 중</p>}
       {status === 'error' && <p role="alert">처리에 실패했습니다</p>}
 
-      {status === 'success' && result && (
+      {/* M-2 — `status === 'success'` 단독이 아니라 `hasResult`(승인 가능한 스냅샷 존재)도
+          함께 본다. 재실행이 실패해도(status==='error') 직전 성공 결과와 그 폴백 배지가
+          유지되어야 RecipientPanel의 승인 가능 상태와 일치한다. */}
+      {(status === 'success' || hasResult) && result && (
         <>
           {displayedUrgency && (
             <UrgencyPanel

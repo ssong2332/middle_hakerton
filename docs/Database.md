@@ -5,6 +5,10 @@ Created only when the project requires a database (architect: "if required").
 Based on PRD Version: v3.2 · Based on UX Version: 6.0
 
 > ✅ **엔진·호스팅은 2026-08-04 사용자 결정으로 승인되었다**(`docs/Architecture.md` 상단 게이트 표 · `docs/DECISIONS.md` #31). **`supabase/migrations/0001_init.sql` 작성·적용 보류 조항은 해제되었다** — T18 착수 가능. 단 T45(인증)가 T18보다 **먼저** 완료돼야 한다(Planning Decision #43).
+>
+> 🔴 **2026-08-05 정정 1건 — RLS 절의 소유자 컬럼명**(DECISIONS #47). 스키마·마이그레이션·코드는 **바꾸지 않았고 문서만 정정**했다. 상세는 아래 "Row Level Security (RLS)" 절.
+>
+> ⚠️ **미정정으로 남긴 드리프트 1건(다음 패스 대상)**: 아래 "마이그레이션 순서 (T18)"가 `0001_init.sql` 한 파일을 전제하지만, 실제 리포에는 **`0001_llm_cache_and_log.sql`(T4)·`0002_sent_messages_and_diff_records.sql`(T14)** 두 파일이 이미 적용돼 있다(measured 2026-08-05 — `supabase/migrations/` 실측). 즉 **T18이 만들 파일은 `0001_init.sql` 이 아니라 `0003_*`** 이며, 그 안에 남는 테이블도 이 절의 목록보다 적다. **이번 패스의 요청 범위 밖이라 손대지 않았다** — 마이그레이션 분할 계획 재작성은 T18 착수 전 architect 패스가 필요하다.
 
 ## Engine
 
@@ -41,7 +45,7 @@ UX-001, UX-002 / AC-039, AC-060
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | uuid | PK | 모든 소유 테이블의 `owner_user_id` 가 참조 |
+| id | uuid | PK | 모든 소유 테이블의 소유자 컬럼이 참조한다 — 🔴 **컬럼 이름은 테이블마다 `user_id` 또는 `owner_user_id` 두 가지다**(정확한 대응은 아래 RLS 절 표, DECISIONS #47) |
 | email | text | UNIQUE | 계정 식별자. **한 이메일당 계정 1개**(UX-002 Business Rules) |
 | encrypted_password | — | — | Supabase 관리. 우리 코드가 읽지 않는다. **최소 8자 정책은 Supabase Auth 설정에서 지정**하며 앱에 중복 검증을 만들지 않는다(Planning Decision #86) |
 
@@ -366,11 +370,25 @@ llm_cache       ── 어떤 테이블과도 관계가 없다 (키가 콘텐츠
 
 🔴 **AC-039를 애플리케이션 `where` 절이 아니라 DB에서 강제한다.** 전 테이블 RLS 활성이 마이그레이션 0001의 필수 항목이다.
 
-| Table | Policy |
-|---|---|
-| `profiles`, `profile_learned_items`, `diff_records`, `dictionary_terms`, `sent_messages`, `recipient_enrichments`, `observation_samples` | `USING (owner_user_id = auth.uid())` / `WITH CHECK (owner_user_id = auth.uid())` — SELECT·INSERT·UPDATE·DELETE 전부. (`profiles` 는 컬럼명이 `user_id`) |
-| `pair_protocols` | `USING (auth.jwt()->>'email' IN (party_a, party_b))` — 양측이 같은 행을 열람·수정(AC-037). 상대가 미가입이면 사실상 발신자만 접근 |
-| `llm_cache`, `llm_call_log` | **RLS 활성 + 정책 0개** = anon/authenticated 전면 차단. 서버가 서비스 롤로만 접근 |
+🔴 **소유자 컬럼 이름은 한 가지가 아니라 두 가지다 — 2026-08-05 정정(DECISIONS #47).** 이 절은 원래 7개 테이블을 `owner_user_id` 로 묶고 `profiles` 만 괄호로 예외 처리하고 있었으나, **같은 문서의 Schema 절과 Indexes 절이 그렇지 않다.** 아래 표가 정확한 값이며 **정책의 *형태*는 전 테이블 동일**(`<소유자 컬럼> = auth.uid()`)이고 다른 것은 **컬럼 이름뿐**이다.
+
+| Table | 소유자 컬럼 | Policy | 컬럼명 근거(같은 문서) |
+|---|---|---|---|
+| `profiles` | **`user_id`** | `USING (user_id = auth.uid())` / `WITH CHECK (user_id = auth.uid())` | Schema :55 (PK) |
+| `profile_learned_items` | **`user_id`** | 동일 | Schema :73 · :78 UNIQUE |
+| `diff_records` | **`user_id`** | 동일 | Schema :88 · G4 쿼리 :102 · Indexes :350~351 |
+| `sent_messages` | **`user_id`** | 동일 | Schema :184 · Indexes :352~353 |
+| `dictionary_terms` | **`owner_user_id`** | `USING (owner_user_id = auth.uid())` / `WITH CHECK (…)` | Schema :117 · :124 UNIQUE · Indexes :355 |
+| `recipient_enrichments` | **`owner_user_id`** | 동일 | Schema :210 · :219 UNIQUE · Indexes :356 |
+| `observation_samples` | **`owner_user_id`** | 동일 | Schema :245 · Indexes :357 |
+| `pair_protocols` | — (쌍 소유) | `USING (auth.jwt()->>'email' IN (party_a, party_b))` — 양측이 같은 행을 열람·수정(AC-037). 상대가 미가입이면 사실상 발신자만 접근 | Schema :136~137 |
+| `llm_cache`, `llm_call_log` | — | **RLS 활성 + 정책 0개** = anon/authenticated 전면 차단. 서버가 서비스 롤로만 접근 | Schema :264 · :282 |
+
+모든 정책은 **SELECT·INSERT·UPDATE·DELETE 전부**에 건다.
+
+🔴 **코드가 아니라 이 문서가 틀려 있었다 — 마이그레이션·코드는 바꾸지 않는다.** 이미 적용된 `supabase/migrations/0002_sent_messages_and_diff_records.sql` 이 `user_id`(:39·:73)와 `using (user_id = auth.uid()) with check (user_id = auth.uid())`(:68·:94)로 작성돼 있고, T14 implementer가 그 파일 주석(:20~28)에 이 불일치를 발견해 architect 동기화를 요청해 두었다(measured 2026-08-05). **이 정정이 그 요청의 처리다.**
+
+⚠️ **두 이름을 하나로 통일하지 않는다.** 통일은 `RENAME` 이며 아래 Migration Policy의 **2026-08-19 이후 additive-only 규칙**(DECISIONS #25)이 금지하는 변경이고, 지금 해도 이미 적용된 마이그레이션 2건과 그 위의 코드를 다시 건드린다. **두 이름이 공존한다는 사실을 정확히 적는 쪽**이 비용 0·오해 0이다. 새 테이블을 추가할 때는 **`user_id` 를 기본으로 쓴다**(적용된 마이그레이션 2건이 쓰는 이름이므로 다수파다).
 
 **검증(T18 완료 조건)**: 계정 2개를 만들어 A의 데이터가 B의 세션에서 **0행**으로 조회됨을 실행 출력으로 기록한다(AC-039의 "계정 2개로 교차 확인"을 그대로 수행).
 

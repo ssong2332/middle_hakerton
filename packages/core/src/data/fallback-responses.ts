@@ -17,7 +17,72 @@ export interface FallbackResponseEntry {
   content: string;
 }
 
-export const FALLBACK_RESPONSES: FallbackResponseEntry[] = [];
+/**
+ * 🔴 T16(2026-08-05) — 이 3건은 **시나리오 기본값**(`cacheKey` 없음)만 채운다. `cacheKey`가
+ * 정확히 일치하는 데모 전용 항목은 채우지 않았다 — 근거: `cacheKey` 공식(`apps/web/lib/llm/cache-key.ts`
+ * `buildCacheKey`)이 `model`을 입력에 포함하는데, `OPENAI_MODEL`은 이 리포에 값이 없다
+ * (`.env.example:13` — 플레이스홀더만 있고 실제 값은 각자 로컬 `.env`/배포 환경변수에만 존재,
+ * `docs/CodingRules.md` Directory Rules `apps/web/lib/supabase` 행과 같은 이유로 시크릿·환경설정을
+ * 이 커밋에 옮겨 적지 않는다). 배포 환경마다 `OPENAI_MODEL` 값이 달라질 수 있어(등급 낮출 때
+ * 재배포만으로 끝나도록 코드에 박지 않는다 — 같은 파일 주석) 지금 특정 모델 문자열을 가정해
+ * `sha256(model ∥ promptVersion ∥ step ∥ canonicalJson(payload))`를 미리 계산하면, 실제 배포
+ * 모델이 다를 때 그 항목은 영원히 조회되지 않는 죽은 데이터가 된다. 반면 아래 시나리오 기본값은
+ * `model`/`payload`와 무관하게 항상 조회된다 — `apps/web/lib/llm/openai.ts`(실호출 실패·상한
+ * 초과·크레딧 소진 시)와 `packages/core/src/steps/{c1,c2,c4}.ts`(step 스키마 검증 실패 시,
+ * `NO_STEP_CACHE_KEY = ''`로 조회) **양쪽 모두**가 이 항목으로 강등된다(`fallback-responses.test.ts`
+ * "정확히 일치하는 cacheKey가 없으면 시나리오 기본값을 반환한다"로 검증된 동작).
+ *
+ * 내용 출처(있는 그대로, 지어내지 않는다) — c1/c2/c4 **셋 다 TestCases U-01**
+ * ("혹시 오늘 중으로 가능하실까요?", `docs/DemoScript.md:105-117`)로 통일한다:
+ *
+ * 🔴 2026-08-05(reviewer C-1 REJECTED → 수정) — 이전 버전은 c1/c2/c4가 서로 다른 데모 시나리오
+ * 에서 왔다. c1.reason은 "마감 신호 없음"을 주장했는데 c2는 실제로 마감(오늘 중 → EOD today)을
+ * `preserved[]`에 넣고 있어 자기모순이었고, c4.backTranslation은 C4 데모 케이스("이 안건은
+ * 보류하고...")의 문구인데 c2.transformed는 U-01("I need this by EOD today...")이라 역번역이
+ * 그 위에 표시되는 변환문과 아무 관계가 없었다 — 폴백 발동 시 이 3건이 `SenderPanel.tsx` 한
+ * 화면에 동시에 뜨므로, `BackTranslationPreview`(변환문 검증이 존재 이유)가 무너지는 결함이었다.
+ * 아래는 셋 다 U-01 하나로 통일한 뒤의 근거다.
+ *
+ * - `c1`: **판단 근거를 지어내지 않는다** — 폴백은 실제 입력을 보지 않았으므로 "마감·장애 신호가
+ *   없다" 같은, 입력을 봤다고 전제하는 주장을 할 근거가 없다. `reason`은 폴백이라 실제 입력 기반
+ *   판단 근거가 없다는 사실 자체를 말한다. `urgency: 'NORMAL'`은 유지한다 — `docs/TestCases.md`는
+ *   U-01(AC-045, C2 변환 케이스)에 C1 분류 등급을 지정하지 않는다(T-U01~T-U08은 다른 문구의 별도
+ *   세트다 — `docs/TestCases.md:345-352`). 표본이 없을 때의 중립값으로 기존 NORMAL을 그대로 쓴다.
+ * - `c2`: `docs/DemoScript.md` 장면 3①(TestCases **U-01** "혹시 오늘 중으로 가능하실까요?")의
+ *   설계된 변환 예시를 **그대로** 썼다 — "우리 변환: I need this by EOD today. Please confirm if
+ *   that's not feasible."(`docs/DemoScript.md:117`). `preserved[]`는 같은 케이스의 마감(오늘 중 →
+ *   EOD today)을 반영했다. (변경 없음 — 원래부터 U-01이었다)
+ * - `c4`: 위 `c2.transformed`("I need this by EOD today. Please confirm if that's not
+ *   feasible.")를 **이 태스크가 성실하게 역번역해 새로 작성했다** — TestCases.md/DemoScript.md
+ *   원문을 그대로 옮긴 것이 아니다(U-01에는 "역번역이 이렇게 돌아오면 정상"이라는 고정 문구가
+ *   없으므로, c2의 변환문 자체를 참조 대상으로 삼아 직접 번역했다. 참조 대상이 명확한 번역이라
+ *   지어낸 값은 아니다).
+ */
+export const FALLBACK_RESPONSES: FallbackResponseEntry[] = [
+  {
+    step: 'c1',
+    content: JSON.stringify({
+      urgency: 'NORMAL',
+      reason:
+        '폴백 응답이라 실제 입력을 확인하지 못했습니다 — 입력 기반 판단 근거 없이 표시하는 기본값입니다.',
+    }),
+  },
+  {
+    step: 'c2',
+    content: JSON.stringify({
+      transformed: "I need this by EOD today. Please confirm if that's not feasible.",
+      reason: '완곡한 표현 속 긴급도를 명시적 기한과 확인 요청 문장으로 복원했습니다.',
+      preserved: [{ kind: 'deadline', sourceText: '오늘 중', transformedText: 'EOD today' }],
+      misreadRisks: [],
+    }),
+  },
+  {
+    step: 'c4',
+    content: JSON.stringify({
+      backTranslation: '오늘 중으로 필요합니다. 어려우시면 알려주세요.',
+    }),
+  },
+];
 
 /**
  * cacheKey 정확 일치를 우선하고, 없으면 같은 step의 시나리오 기본값(cacheKey 없는 항목)을 쓴다.

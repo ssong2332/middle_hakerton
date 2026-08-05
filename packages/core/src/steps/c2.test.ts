@@ -49,7 +49,12 @@ describe('runToneTransform', () => {
     const llm = fakeLlm({ content: VALID_CONTENT, source: 'live' });
 
     await runToneTransform(
-      { text: 'hello', languageDirection: 'en-ko', honorificLevel: 'hapsyo', referenceDate: '2026-08-05' },
+      {
+        text: 'hello',
+        languageDirection: 'en-ko',
+        honorificLevel: 'hapsyo',
+        referenceDate: '2026-08-05',
+      },
       llm,
     );
 
@@ -79,7 +84,12 @@ describe('runToneTransform', () => {
     const llm = fakeLlm({ content: VALID_CONTENT, source: 'live' });
 
     await runToneTransform(
-      { text: 'hi', languageDirection: 'en-ko', honorificLevel: 'hapsyo', referenceDate: '2026-08-05' },
+      {
+        text: 'hi',
+        languageDirection: 'en-ko',
+        honorificLevel: 'hapsyo',
+        referenceDate: '2026-08-05',
+      },
       llm,
     );
 
@@ -110,14 +120,18 @@ describe('runToneTransform', () => {
     const llm = fakeLlm({ content: '이것은 JSON이 아닙니다', source: 'live' });
 
     await expect(
-      runToneTransform({
-        text: 'hi',
-        languageDirection: 'ko-en',
-        honorificLevel: null,
-        referenceDate: '2026-08-05',
-      }, llm, {
-        fallbackLookup: () => undefined,
-      }),
+      runToneTransform(
+        {
+          text: 'hi',
+          languageDirection: 'ko-en',
+          honorificLevel: null,
+          referenceDate: '2026-08-05',
+        },
+        llm,
+        {
+          fallbackLookup: () => undefined,
+        },
+      ),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
   });
 
@@ -128,14 +142,18 @@ describe('runToneTransform', () => {
     });
 
     await expect(
-      runToneTransform({
-        text: 'hi',
-        languageDirection: 'ko-en',
-        honorificLevel: null,
-        referenceDate: '2026-08-05',
-      }, llm, {
-        fallbackLookup: () => undefined,
-      }),
+      runToneTransform(
+        {
+          text: 'hi',
+          languageDirection: 'ko-en',
+          honorificLevel: null,
+          referenceDate: '2026-08-05',
+        },
+        llm,
+        {
+          fallbackLookup: () => undefined,
+        },
+      ),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
   });
 
@@ -151,14 +169,18 @@ describe('runToneTransform', () => {
     });
 
     await expect(
-      runToneTransform({
-        text: 'hi',
-        languageDirection: 'ko-en',
-        honorificLevel: null,
-        referenceDate: '2026-08-05',
-      }, llm, {
-        fallbackLookup: () => undefined,
-      }),
+      runToneTransform(
+        {
+          text: 'hi',
+          languageDirection: 'ko-en',
+          honorificLevel: null,
+          referenceDate: '2026-08-05',
+        },
+        llm,
+        {
+          fallbackLookup: () => undefined,
+        },
+      ),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
   });
 
@@ -174,14 +196,18 @@ describe('runToneTransform', () => {
     });
 
     await expect(
-      runToneTransform({
-        text: 'hi',
-        languageDirection: 'ko-en',
-        honorificLevel: null,
-        referenceDate: '2026-08-05',
-      }, llm, {
-        fallbackLookup: () => undefined,
-      }),
+      runToneTransform(
+        {
+          text: 'hi',
+          languageDirection: 'ko-en',
+          honorificLevel: null,
+          referenceDate: '2026-08-05',
+        },
+        llm,
+        {
+          fallbackLookup: () => undefined,
+        },
+      ),
     ).rejects.toBeInstanceOf(LLMMalformedResponseError);
   });
 
@@ -295,16 +321,43 @@ describe('runToneTransform', () => {
     const fallbackLookup = vi.fn().mockReturnValue(undefined);
 
     await expect(
-      runToneTransform({
-        text: 'hi',
+      runToneTransform(
+        {
+          text: 'hi',
+          languageDirection: 'ko-en',
+          honorificLevel: null,
+          referenceDate: '2026-08-05',
+        },
+        llm,
+        {
+          fallbackLookup,
+        },
+      ),
+    ).rejects.toBeInstanceOf(LLMMalformedResponseError);
+    expect(fallbackLookup).toHaveBeenCalled();
+  });
+
+  // T16(AC-041) — `fallbackLookup`을 주입하지 않으면 기본값(`../data/fallback-responses`의 실제
+  // `FALLBACK_RESPONSES`)이 쓰인다. T16이 채운 실 데이터가 이 스텝의 스키마(preserved[]가 자기신고
+  // 불일치 필터까지 통과하는지 포함)를 만족하는지 증명한다.
+  it('T16 — fallbackLookup 미주입 시 실 FALLBACK_RESPONSES의 c2 기본값으로 정상 폴백한다', async () => {
+    const llm = fakeLlm({ content: '이것은 JSON이 아닙니다', source: 'live' });
+
+    const result = await runToneTransform(
+      {
+        text: '아무 원문',
         languageDirection: 'ko-en',
         honorificLevel: null,
         referenceDate: '2026-08-05',
-      }, llm, {
-        fallbackLookup,
-      }),
-    ).rejects.toBeInstanceOf(LLMMalformedResponseError);
-    expect(fallbackLookup).toHaveBeenCalled();
+      },
+      llm,
+    );
+
+    expect(result.source).toBe('fallback');
+    expect(result.transformed.length).toBeGreaterThan(0);
+    expect(result.reason.length).toBeGreaterThan(0);
+    expect(Array.isArray(result.preserved)).toBe(true);
+    expect(Array.isArray(result.misreadRisks)).toBe(true);
   });
 
   /**
