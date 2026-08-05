@@ -167,6 +167,29 @@ export function MediationWorkspace() {
         ? '중재 처리에 실패했습니다.'
         : '';
 
+  // 🔴 Major 2/MJ-A/CR-1(reviewer REJECTED → 수정) + 사용자 결정(2026-08-06, live/cache로 확장) —
+  // `handleRunMediation`이 finalText를 프로그램적으로 자동 채우거나(live/cache는 `transformed`,
+  // fallback은 `''`) 비울 때마다 이 헬퍼를 거친다. 세 분기 모두 같은 정책을 공유한다 — "직전
+  // 자동 채움 값과 현재 finalText가 다르면(=사용자가 그 사이 직접 편집) 새 자동 채움 값으로
+  // 덮어쓰지 않는다".
+  //
+  // CR-1(reviewer REJECTED → 수정) — `setFinalText`의 함수형 업데이터는 호출 시점이 아니라
+  // 나중에(렌더 단계에서) 실행된다. 바로 다음 줄에서 ref를 새 값으로 덮어쓰면, 업데이터가 실제로
+  // 도는 시점엔 이미 ref가 새 값으로 바뀌어 있어 "직전 값과 비교"가 무력화된다(비교식이 사실상
+  // `prev === newText`가 되어버림). 초기화 전 값을 로컬 상수로 먼저 캡처해 비교한다.
+  //
+  // MJ-A(reviewer 2라운드 경고 → 수정) — 클로저로 캡처된 `finalText`(재실행이 시작된 시점의 값)와
+  // 비교하면, 재실행이 진행되는 동안(`isRunning`이어도 최종 발송문 textarea는 비활성화되지 않는다
+  // — `RecipientPanel.tsx`는 `disabled={isDelivered}`뿐) 사용자가 그 사이 편집한 값이 무시되고
+  // "재실행 시작 시점"의 옛 값으로 "편집 안 했다"고 오판정해 방금 입력한 텍스트를 지울 수 있었다.
+  // 함수형 업데이트로 항상 응답이 도착한 시점의 실제 최신 state(prev)와 비교한다 — stale closure가
+  // 개입할 여지가 없다.
+  function applyAutoFill(newText: string) {
+    const previousAutoFilled = lastAutoFilledFinalTextRef.current;
+    setFinalText((prev) => (prev === previousAutoFilled ? newText : prev));
+    lastAutoFilledFinalTextRef.current = newText;
+  }
+
   async function handleRunMediation() {
     setStatus('loading');
     // 새 실행을 시작하면 이전 승인 상태를 초기화한다 — 이전 결과에 대한 "발송됨" 상태가 새
@@ -208,28 +231,15 @@ export function MediationWorkspace() {
       // 승인이 막힌다. C2 출처 판정은 `SenderPanel.tsx`의 `result.stepSources?.c2 ?? result.source`
       // 패턴을 그대로 따른다(정보를 지어내지 않는다 — `stepSources`가 없으면 구 계약 필드인 집계
       // `source`로 degrade).
+      //
+      // 🔴 사용자 결정(2026-08-06) — Major 2/MJ-A/CR-1 가드는 이전 라운드에서 `fallback` 분기에만
+      // 있었고, `live`/`cache` 분기는 무조건 `body.transformed`로 덮어썼다. 그래서 폴백 상태에서
+      // 사용자가 직접 쓴 발송문이 있어도 재실행 결과가 live/cache로 바뀌면 조용히 사라졌다. 세 분기
+      // (fallback이 비우는 것, live/cache가 채우는 것) 모두 같은 정책 — "직전 자동 채움 값과 현재
+      // finalText가 다르면(=사용자가 그 사이 직접 편집) 새 결과로 덮어쓰지 않는다" — 을 따르도록
+      // `applyAutoFill` 헬퍼로 통합한다.
       const c2Source = body.stepSources?.c2 ?? body.source;
-      if (c2Source === 'fallback') {
-        // Major 2 — 직전 자동 채움 값과 현재 finalText가 다르면(=사용자가 그 사이 직접 편집)
-        // 폴백이 다시 와도 사용자가 쓴 원문을 지우지 않는다.
-        //
-        // MJ-A(reviewer 2라운드 경고 → 수정) — 클로저로 캡처된 `finalText`(이 함수가 시작된
-        // 시점의 값)와 비교하면, 재실행이 진행되는 동안(`isRunning`이어도 최종 발송문 textarea는
-        // 비활성화되지 않는다 — `RecipientPanel.tsx`는 `disabled={isDelivered}`뿐) 사용자가 그
-        // 사이 편집한 값이 무시되고 "재실행 시작 시점"의 옛 값으로 "편집 안 했다"고 오판정해
-        // 방금 입력한 텍스트를 지울 수 있었다. 함수형 업데이트로 항상 응답이 도착한 시점의
-        // 실제 최신 state(prev)와 비교한다 — stale closure가 개입할 여지가 없다.
-        // CR-1(reviewer REJECTED → 수정) — `setFinalText`의 함수형 업데이터는 호출 시점이 아니라
-        // 나중에(렌더 단계에서) 실행된다. 바로 다음 줄에서 ref를 ''로 초기화하면, 업데이터가 실제로
-        // 도는 시점엔 이미 ref가 ''라 비교식이 사실상 `prev === ''`가 되어 직전 live/cache 자동
-        // 채움 값이 있을 때 절대 비워지지 않는다. 초기화 전 값을 로컬 상수로 먼저 캡처해 비교한다.
-        const previousAutoFilled = lastAutoFilledFinalTextRef.current;
-        setFinalText((prev) => (prev === previousAutoFilled ? '' : prev));
-        lastAutoFilledFinalTextRef.current = '';
-      } else {
-        setFinalText(body.transformed);
-        lastAutoFilledFinalTextRef.current = body.transformed;
-      }
+      applyAutoFill(c2Source === 'fallback' ? '' : body.transformed);
       // Critical — 이 실행이 실제로 검토·승인 가능한 대상이 되는 유일한 지점. text/recipient는
       // 이 요청을 만든 값 그대로, urgency는 서버가 반영한 값 그대로 고정한다.
       setApprovalSnapshot({

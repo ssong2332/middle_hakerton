@@ -990,6 +990,190 @@ describe('MediationWorkspace', () => {
     ).toBe(true);
   });
 
+  // 🔴 사용자 결정(2026-08-06) — Major 2/MJ-A/CR-1 가드는 지금까지 `fallback` 분기에만 있었다.
+  // `live`/`cache` 분기는 무조건 `setFinalText(body.transformed)`로 덮어써, 폴백 상태에서 사용자가
+  // 직접 쓴 발송문이 있어도 재실행 결과가 live로 바뀌면 조용히 사라졌다. live/cache도 fallback과
+  // 동일한 정책(직전 자동 채움 값과 다르면=사용자가 편집했으면 덮어쓰지 않는다)을 따른다.
+  it('사용자 결정 — 폴백 상태에서 사용자가 직접 쓴 발송문은 재실행이 live로 바뀌어도 지워지지 않는다', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') {
+        const callCount = fetchMock.mock.calls.filter(([u]) => u === '/api/mediate').length;
+        if (callCount <= 1) {
+          return Promise.resolve(
+            mediateSuccessResponse({
+              source: 'fallback',
+              stepSources: { c1: 'live', c2: 'fallback', c4: 'live' },
+            }),
+          );
+        }
+        return Promise.resolve(mediateSuccessResponse());
+      }
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
+    });
+
+    const finalTextArea = screen.getByLabelText('최종 발송문') as HTMLTextAreaElement;
+    expect(finalTextArea.value).toBe('');
+
+    fireEvent.change(finalTextArea, { target: { value: '제가 직접 작성한 최종 발송문입니다.' } });
+
+    // 원문을 바꾸지 않고 재실행 — 이번엔 live.
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([u]) => u === '/api/mediate')).toHaveLength(2);
+    });
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+        '제가 직접 작성한 최종 발송문입니다.',
+      );
+    });
+  });
+
+  // 🔴 사용자 결정(2026-08-06) — 위와 같은 메커니즘을 cache 전이에서도 확인한다.
+  it('사용자 결정 — 폴백 상태에서 사용자가 직접 쓴 발송문은 재실행이 cache로 바뀌어도 지워지지 않는다', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') {
+        const callCount = fetchMock.mock.calls.filter(([u]) => u === '/api/mediate').length;
+        if (callCount <= 1) {
+          return Promise.resolve(
+            mediateSuccessResponse({
+              source: 'fallback',
+              stepSources: { c1: 'live', c2: 'fallback', c4: 'live' },
+            }),
+          );
+        }
+        return Promise.resolve(
+          mediateSuccessResponse({
+            source: 'cache',
+            stepSources: { c1: 'live', c2: 'cache', c4: 'live' },
+          }),
+        );
+      }
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
+    });
+
+    const finalTextArea = screen.getByLabelText('최종 발송문') as HTMLTextAreaElement;
+    expect(finalTextArea.value).toBe('');
+
+    fireEvent.change(finalTextArea, { target: { value: '제가 직접 작성한 최종 발송문입니다.' } });
+
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([u]) => u === '/api/mediate')).toHaveLength(2);
+    });
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+        '제가 직접 작성한 최종 발송문입니다.',
+      );
+    });
+  });
+
+  // 회귀 — 자동 채움 값을 사용자가 건드리지 않았다면, 재실행이 live→live로 바뀌는 정상 케이스는
+  // 여전히 새 결과로 갱신되어야 한다(위 가드가 정상 갱신 경로까지 막으면 안 된다).
+  it('회귀 — 자동 채움 값을 편집하지 않았다면 재실행이 live→live로 바뀌어도 새 결과로 갱신된다', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') {
+        const callCount = fetchMock.mock.calls.filter(([u]) => u === '/api/mediate').length;
+        if (callCount <= 1) {
+          return Promise.resolve(mediateSuccessResponse());
+        }
+        return Promise.resolve(mediateSuccessResponse({ transformed: 'Updated live response.' }));
+      }
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+        'Please confirm by tomorrow.',
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+        'Updated live response.',
+      );
+    });
+  });
+
+  // 🔴 MJ-A(live/cache 확장, 사용자 결정 2026-08-06) — 재실행이 진행되는 동안(`isRunning`이어도
+  // 최종 발송문 textarea는 비활성화되지 않는다) 사용자가 직접 편집하면, 응답이 live/cache로 와도
+  // 방금 입력한 텍스트를 지우면 안 된다. fallback 분기에서 이미 검증된 stale-closure 가드
+  // (functional setState + 응답 처리 시점에 ref를 로컬로 캡처)가 live/cache에도 그대로 적용된다.
+  it('MJ-A(live/cache 확장) — 재실행이 진행 중인 동안 사용자가 최종 발송문을 편집하면, 응답이 live/cache로 와도 방금 입력한 텍스트가 지워지지 않는다', async () => {
+    let resolveSecondRun: ((value: unknown) => void) | null = null;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') {
+        const callCount = fetchMock.mock.calls.filter(([u]) => u === '/api/mediate').length;
+        if (callCount <= 1) {
+          return Promise.resolve(mediateSuccessResponse());
+        }
+        return new Promise((resolve) => {
+          resolveSecondRun = resolve;
+        });
+      }
+      throw new Error(`unexpected url: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+        'Please confirm by tomorrow.',
+      );
+    });
+
+    const finalTextArea = screen.getByLabelText('최종 발송문') as HTMLTextAreaElement;
+
+    // 재실행 시작(아직 응답 안 옴).
+    fireEvent.click(screen.getByRole('button', { name: '실행' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('분류 중 → 변환 중 → 역번역 중')).toBeTruthy();
+    });
+
+    // 요청이 진행되는 동안 사용자가 textarea에 직접 타이핑한다.
+    fireEvent.change(finalTextArea, { target: { value: '진행 중에 사용자가 입력한 텍스트' } });
+    expect(finalTextArea.value).toBe('진행 중에 사용자가 입력한 텍스트');
+
+    // 응답이 live로 온다(다른 transformed 값).
+    resolveSecondRun!(mediateSuccessResponse({ transformed: 'Second live response.' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('분류 중 → 변환 중 → 역번역 중')).toBeNull();
+    });
+
+    expect((screen.getByLabelText('최종 발송문') as HTMLTextAreaElement).value).toBe(
+      '진행 중에 사용자가 입력한 텍스트',
+    );
+  });
+
   // 🔴 M2(reviewer 최종 APPROVED, Major 비차단 → 수정) — 실행 성공(A) → 재실행 시작(진행 중) →
   // 그 사이 승인 클릭(A가 전송됨) → 재실행 완료(B) → 화면이 B로 갱신되는데 Delivered 잠금
   // 상태라 "발송됨" 표시와 함께 B가 남아, 실제로 전송된 A가 아니라 B가 보이는 불일치가
