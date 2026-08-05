@@ -1,17 +1,25 @@
 /**
  * `POST /api/mediate` — `docs/API.md` "POST /api/mediate" · `docs/Architecture.md` Data Flow ①.
  *
- * 🔴 **범위 경계(T5+T7+T9 누적).** 최종 계약은 C1 분류 → C3 프로필 → C5 용어 주입 → C2 변환 →
+ * 🔴 **범위 경계(T5+T7+T9+T10 누적).** 최종 계약은 C1 분류 → C3 프로필 → C5 용어 주입 → C2 변환 →
  * C4 역번역을 고정 순서로 실행하지만(AC-032), 그 오케스트레이션(`packages/core/src/pipeline.ts`의
  * `run()`)은 **T28의 범위**로 명시돼 있다(그 파일 헤더 주석 "이 파일에 구현이 없는 것은 의도다").
- * C3(T19)·C5(T22)·C2(T10)·C6(T24)는 아직 없다. 이 라우트는 **지금 실제로 동작하는 두 스텝인
- * C1(T7)·C4만 수행**하고, 나머지 필드는 `MediationResult`(F1) 계약을 만족시키는 선에서
+ * C3(T19)·C5(T22)·C6(T24)는 아직 없다. 이 라우트는 **지금 실제로 동작하는 세 스텝인
+ * C1(T7)·C2(T10)·C4(T5)만 수행**하고, 나머지 필드는 `MediationResult`(F1) 계약을 만족시키는 선에서
  * placeholder로 채운다 — 각 필드 옆 주석이 소유 태스크를 가리킨다. 해당 태스크가 착수되면
  * 그 줄만 교체하면 된다(`packages/core/src/pipeline.ts`가 준비되면 이 라우트는 그것을 호출하는
  * 형태로 바뀐다 — T28 완료 시 이 파일도 함께 정리 대상).
  *
  * 근거: `docs/Tasks.md` T6 원문 "T5는 [BE-B] 라우트만 만들고 그것을 호출하는 브라우저 화면이
  * 없다" — T5가 실제 HTTP 라우트를 만든다는 것을 그 다음 태스크(T6)가 전제하고 있다.
+ *
+ * 🔴 **T10 배선 — 발신자 프로필이 아직 없다.** C2의 존댓말 레벨 입력(`honorificLevel`)은
+ * `sender.profile.honorificLevel`에서 와야 하지만(AC-046②), 그 값을 채우는 C3 온보딩(T19)과
+ * 그것을 저장하는 스키마(T18)가 아직 `todo`다 — 이 라우트는 세션에서 프로필을 조회하지 않고
+ * 항상 `null`을 넘긴다. `runToneTransform`이 그 경우 `DEFAULT_HONORIFIC_LEVEL`(`prompts/c2.ts`)로
+ * 대체한다(`packages/core/src/steps/c2.ts` `RunToneTransformInput.honorificLevel` 주석 —
+ * 쌍방 규약(#24)에도 존댓말 축 자체가 없어 "규약 우선" 조각은 지금 표현 불가능하다는 판단 포함).
+ * T19·T18이 붙으면 이 자리를 실제 프로필 조회로 교체한다.
  *
  * 🔴 **T9(AC-005) 분기점 안내.** `docs/Architecture.md` Data Flow "① 웹앱 중재" ②는 "CRITICAL이면
  * 예약·지연 경로를 건너뛰고 톤 정제만"을 요구한다. 이 저장소에는 아직 예약 발송(UX-006)·기한
@@ -27,6 +35,7 @@ import {
   honorificMixedWarning,
   resolveEffectiveUrgency,
   runBackTranslation,
+  runToneTransform,
   runUrgencyClassification,
   ticketOptionFrom,
   type LanguageCode,
@@ -57,14 +66,15 @@ function senderLanguageOf(direction: 'ko-en' | 'en-ko'): LanguageCode {
 }
 
 /**
- * 🔴 이 라우트가 지금 실제로 LLM을 두 번 호출한다(C1·C4) — `MediationResult.source`는 단일
- * 필드라 두 호출의 출처를 하나로 합쳐야 한다. `docs/Architecture.md`·`docs/API.md` 어디에도
- * "복수 스텝의 source를 어떻게 합치는가"에 대한 명시가 없어(T28 파이프라인 오케스트레이션의
- * 범위로 보인다), 여기서는 AC-041의 취지("실제 LLM 결과인 것처럼 보이면 안 된다")를 따라
- * **가장 신뢰도가 낮은 쪽이 이긴다**(fallback > cache > live)로 보수적으로 합친다 — 두 스텝 중
- * 하나라도 폴백이었다면 전체 응답을 "폴백 응답 사용 중"으로 표시하는 쪽이, 조용히 `live`로
- * 보이는 쪽보다 AC-041 위반 위험이 낮다. T28이 실제 파이프라인을 조립할 때 이 판단을 재검토해야
- * 한다(합치는 스텝이 2개에서 늘어난다).
+ * 🔴 이 라우트가 지금 실제로 LLM을 세 번 호출한다(C1·C2·C4 — T10에서 C2가 추가돼 둘에서
+ * 셋으로 늘었다) — `MediationResult.source`는 단일 필드라 세 호출의 출처를 하나로 합쳐야 한다.
+ * `docs/Architecture.md`·`docs/API.md` 어디에도 "복수 스텝의 source를 어떻게 합치는가"에 대한
+ * 명시가 없어(T28 파이프라인 오케스트레이션의 범위로 보인다), 여기서는 AC-041의 취지("실제 LLM
+ * 결과인 것처럼 보이면 안 된다")를 따라 **가장 신뢰도가 낮은 쪽이 이긴다**(fallback > cache >
+ * live)로 보수적으로 합친다 — 세 스텝 중 하나라도 폴백이었다면 전체 응답을 "폴백 응답 사용 중"으로
+ * 표시하는 쪽이, 조용히 `live`로 보이는 쪽보다 AC-041 위반 위험이 낮다. `combineSource`를 2-인자
+ * 함수로 유지하고 `reduce`로 여러 개를 접는다 — T28이 실제 파이프라인을 조립할 때 이 판단을
+ * 재검토해야 한다(합치는 스텝이 더 늘어날 수 있다).
  */
 const SOURCE_PRIORITY: Record<ResponseSource, number> = { fallback: 2, cache: 1, live: 0 };
 function combineSource(a: ResponseSource, b: ResponseSource): ResponseSource {
@@ -76,16 +86,11 @@ export const POST = withApi<MediateRequest, MediationResult>(
   async ({ input, session }) => {
     const senderLanguage = senderLanguageOf(input.context.languageDirection);
 
-    // 🔴 C2(T10) 대기 — 실제 톤 변환이 없으므로 원문을 그대로 "변환문" 자리에 둔다. 이것은
-    // 톤 변환이 아니라 항등 placeholder다(변환 손실이 없다고 주장하지 않는다). T10 착수 시
-    // 이 줄을 C2 호출로 교체한다.
-    const transformed = input.text;
-
     const llm = createOpenAiLLMClient(session?.userId);
 
-    // C1(T7) — 원문의 긴급도를 분류한다(AC-003). 톤 변환(C2)이 아직 없으므로 원문을 그대로
-    // 넘긴다 — C1은 변환 전 원문의 긴급도를 판정하는 스텝이라 이 순서 자체는 T10 착수 후에도
-    // 바뀌지 않는다(`docs/Architecture.md` Data Flow ①이 C1을 항상 맨 앞에 둔다).
+    // C1(T7) — 원문의 긴급도를 분류한다(AC-003). C1은 변환 전 원문의 긴급도를 판정하는 스텝이라
+    // 이 순서는 C2가 붙은 뒤에도 바뀌지 않는다(`docs/Architecture.md` Data Flow ①이 C1을 항상
+    // 맨 앞에 둔다).
     const classification = await runUrgencyClassification({ text: input.text }, llm);
     // AC-004 — 사용자 override가 있으면 C1 판정 대신 그 값을 쓴다. override 판정 로직의 단일
     // 출처는 `resolveEffectiveUrgency`(core) 하나이며 이 라우트가 다시 구현하지 않는다.
@@ -94,15 +99,33 @@ export const POST = withApi<MediateRequest, MediationResult>(
       input.context.urgencyOverride ?? null,
     );
 
+    // C2(T10) — 보존 대상(마감일·수치·필수 액션)을 먼저 추출해 고정한 뒤 톤을 변환하고, 같은
+    // 호출 안에서 오해 사전 경고(misreadRisks)를 함께 산출한다(AC-006/043/045/046/049). 프로필의
+    // 존댓말 레벨은 세션에서 아직 조회하지 않는다(파일 상단 "T10 배선" 주석 참조) — `null`을
+    // 넘기면 `runToneTransform`이 기본 레지스터로 대체한다.
+    const {
+      transformed,
+      reason,
+      preserved,
+      misreadRisks,
+      source: toneSource,
+    } = await runToneTransform(
+      {
+        text: input.text,
+        languageDirection: input.context.languageDirection,
+        honorificLevel: null,
+      },
+      llm,
+    );
+
     const { backTranslation, source: backTranslationSource } = await runBackTranslation(
       { text: transformed, targetLanguage: senderLanguage },
       llm,
     );
-    const source = combineSource(classification.source, backTranslationSource);
+    const source = [classification.source, toneSource, backTranslationSource].reduce(combineSource);
 
-    // AC-046③ — EN→KO 변환문의 종결어미 레벨 혼용 감지. C2가 없는 지금은 `transformed`가
-    // 원문(placeholder)이라 실질적으로 트리거될 일이 적지만, 배선 자체는 지금 완성해 둔다 —
-    // T10이 실제 한국어 변환문을 채우는 순간 그대로 동작한다.
+    // AC-046③ — EN→KO 변환문의 종결어미 레벨 혼용 감지. C2가 실제 한국어 변환문을 채우므로
+    // 이제 정상적으로 트리거된다.
     const warnings: Warning[] = [];
     if (input.context.languageDirection === 'en-ko') {
       const warning = honorificMixedWarning(transformed);
@@ -122,14 +145,11 @@ export const POST = withApi<MediateRequest, MediationResult>(
       // `isOverridden`을 그대로 받아 렌더만 할 뿐 이 판단을 하지 않는다.
       urgencyReason: classification.reason,
       transformed,
-      // 🔴 C2(T10) 대기.
-      reason: 'C2 톤 변환이 아직 연결되지 않았습니다(T10 대기) — 임시값입니다.',
-      // 🔴 C2 보존 필터(T10) 대기.
-      preserved: [],
+      reason,
+      preserved,
       backTranslation,
       warnings,
-      // 🔴 오해 사전 경고 생성(T10) 대기.
-      misreadRisks: [],
+      misreadRisks,
       // 🔴 수신자 국가 정보가 아직 연결되지 않아(T22/T41) 항상 null이므로 빈 배열이 정확한
       // 값이다(AC-063①) — placeholder가 아니라 현재 상태의 정답이다.
       holidayConflicts: [],

@@ -33,7 +33,11 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'node',
-          include: ['{apps,packages}/**/*.test.{ts,tsx}'],
+          // 🔴 T11(`tests/regression-c2.ts`)이 이 목록에 `tests/`를 추가했다 — 그 전에는 `tests/`가
+          // 빈 스캐폴드(`tests/README.md`만)라 대상이 없었다. `docs/Architecture.md` Tech Stack
+          // "테스트" 행 "웹앱·확장·코어가 한 러너로 돈다"가 `tests/`도 예외 없이 포함한다 —
+          // 별도 러너를 만들면 T11이 요구하는 "하나의 실행 출력"이 갈라진다.
+          include: ['{apps,packages,tests}/**/*.test.{ts,tsx}'],
           exclude: [...sharedExclude, 'apps/web/**/*.test.tsx'],
           environment: 'node',
         },
