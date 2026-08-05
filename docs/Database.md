@@ -144,7 +144,11 @@ UX-011, UX-018(Stage 4 확정 쓰기), UX-004(읽기) / AC-037, AC-074, AC-075, 
 | last_written_by | uuid | NULL, FK → `auth.users(id)` | 누가 마지막으로 썼는지(감사용). **판정에는 `authorship_state` 를 읽고 시각을 비교하지 않는다**(AC-075③) |
 | updated_at | timestamptz | NOT NULL default now() | |
 
-🔴 **축을 5개로 늘리지 않는다** — AC-073②는 "스키마/UI가 5번째 필드의 존재를 물리적으로 막아야 한다"고 요구한다. 컬럼 추가는 리뷰에서 반려한다.
+🔴 **축을 5개로 늘리지 않는다.** 컬럼 추가는 리뷰에서 반려한다.
+
+> 🔴 **2026-08-05 정정 — 결론은 그대로, 인용이 틀렸다.** 이 줄은 *"AC-073②는 «스키마/UI가 5번째 필드의 존재를 물리적으로 막아야 한다»고 요구한다"* 라고 적고 있었으나, **PRD에 그런 문장은 없다**(measured — `docs/PRD.md` 전문에서 "물리적" 검색 시 :331·:393·GitWorkflow 뿐이며 AC-073 행에는 없다). AC-073 ②의 실제 문구(`docs/PRD.md:591`)는 *"**제안 축**은 #24 쌍방 규약의 기존 4항목(직설 허용 / 이모지 / 호칭 / 마감 표현)과 정확히 일치하며 **새 축을 만들지 않는다**(축 이름 대조로 확인)"* 로, **스타일 추론이 제안하는 축**을 규약의 4항목으로 묶는 조항이다.
+> **4축을 유지하는 진짜 근거 3가지**: ① **AC-037이 4항목을 열거**한다 — 축을 늘리는 것은 AC-037의 정의 변경이고 **planner 소관**이다(architect는 요구사항을 만들지 않는다, AGENTS.md). ② `docs/UX.md` UX-011이 *"the 4 items (directness allowed / emoji use / form of address / deadline phrasing)"* 로 화면을 고정했다. ③ AC-073 ②의 *"축 이름 대조"* 판정은 **규약 축 = 그 4개**라는 전제 위에서만 성립한다.
+> **AC-046 ②("존댓말 레벨은 규약이 우선")는 이 표에 담을 자리가 없다** — 그 절을 MVP 구현 대상에서 제외한 판정과 근거는 `docs/Architecture.md` **Data Flow 1-a** · DECISIONS **#39** · **ADR-0007**. `honorific_level` 컬럼을 여기에 추가하는 마이그레이션도 반려 대상이다.
 
 #### AC-075의 architect 판단 — `inference_draft`(ⓐ)의 위치
 
