@@ -15,7 +15,7 @@ import {
   type FallbackResponseEntry,
   type LLMStep,
 } from '@cross-border/core';
-import { createGeminiLLMClient, type GeminiLLMClientDeps } from './gemini';
+import { createGeminiLLMClient, REQUEST_TIMEOUT_MS, type GeminiLLMClientDeps } from './gemini';
 
 type FakeGeminiClient = NonNullable<GeminiLLMClientDeps['geminiClient']>;
 
@@ -311,6 +311,17 @@ describe('createGeminiLLMClient — 응답 검증(LLM_MALFORMED)', () => {
     await expect(llm.complete(step, 'v1', { text: 'hello' })).rejects.toBeInstanceOf(
       LLMUnavailableError,
     );
+  });
+});
+
+describe('REQUEST_TIMEOUT_MS — Gemini API 서버측 하한 가드(T49)', () => {
+  it('10000ms(Gemini API가 서버측에서 강제하는 "manually set deadline" 최소 허용값) 미만이면 안 된다', () => {
+    // 2026-08-06 진단(T11 라이브 회귀, LLM_PROVIDER=gemini): 이 값이 3000ms였을 때
+    // 73번의 llm.complete('c2', ...) Gemini 실호출 전부가 HTTP 400 INVALID_ARGUMENT
+    // ("Manually set deadline 3s is too short. Minimum allowed deadline is 10s.")로
+    // 즉시 거부되어 outcome:'fallback'이 됐다 — 그 결과가 53건 중 4건 통과였다.
+    // 이 값을 10000 미만으로 다시 낮추면 이 테스트가 즉시 실패해 재발을 막는다.
+    expect(REQUEST_TIMEOUT_MS).toBeGreaterThanOrEqual(10_000);
   });
 });
 

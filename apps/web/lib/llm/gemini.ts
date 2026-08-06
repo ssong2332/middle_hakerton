@@ -55,7 +55,7 @@ import {
  * 이슈(googleapis/js-genai#1277)로 항상 보장되지는 않지만, 로컬 테스트 전용 도구이므로
  * best-effort로 설정해 둔다 — 실제 타임아웃 신뢰성이 필요해지면 그때 재검토한다.
  */
-const REQUEST_TIMEOUT_MS = 3000;
+export const REQUEST_TIMEOUT_MS = 3000;
 
 export interface GeminiLLMClientDeps {
   supabase?: SupabaseClient;
