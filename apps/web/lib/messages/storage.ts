@@ -9,6 +9,7 @@
  * records.sql`을 작성한다(파일만, 실제 적용은 오케스트레이터 판단 — `docs/Tasks.md` T14 원문).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { classifyDiffPattern } from '@cross-border/core';
 
 export type SentMessageChannel = 'web_mock' | 'extension_insert' | 'extension_clipboard';
 
@@ -83,6 +84,11 @@ export async function insertDiffRecord(
   client: SupabaseClient,
   input: CreateDiffRecordInput,
 ): Promise<{ id: string; patternKey: string | null }> {
+  // 🔴 T20 — `classifyDiffPattern`(`packages/core/src/rules/pattern-detection.ts`)이 이제
+  // pattern_key를 채운다. 분류 불가(신호 없음)면 그 함수 자신이 `null`을 돌려준다(지어내지
+  // 않는다 — `docs/Database.md` diff_records.pattern_key "분류 불가면 NULL").
+  const patternKey = classifyDiffPattern(input.aiText, input.finalText);
+
   const { data, error } = await client
     .from('diff_records')
     .insert({
@@ -90,10 +96,7 @@ export async function insertDiffRecord(
       message_id: input.messageId,
       ai_text: input.aiText,
       final_text: input.finalText,
-      // 🔴 수정 패턴 분류기가 아직 없다(`docs/Tasks.md` T20 "diff 저장 + 3회 반복 패턴 감지"가
-      // 소유 — AC-012/AC-013). 분류 불가는 NULL이 정답이다(`docs/Database.md` diff_records.
-      // pattern_key "분류 불가면 NULL(지어내지 않는다)") — 없는 분류를 지어내지 않는다.
-      pattern_key: null,
+      pattern_key: patternKey,
       recipient_identifier: input.recipientIdentifier,
       channel: toDiffChannel(input.channel),
     })
@@ -102,9 +105,9 @@ export async function insertDiffRecord(
   if (error) throw error;
 
   const row = data as { id: string };
-  // 🔴 pattern_key가 항상 null이므로 이 diff가 3회 도달을 만들었을 리 없다 — 3회 판정·
-  // profile_learned_items 반영은 T20 범위(`apps/web/app/api/messages/route.ts` 헤더 주석 참조).
-  return { id: row.id, patternKey: null };
+  // 🔴 3회 반복 판정·`profile_learned_items` 반영은 DB 조회가 필요해 여기서 하지 않는다 —
+  // `apps/web/lib/messages/pattern-learning.ts`(호출부: `app/api/messages/route.ts`)의 범위다.
+  return { id: row.id, patternKey };
 }
 
 /**
