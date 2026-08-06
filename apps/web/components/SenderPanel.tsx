@@ -6,6 +6,7 @@ import { BackTranslationPreview } from './BackTranslationPreview';
 import { ComparisonView } from './ComparisonView';
 import { MisreadRiskPanel } from './MisreadRiskPanel';
 import { UrgencyPanel } from './UrgencyPanel';
+import styles from './SenderPanel.module.css';
 
 export interface SenderPanelProps {
   text: string;
@@ -72,40 +73,60 @@ export function SenderPanel({
 
   return (
     <section aria-label="발신자 패널">
-      <h2>메시지 작성</h2>
-      <label htmlFor="sender-recipient">받는 사람</label>
-      <input
-        id="sender-recipient"
-        type="text"
-        value={recipient}
-        onChange={(event) => onRecipientChange(event.target.value)}
-      />
-      {recipientFormatInvalid && <p>받는 사람은 이메일 형식이어야 합니다.</p>}
+      <h2 className={styles.title}>발신자</h2>
+      <div className={styles.fieldGroup}>
+        <label htmlFor="sender-recipient">받는 사람</label>
+        <input
+          id="sender-recipient"
+          type="text"
+          value={recipient}
+          onChange={(event) => onRecipientChange(event.target.value)}
+        />
+        {recipientFormatInvalid && (
+          <p className={styles.fieldError}>받는 사람은 이메일 형식이어야 합니다.</p>
+        )}
+      </div>
 
-      <label htmlFor="sender-text">메시지</label>
-      <textarea
-        id="sender-text"
-        value={text}
-        onChange={(event) => onTextChange(event.target.value)}
-      />
+      <div className={styles.fieldGroup}>
+        <label htmlFor="sender-text">메시지</label>
+        <textarea
+          id="sender-text"
+          className={styles.message}
+          value={text}
+          onChange={(event) => onTextChange(event.target.value)}
+        />
+      </div>
 
       {/* T16(AC-029, docs/UX.md:1015) — 실패 상태에서는 같은 버튼이 "다시 시도"로 바뀐다. 별도
           버튼을 추가하지 않는 이유: 핸들러(onRunMediation)가 동일하고("재시도 = 재실행"), 버튼을
           하나 더 두면 실패 상태에서 "실행"과 "다시 시도" 두 개가 동시에 보여 혼란을 준다. */}
-      <button type="button" onClick={onRunMediation} disabled={!canRun}>
+      <button
+        type="button"
+        className={styles.runButton}
+        onClick={onRunMediation}
+        disabled={!canRun}
+      >
         {status === 'error' ? '다시 시도' : '실행'}
       </button>
       {/* T16(AC-029, docs/UX.md:1013) — 단계 라벨 진행 표시. `docs/UX.md`의 예시 문구를 그대로
           쓰는 정적 텍스트다(타이머로 단계를 전환하지 않는다) — 판단 근거는
           `MediationWorkspace.tsx` 헤더 주석 "T16 — 진행 표시 방식" 참조. */}
-      {status === 'loading' && <p role="status">분류 중 → 변환 중 → 역번역 중</p>}
-      {status === 'error' && <p role="alert">처리에 실패했습니다</p>}
+      {status === 'loading' && (
+        <p role="status" className={styles.loadingText}>
+          분류 중 → 변환 중 → 역번역 중
+        </p>
+      )}
+      {status === 'error' && (
+        <p role="alert" className={styles.errorText}>
+          처리에 실패했습니다
+        </p>
+      )}
 
       {/* M-2 — `status === 'success'` 단독이 아니라 `hasResult`(승인 가능한 스냅샷 존재)도
           함께 본다. 재실행이 실패해도(status==='error') 직전 성공 결과와 그 폴백 배지가
           유지되어야 RecipientPanel의 승인 가능 상태와 일치한다. */}
       {(status === 'success' || hasResult) && result && (
-        <>
+        <div className={styles.resultBlock}>
           {displayedUrgency && (
             // 🔴 (2026-08-05 — C-1, reviewer REJECTED → 수정, F1-e·ADR-0009 D3) `stepSources.c1`을
             // 넘긴다 — ADR-0009 D3 매핑표가 "c1 → UrgencyPanel.tsx"를 지정했는데 이전 배선에는 이
@@ -169,9 +190,11 @@ export function SenderPanel({
             source={result.stepSources?.c4 ?? result.source}
           />
           {result.personalizationApplied === false && (
-            <p role="status">개인화 미적용 — 기본 변환만 적용되었습니다</p>
+            <p role="status" className={styles.personalizationNote}>
+              개인화 미적용 — 기본 변환만 적용되었습니다
+            </p>
           )}
-        </>
+        </div>
       )}
     </section>
   );

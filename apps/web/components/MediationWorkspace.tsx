@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import type { MediationResult, UrgencyLevel } from '@cross-border/core';
 import { RecipientPanel } from './RecipientPanel';
 import { SenderPanel } from './SenderPanel';
+import styles from './MediationWorkspace.module.css';
 
 type MediationStatus = 'idle' | 'loading' | 'error' | 'success';
 type ApproveStatus = 'idle' | 'sending' | 'sent' | 'error';
@@ -54,12 +55,6 @@ const srOnlyStyle = {
   whiteSpace: 'nowrap',
   border: 0,
 } as const;
-
-// Major 4(reviewer REJECTED → 수정) — AC-009 "발신자·수신자 패널이 나란히 표시된다"가 시각적으로
-// 구현되지 않았다(리포 전체에 스타일이 0건 — 이 클러스터가 만든 회귀는 아니다). 정교한 디자인
-// 시스템 없이 최소 flex 레이아웃으로 AC-009 조건("나란히 비교 가능")만 충족한다.
-const twoPanelStyle = { display: 'flex', gap: '24px', alignItems: 'flex-start' } as const;
-const panelColumnStyle = { flex: '1 1 0%', minWidth: 0 } as const;
 
 /**
  * T13/T14 — UX-004 Two-Panel Mediation Workspace 본체(AC-009). 발신자 패널(`SenderPanel`)과
@@ -335,39 +330,41 @@ export function MediationWorkspace() {
       <div aria-live="polite" role="status" aria-label="중재 진행 상태 알림" style={srOnlyStyle}>
         {liveAnnouncement}
       </div>
-      <div style={twoPanelStyle}>
-        <div style={panelColumnStyle}>
-          <SenderPanel
-            text={text}
-            onTextChange={setText}
-            recipient={recipient}
-            onRecipientChange={setRecipient}
-            status={status}
-            result={result}
-            urgencyOverride={urgencyOverride}
-            onOverride={setUrgencyOverride}
-            isOverridden={isOverridden}
-            displayedUrgency={displayedUrgency}
-            onRunMediation={handleRunMediation}
-            hasResult={hasResult}
-            // MJ-5 — 스냅샷이 있으면 그 시점의 원문을, 없으면(첫 실행 전) 라이브 원문을 그대로
-            // 쓴다(스냅샷이 없을 때는 ComparisonView/BackTranslationPreview 자체가 렌더되지
-            // 않으므로 이 값은 실제로 쓰이지 않지만, prop 타입을 `string`으로 단순하게 유지하기
-            // 위한 안전한 fallback이다).
-            originalTextSnapshot={approvalSnapshot?.text ?? text}
-          />
-        </div>
-        <div style={panelColumnStyle}>
-          <RecipientPanel
-            hasResult={hasResult}
-            isStale={isStale}
-            isRunning={isRunning}
-            finalText={finalText}
-            onFinalTextChange={setFinalText}
-            onApprove={handleApprove}
-            approveStatus={approveStatus}
-            sentAt={sentAt}
-          />
+      <div className={styles.frame}>
+        <div className={styles.twoPanel}>
+          <div className={styles.column}>
+            <SenderPanel
+              text={text}
+              onTextChange={setText}
+              recipient={recipient}
+              onRecipientChange={setRecipient}
+              status={status}
+              result={result}
+              urgencyOverride={urgencyOverride}
+              onOverride={setUrgencyOverride}
+              isOverridden={isOverridden}
+              displayedUrgency={displayedUrgency}
+              onRunMediation={handleRunMediation}
+              hasResult={hasResult}
+              // MJ-5 — 스냅샷이 있으면 그 시점의 원문을, 없으면(첫 실행 전) 라이브 원문을 그대로
+              // 쓴다(스냅샷이 없을 때는 ComparisonView/BackTranslationPreview 자체가 렌더되지
+              // 않으므로 이 값은 실제로 쓰이지 않지만, prop 타입을 `string`으로 단순하게 유지하기
+              // 위한 안전한 fallback이다).
+              originalTextSnapshot={approvalSnapshot?.text ?? text}
+            />
+          </div>
+          <div className={`${styles.column} ${styles.columnRecipient}`}>
+            <RecipientPanel
+              hasResult={hasResult}
+              isStale={isStale}
+              isRunning={isRunning}
+              finalText={finalText}
+              onFinalTextChange={setFinalText}
+              onApprove={handleApprove}
+              approveStatus={approveStatus}
+              sentAt={sentAt}
+            />
+          </div>
         </div>
       </div>
     </div>

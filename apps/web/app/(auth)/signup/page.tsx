@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/browser';
 import { isValidEmailFormat } from '../../../lib/validate-email';
 import { passwordLengthError } from '../../../lib/validate-password';
+import styles from '../auth.module.css';
 
 const ONBOARDING_ROUTE = '/onboarding';
 const PASSWORD_MISMATCH_MESSAGE = '비밀번호가 일치하지 않습니다';
@@ -104,25 +105,33 @@ export default function SignupPage() {
   }
 
   return (
-    <main>
-      <h1>UX-002 회원가입</h1>
+    <main className={styles.page}>
+      <h1 className={styles.title}>UX-002 회원가입</h1>
       {banner === 'duplicate-email' && (
-        <p role="alert">
+        <p role="alert" className={styles.banner}>
           이미 가입된 이메일입니다 <a href="/login">로그인</a>
         </p>
       )}
-      {banner === 'weak-password' && <p role="alert">{WEAK_PASSWORD_MESSAGE}</p>}
+      {banner === 'weak-password' && (
+        <p role="alert" className={styles.banner}>
+          {WEAK_PASSWORD_MESSAGE}
+        </p>
+      )}
       {banner === 'network' && (
-        <div role="alert">
+        <div role="alert" className={styles.banner}>
           <p>처리 중 오류가 발생했습니다</p>
-          <button type="button" onClick={() => void submit()}>
+          <button type="button" className={styles.retryButton} onClick={() => void submit()}>
             다시 시도
           </button>
         </div>
       )}
-      {status === 'success' && <p role="status">회원가입되었습니다</p>}
-      <form onSubmit={handleSubmit}>
-        <div>
+      {status === 'success' && (
+        <p role="status" className={styles.statusText}>
+          회원가입되었습니다
+        </p>
+      )}
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
           <label htmlFor="signup-email">이메일</label>
           <input
             id="signup-email"
@@ -132,50 +141,58 @@ export default function SignupPage() {
             onBlur={() => setEmailTouched(true)}
           />
           {emailTouched && email !== '' && !emailFormatValid && (
-            <p>이메일 형식이 올바르지 않습니다</p>
+            <p className={styles.fieldError}>이메일 형식이 올바르지 않습니다</p>
           )}
         </div>
-        <div>
+        <div className={styles.field}>
           <label htmlFor="signup-password">비밀번호</label>
-          <input
-            id="signup-password"
-            type={showPassword ? 'text' : 'password'}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <button
-            type="button"
-            aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
-            onClick={() => setShowPassword((value) => !value)}
-          >
-            {showPassword ? '숨기기' : '보기'}
-          </button>
+          <div className={styles.fieldRow}>
+            <input
+              id="signup-password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <button
+              type="button"
+              className={styles.toggleButton}
+              aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
+              onClick={() => setShowPassword((value) => !value)}
+            >
+              {showPassword ? '숨기기' : '보기'}
+            </button>
+          </div>
           {/* AC-060③ — 이 문구 이상의 복잡도 안내(대문자·특수문자 등)를 추가하지 않는다. */}
-          <p>최소 8자</p>
-          {passwordError && <p>{passwordError}</p>}
+          <p className={styles.hint}>최소 8자</p>
+          {passwordError && <p className={styles.fieldError}>{passwordError}</p>}
         </div>
-        <div>
+        <div className={styles.field}>
           <label htmlFor="signup-confirm-password">비밀번호 확인</label>
-          <input
-            id="signup-confirm-password"
-            type={showConfirmPassword ? 'text' : 'password'}
-            value={confirmPassword}
-            onChange={(event) => setConfirmPassword(event.target.value)}
-          />
-          <button
-            type="button"
-            aria-label={showConfirmPassword ? '비밀번호 확인 숨기기' : '비밀번호 확인 보기'}
-            onClick={() => setShowConfirmPassword((value) => !value)}
-          >
-            {showConfirmPassword ? '숨기기' : '보기'}
-          </button>
-          {confirmError && <p>{confirmError}</p>}
+          <div className={styles.fieldRow}>
+            <input
+              id="signup-confirm-password"
+              type={showConfirmPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+            />
+            <button
+              type="button"
+              className={styles.toggleButton}
+              aria-label={showConfirmPassword ? '비밀번호 확인 숨기기' : '비밀번호 확인 보기'}
+              onClick={() => setShowConfirmPassword((value) => !value)}
+            >
+              {showConfirmPassword ? '숨기기' : '보기'}
+            </button>
+          </div>
+          {confirmError && <p className={styles.fieldError}>{confirmError}</p>}
         </div>
-        <button type="submit" disabled={!canSubmit}>
+        <button type="submit" className={styles.submit} disabled={!canSubmit}>
           {status === 'submitting' ? '가입 중…' : '회원가입'}
         </button>
       </form>
-      <a href="/login">로그인</a>
+      <a href="/login" className={styles.bottomLink}>
+        로그인
+      </a>
     </main>
   );
 }

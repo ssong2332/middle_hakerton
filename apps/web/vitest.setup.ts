@@ -6,8 +6,19 @@
  * "여러 개 찾음" 오류를 낸다(measured). 🔴 `@testing-library/jest-dom`은 설치돼 있지 않다 —
  * 새 의존성을 추가하지 않고 vitest 기본 매처(`toBeTruthy`/`toBeNull` 등)만 쓴다.
  */
-import { afterEach } from 'vitest';
+import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
+
+/**
+ * 리뷰 M-6 후속 — `next/font/google`은 Next.js 빌드 컴파일러(SWC/babel) 전용 매크로라 Vitest의
+ * Vite/oxc 변환 경로에서는 실제 함수가 아니다(`apps/web/app/layout.tsx`가 호출하는 `Archivo`/
+ * `IBM_Plex_Mono`). Next.js 공식 가이드가 권장하는 대로 테스트 전역에서 목(mock)으로 대체한다 —
+ * `variable`만 실제 사용처(`globals.css`의 `var(--font-archivo)` 등)와 일치시키면 충분하다.
+ */
+vi.mock('next/font/google', () => ({
+  Archivo: () => ({ className: 'font-archivo-mock', variable: '--font-archivo' }),
+  IBM_Plex_Mono: () => ({ className: 'font-plex-mono-mock', variable: '--font-plex-mono' }),
+}));
 
 afterEach(() => {
   cleanup();

@@ -2,6 +2,7 @@
 
 import type { PreservedItem, ResponseSource } from '@cross-border/core';
 import { NON_LIVE_NOTICE } from '../lib/non-live-notice';
+import styles from './ComparisonView.module.css';
 
 export interface ComparisonViewProps {
   originalText: string;
@@ -46,12 +47,6 @@ export interface ComparisonViewProps {
  * 이제 **서로 다른 스텝의 진실**을 각자 정확히 본다(C2 live + C4 fallback이면 이 컴포넌트에는
  * 배지가 뜨지 않고 역번역 영역에만 뜬다).
  */
-// Major 4(reviewer REJECTED → 수정) — AC-008 "원문/변환문/변환 이유가 한 화면에서 나란히 비교
-// 가능하다"가 시각적으로 구현되지 않았다(리포 전체에 스타일 0건 — 이 클러스터가 만든 회귀는
-// 아니다). 정교한 디자인 시스템 없이 최소 flex 레이아웃으로 "나란히" 조건만 충족한다.
-const columnsStyle = { display: 'flex', gap: '16px' } as const;
-const columnStyle = { flex: '1 1 0%', minWidth: 0 } as const;
-
 export function ComparisonView({
   originalText,
   transformed,
@@ -60,16 +55,16 @@ export function ComparisonView({
   source,
 }: ComparisonViewProps) {
   return (
-    <section aria-label="원문·변환문·변환 이유 비교" style={columnsStyle}>
-      <div style={columnStyle}>
+    <section aria-label="원문·변환문·변환 이유 비교" className={styles.columns}>
+      <div className={styles.column}>
         <h3>원문</h3>
         <p>{originalText}</p>
       </div>
-      <div style={columnStyle}>
+      <div className={`${styles.column} ${styles.transformedColumn}`}>
         <h3>변환문</h3>
         <p>{transformed}</p>
         {preserved.length > 0 && (
-          <div aria-label="보존된 항목">
+          <div aria-label="보존된 항목" className={styles.preserved}>
             <h4>보존된 항목</h4>
             <ul>
               {preserved.map((item, index) => (
@@ -82,9 +77,13 @@ export function ComparisonView({
         )}
         {/* AC-041, ADR-0009 D3 — 이 영역(변환문/변환 이유)의 진실은 `stepSources.c2`뿐이다.
             전체 응답 합산값(`source`)이 아니라 C2 전용 값만 보고 판단한다. */}
-        {source !== 'live' && <p role="status">{NON_LIVE_NOTICE}</p>}
+        {source !== 'live' && (
+          <p role="status" className={styles.notice}>
+            {NON_LIVE_NOTICE}
+          </p>
+        )}
       </div>
-      <div style={columnStyle}>
+      <div className={styles.column}>
         <h3>변환 이유</h3>
         <p>{reason}</p>
       </div>
