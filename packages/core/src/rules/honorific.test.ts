@@ -8,6 +8,7 @@ import {
   detectHonorificMixing,
   hasClassifiableHonorificSentence,
   honorificMixedWarning,
+  honorificNotRegisteredWarnings,
 } from './honorific';
 
 describe('detectHonorificMixing', () => {
@@ -133,5 +134,38 @@ describe('honorificMixedWarning', () => {
   it('경고 문구에 국가·국민성 서술을 넣지 않는다(Conventions 7)', () => {
     const warning = honorificMixedWarning('확인 부탁드립니다. 편하실 때 연락 주세요.');
     expect(warning?.message).not.toMatch(/한국|korea|korean|국민성/i);
+  });
+});
+
+/**
+ * T22 — AC-047②. `honorificNotRegisteredWarnings`는 C2 스텝이 원문과 교차 검증까지 마치고 넘긴
+ * subject 목록을 `Warning[]`으로 조립만 한다(재검증하지 않는다) — 여기서는 조립 자체(타입·문구·
+ * 다건 처리)만 검증한다.
+ */
+describe('honorificNotRegisteredWarnings', () => {
+  it('subject 1건이면 honorificNotRegistered 타입 Warning 1건을 반환한다(AC-047②)', () => {
+    const warnings = honorificNotRegisteredWarnings(['Minho']);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toEqual({
+      type: 'honorificNotRegistered',
+      message: expect.stringContaining('호칭 미등록'),
+      subject: 'Minho',
+    });
+  });
+
+  it('subject가 여러 건이면 각각 별개의 Warning으로 만든다(하나로 합치지 않는다)', () => {
+    const warnings = honorificNotRegisteredWarnings(['Minho', '박 과장님']);
+    expect(warnings).toHaveLength(2);
+    expect(warnings.map((w) => w.subject)).toEqual(['Minho', '박 과장님']);
+    expect(warnings.every((w) => w.type === 'honorificNotRegistered')).toBe(true);
+  });
+
+  it('subject가 없으면(등록/무제 인물만) 빈 배열을 반환한다 — 경고가 없으면 아무것도 표시하지 않는다', () => {
+    expect(honorificNotRegisteredWarnings([])).toEqual([]);
+  });
+
+  it('경고 문구에 국가·국민성 서술을 넣지 않는다(Conventions 7)', () => {
+    const [warning] = honorificNotRegisteredWarnings(['Alex']);
+    expect(warning.message).not.toMatch(/한국|korea|korean|국민성/i);
   });
 });
