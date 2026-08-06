@@ -1,5 +1,7 @@
 'use client';
 
+import styles from './RecipientPanel.module.css';
+
 export interface RecipientPanelProps {
   /**
    * 승인 대상 스냅샷이 있는가 — 없으면 승인할 대상 자체가 없다(Empty 상태). 🔴 Major 1
@@ -69,26 +71,36 @@ export function RecipientPanel({
 
   return (
     <section aria-label="수신자 패널">
-      <h2>수신자가 받을 내용</h2>
-      {!hasResult && <p>메시지를 실행하면 여기에서 상대방이 받을 내용을 확인할 수 있습니다.</p>}
+      <div className={styles.header}>
+        <h2 className={styles.title}>수신자에게 보이는 메시지</h2>
+      </div>
+      {!hasResult && (
+        <p className={styles.emptyState}>
+          메시지를 실행하면 여기에서 상대방이 받을 내용을 확인할 수 있습니다.
+        </p>
+      )}
       {hasResult && (
         <>
-          <label htmlFor="final-text">최종 발송문</label>
-          <textarea
-            id="final-text"
-            value={finalText}
-            disabled={isDelivered}
-            onChange={(event) => onFinalTextChange(event.target.value)}
-          />
+          <div className={styles.fieldGroup}>
+            <label htmlFor="final-text">최종 발송문</label>
+            <textarea
+              id="final-text"
+              value={finalText}
+              disabled={isDelivered}
+              onChange={(event) => onFinalTextChange(event.target.value)}
+            />
+          </div>
           {approveStatus === 'error' && (
-            <p role="alert">승인 처리에 실패했습니다. 다시 시도해 주세요.</p>
+            <p role="alert" className={styles.errorText}>
+              승인 처리에 실패했습니다. 다시 시도해 주세요.
+            </p>
           )}
           {/* 🔴 Critical(reviewer REJECTED → 수정) — 원문/수신자/긴급도 override가 승인 대상
               스냅샷과 달라지면(재실행 없이 편집됨) 아직 검토되지 않은 값이므로 승인을 막는다.
               M1(reviewer 최종 APPROVED → 수정) — 긴급도 override도 같은 사유이므로 문구도
               세 사유를 모두 포함하도록 일반화한다(원인을 텍스트/수신자로만 한정하지 않는다). */}
           {!isDelivered && isStale && (
-            <p role="status">
+            <p role="status" className={styles.statusText}>
               메시지, 수신자 또는 긴급도가 변경되었습니다 — 다시 실행한 뒤 승인할 수 있습니다.
             </p>
           )}
@@ -96,20 +108,29 @@ export function RecipientPanel({
               "죽은 버튼"처럼 보였다. `isStale`과 같은 패턴(role="status")으로 이유를 알려준다.
               isStale과 동시에 뜰 수 있으므로 서로 다른 문구로 별도 렌더한다. */}
           {!isDelivered && !isStale && isFinalTextEmpty && (
-            <p role="status">최종 발송문을 입력해야 승인할 수 있습니다.</p>
+            <p role="status" className={styles.statusText}>
+              최종 발송문을 입력해야 승인할 수 있습니다.
+            </p>
           )}
           {isDelivered ? (
-            <p role="status">발송됨 — {sentAt}</p>
+            <p role="status" className={styles.delivered}>
+              발송됨 — {sentAt}
+            </p>
           ) : (
             <button
               type="button"
+              className={styles.approveButton}
               onClick={onApprove}
               disabled={approveStatus === 'sending' || isStale || isRunning || isFinalTextEmpty}
             >
               승인 & 전송
             </button>
           )}
-          {approveStatus === 'sending' && <p role="status">전송 중…</p>}
+          {approveStatus === 'sending' && (
+            <p role="status" className={styles.statusText}>
+              전송 중…
+            </p>
+          )}
         </>
       )}
     </section>

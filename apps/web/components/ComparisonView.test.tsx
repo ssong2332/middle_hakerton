@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { PreservedItem } from '@cross-border/core';
 import { ComparisonView } from './ComparisonView';
+import styles from './ComparisonView.module.css';
 
 describe('ComparisonView', () => {
   it('AC-008 — 원문/변환문/변환 이유 3열을 나란히 표시한다', () => {
@@ -31,7 +32,15 @@ describe('ComparisonView', () => {
   // 않았다. 이 리포에는 시각 회귀 도구가 없으므로(`docs/CodingRules.md` "E2E 도구... 도입하지
   // 않는다"), 3열이 실제로 가로 배치(flex)로 구현됐는지를 구조적으로 확인하는 것이 가능한 최선의
   // 검증이다.
-  it('Major 4/AC-008 — 3열이 flex 컨테이너 안에서 가로로 나란히 배치된다', () => {
+  //
+  // 🔴 (구현자, 2026-08-06 — CSS 실장 태스크) 레이아웃이 인라인 `style={{display:'flex'}}`에서
+  // `ComparisonView.module.css`의 `.columns` 클래스로 옮겨졌다(`docs/design-mockups` 목업 기준
+  // 실제 디자인 토큰 적용). `display:flex` 자체는 이제 컴파일된 CSS 파일에 있고 jsdom은 외부
+  // 스타일시트 규칙을 적용해 보여주지 않으므로(`getComputedStyle`로도 확인 불가), 인라인 style
+  // 속성을 더 이상 근거로 쓸 수 없다 — CSS Module 클래스가 실제로 부여됐는지(className 존재)와
+  // 자식 3개가 그 컨테이너의 직계 자식이라는 구조는 계속 검증한다. `display:flex` 규칙이 실제로
+  // 컴파일 산출물에 존재하는지는 `npm run build` 산출물 확인으로 별도 근거를 남긴다(구현 보고서).
+  it('Major 4/AC-008 — 3열이 CSS Module 레이아웃 클래스가 적용된 컨테이너 안에서 나란히 배치된다', () => {
     render(
       <ComparisonView
         originalText="원문"
@@ -43,7 +52,7 @@ describe('ComparisonView', () => {
     );
 
     const container = screen.getByLabelText('원문·변환문·변환 이유 비교');
-    expect(container.getAttribute('style')).toMatch(/display:\s*flex/);
+    expect(container.className).toContain(styles.columns);
     // 3열(원문/변환문/변환 이유) 각각이 flex 컨테이너의 직계 자식이어야 "나란히"가 성립한다.
     expect(container.children).toHaveLength(3);
   });

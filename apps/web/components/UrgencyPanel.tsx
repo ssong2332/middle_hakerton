@@ -2,6 +2,7 @@
 
 import type { ResponseSource, UrgencyLevel } from '@cross-border/core';
 import { NON_LIVE_NOTICE } from '../lib/non-live-notice';
+import styles from './UrgencyPanel.module.css';
 
 export interface UrgencyPanelProps {
   /** 화면에 표시할 등급 — 부모가 override(있으면)와 C1 판정 중 무엇을 보일지 계산해 넘긴다. */
@@ -46,19 +47,33 @@ export function UrgencyPanel({
   source,
 }: UrgencyPanelProps) {
   return (
-    <section aria-label="긴급도">
+    <section aria-label="긴급도" className={styles.panel}>
       {/* 접근성 — 배지는 색상만이 아니라 텍스트 라벨로도 등급을 드러낸다(`docs/UX.md` UX-004
           Accessibility "Urgency badge includes a text label, not color alone"). */}
-      <p>
-        <strong>{urgency}</strong>
-      </p>
-      <p>{urgencyReason}</p>
+      <div className={styles.badgeRow}>
+        <span className={styles.badgeLabel}>긴급도</span>
+        <p>
+          <strong className={styles.badge}>{urgency}</strong>
+        </p>
+      </div>
+      <p className={styles.reason}>{urgencyReason}</p>
       {/* AC-041, ADR-0009 D3 — 이 영역(등급/근거)의 진실은 `stepSources.c1`뿐이다. */}
-      {source !== 'live' && <p role="status">{NON_LIVE_NOTICE}</p>}
-      {isOverridden && <p role="status">사용자가 등급을 조정했습니다</p>}
-      <label htmlFor="urgency-override">긴급도 조정</label>
+      {source !== 'live' && (
+        <p role="status" className={styles.notice}>
+          {NON_LIVE_NOTICE}
+        </p>
+      )}
+      {isOverridden && (
+        <p role="status" className={styles.overriddenNote}>
+          사용자가 등급을 조정했습니다
+        </p>
+      )}
+      <label htmlFor="urgency-override" className={styles.overrideLabel}>
+        긴급도 조정
+      </label>
       <select
         id="urgency-override"
+        className={styles.overrideSelect}
         value={urgency}
         onChange={(event) => onOverride(event.target.value as UrgencyLevel)}
       >

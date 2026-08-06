@@ -1,0 +1,59 @@
+.panel {
+  border: 1px solid var(--border-strong);
+  background: var(--color-surface);
+  padding: 11px 12px;
+}
+
+.badgeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.badgeLabel {
+  font: 800 10px var(--font-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 7px;
+  background: var(--border-strong);
+  color: var(--color-surface);
+  font: 800 10px var(--font-sans);
+  letter-spacing: 0.08em;
+}
+
+.reason {
+  font: 400 11px var(--font-sans);
+  line-height: 1.5;
+  color: var(--text-muted-75);
+  margin-bottom: 9px;
+}
+
+.notice {
+  font: 600 9px var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+  margin-bottom: 6px;
+}
+
+.overriddenNote {
+  font: 400 11px var(--font-sans);
+  color: var(--text-muted-75);
+  margin-bottom: 6px;
+}
+
+.overrideLabel {
+  display: block;
+  font: 600 9px var(--font-mono);
+  letter-spacing: 0.1em;
+  color: var(--text-muted-75);
+  margin-bottom: 5px;
+}
+
+.overrideSelect {
+  width: auto;
+}

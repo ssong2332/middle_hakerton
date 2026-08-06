@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { LogoutButton } from '../../../components/LogoutButton';
+import styles from './with-nav.module.css';
 
 /**
  * 상시 내비게이션(로그아웃 포함)이 있는 인증된 화면들(`/mediate`, `/profile`, `/terminology`
@@ -22,7 +23,10 @@ import { LogoutButton } from '../../../components/LogoutButton';
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <>
-      <LogoutButton />
+      <nav className={styles.nav}>
+        <span className={styles.brand}>MEDIATE</span>
+        <LogoutButton />
+      </nav>
       {children}
     </>
   );

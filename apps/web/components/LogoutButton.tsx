@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../lib/supabase/browser';
+import styles from './LogoutButton.module.css';
 
 export function LogoutButton() {
   const router = useRouter();
@@ -23,7 +24,12 @@ export function LogoutButton() {
   }
 
   return (
-    <button type="button" onClick={() => void handleClick()} disabled={loading}>
+    <button
+      type="button"
+      className={styles.button}
+      onClick={() => void handleClick()}
+      disabled={loading}
+    >
       로그아웃
     </button>
   );
