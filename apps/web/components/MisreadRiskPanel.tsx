@@ -1,6 +1,7 @@
 'use client';
 
 import type { MisreadRisk } from '@cross-border/core';
+import styles from './MisreadRiskPanel.module.css';
 
 export type MisreadRiskVariant = 'full' | 'reduced';
 
@@ -24,7 +25,7 @@ const RISK_PANEL_LABEL = '오해 위험';
  */
 function RiskItemDetails({ risk }: { risk: MisreadRisk }) {
   return (
-    <dl>
+    <dl className={styles.riskDetails}>
       <dt>인용</dt>
       <dd>{risk.quote}</dd>
       <dt>예상되는 오해</dt>
@@ -55,7 +56,7 @@ export function MisreadRiskPanel({ risks, variant }: MisreadRiskPanelProps) {
 
   if (variant === 'reduced') {
     return (
-      <section aria-label={RISK_PANEL_LABEL}>
+      <section aria-label={RISK_PANEL_LABEL} className={styles.panelReduced}>
         <details>
           <summary>
             {RISK_PANEL_LABEL} {risks.length}건
@@ -73,7 +74,7 @@ export function MisreadRiskPanel({ risks, variant }: MisreadRiskPanelProps) {
   }
 
   return (
-    <section aria-label={RISK_PANEL_LABEL}>
+    <section aria-label={RISK_PANEL_LABEL} className={styles.panelFull}>
       <h3>
         {RISK_PANEL_LABEL} {risks.length}건
       </h3>

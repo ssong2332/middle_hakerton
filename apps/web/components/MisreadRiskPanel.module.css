@@ -1,0 +1,54 @@
+.panelFull {
+  border: 1px solid var(--border-strong);
+  background: var(--color-surface);
+  padding: 11px 12px;
+}
+
+.panelFull h3 {
+  font: 800 11px var(--font-sans);
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.panelFull ul,
+.panelReduced ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.panelFull li {
+  border-top: 1px solid var(--border-thin);
+  padding-top: 8px;
+}
+
+.panelFull li:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.panelReduced summary {
+  cursor: pointer;
+  font: 800 11px var(--font-sans);
+  padding: 6px 0;
+}
+
+.riskDetails {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  font: 400 11px var(--font-sans);
+  line-height: 1.5;
+}
+
+.riskDetails dt {
+  font: 800 9px var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--text-muted-60);
+}
+
+.riskDetails dd {
+  margin: 0 0 4px;
+}

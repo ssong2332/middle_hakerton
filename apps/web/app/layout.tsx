@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import './globals.css';
 
 export const metadata = {
   title: '크로스보더 협업 중재 서비스',

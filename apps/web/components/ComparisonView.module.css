@@ -1,0 +1,53 @@
+.columns {
+  display: flex;
+  gap: 16px;
+}
+
+.column {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.column h3 {
+  font: 800 9px var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  color: var(--text-muted-60);
+}
+
+.column p {
+  font: 400 13px var(--font-sans);
+  line-height: 1.6;
+}
+
+.transformedColumn {
+  border: 1px solid var(--border-strong);
+  background: var(--color-surface);
+  padding: 11px 12px;
+}
+
+.preserved {
+  margin-top: 9px;
+}
+
+.preserved h4 {
+  font: 800 9px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  color: var(--text-muted-60);
+}
+
+.preserved ul {
+  margin: 0;
+  padding-left: 16px;
+  font: 400 11px var(--font-sans);
+}
+
+.notice {
+  margin-top: 8px;
+  font: 600 9px var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+}

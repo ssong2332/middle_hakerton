@@ -3,11 +3,12 @@
 // "실제 화면은 T12/T13이 채운다"가 여기서 실현된다 — `MediationDemoForm`(T6의 최소 하네스)은
 // 흡수·대체되어 삭제됐다(`MediationWorkspace.tsx` 헤더 주석 참조).
 import { MediationWorkspace } from '../../../../components/MediationWorkspace';
+import styles from './mediate.module.css';
 
 export default function MediatePage() {
   return (
-    <main>
-      <h1>중재 워크스페이스</h1>
+    <main className={styles.page}>
+      <h1 className={styles.title}>중재 워크스페이스</h1>
       <MediationWorkspace />
     </main>
   );

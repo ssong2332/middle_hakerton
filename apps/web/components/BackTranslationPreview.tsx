@@ -2,6 +2,7 @@
 
 import type { ResponseSource, Warning } from '@cross-border/core';
 import { NON_LIVE_NOTICE } from '../lib/non-live-notice';
+import styles from './BackTranslationPreview.module.css';
 
 export interface BackTranslationPreviewProps {
   originalText: string;
@@ -46,7 +47,7 @@ export function BackTranslationPreview({
   const honorificWarning = warnings.find((warning) => warning.type === 'honorificLevelMixed');
 
   return (
-    <section aria-label="역번역 미리보기">
+    <section aria-label="역번역 미리보기" className={styles.panel}>
       <div>
         <h3>원문</h3>
         <p>{originalText}</p>
@@ -55,9 +56,19 @@ export function BackTranslationPreview({
         <h3>역번역</h3>
         <p>{backTranslation}</p>
       </div>
-      {source !== 'live' && <p role="status">{NON_LIVE_NOTICE}</p>}
-      <p role="note">{LIMITATION_NOTICE}</p>
-      {honorificWarning ? <p role="alert">{honorificWarning.message}</p> : null}
+      {source !== 'live' && (
+        <p role="status" className={styles.notice}>
+          {NON_LIVE_NOTICE}
+        </p>
+      )}
+      <p role="note" className={styles.limitation}>
+        {LIMITATION_NOTICE}
+      </p>
+      {honorificWarning ? (
+        <p role="alert" className={styles.warning}>
+          {honorificWarning.message}
+        </p>
+      ) : null}
     </section>
   );
 }

@@ -1,0 +1,77 @@
+.title {
+  font: 800 10px var(--font-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.fieldGroup {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+.fieldGroup input,
+.fieldGroup textarea {
+  width: 100%;
+}
+
+.message {
+  min-height: 130px;
+}
+
+.fieldError {
+  font-size: 12px;
+  color: var(--color-danger-text);
+  margin-top: 2px;
+}
+
+.runButton {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  margin-top: 4px;
+  background: var(--color-focus);
+  color: var(--color-surface);
+  border: 1px solid var(--color-focus);
+  font: 800 13px var(--font-sans);
+  text-align: left;
+}
+
+.runButton:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.runButton:disabled {
+  opacity: 0.45;
+}
+
+.loadingText {
+  margin-top: 10px;
+  font: 400 11px var(--font-mono);
+  color: var(--text-muted-60);
+}
+
+.errorText {
+  margin-top: 10px;
+  font: 600 12px var(--font-sans);
+  color: var(--color-danger-text);
+}
+
+.resultBlock {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 2px solid var(--border-rule);
+  display: grid;
+  gap: 14px;
+}
+
+.personalizationNote {
+  font: 400 11px var(--font-sans);
+  color: var(--text-muted-75);
+  padding: 8px 10px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--border-thin-alt);
+}

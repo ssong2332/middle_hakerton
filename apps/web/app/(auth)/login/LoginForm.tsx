@@ -15,6 +15,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/browser';
 import { isValidEmailFormat } from '../../../lib/validate-email';
+import styles from '../auth.module.css';
 
 const DEFAULT_REDIRECT = '/mediate';
 
@@ -87,22 +88,28 @@ export function LoginForm() {
   }
 
   return (
-    <main>
-      <h1>UX-001 로그인</h1>
+    <main className={styles.page}>
+      <h1 className={styles.title}>UX-001 로그인</h1>
       {errorKind === 'invalid-credentials' && (
-        <p role="alert">이메일 또는 비밀번호가 올바르지 않습니다</p>
+        <p role="alert" className={styles.banner}>
+          이메일 또는 비밀번호가 올바르지 않습니다
+        </p>
       )}
       {errorKind === 'network' && (
-        <div role="alert">
+        <div role="alert" className={styles.banner}>
           <p>처리 중 오류가 발생했습니다</p>
-          <button type="button" onClick={() => void submit()}>
+          <button type="button" className={styles.retryButton} onClick={() => void submit()}>
             다시 시도
           </button>
         </div>
       )}
-      {status === 'success' && <p role="status">로그인되었습니다</p>}
-      <form onSubmit={handleSubmit}>
-        <div>
+      {status === 'success' && (
+        <p role="status" className={styles.statusText}>
+          로그인되었습니다
+        </p>
+      )}
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
           <label htmlFor="login-email">이메일</label>
           <input
             id="login-email"
@@ -112,10 +119,10 @@ export function LoginForm() {
             onBlur={() => setEmailTouched(true)}
           />
           {emailTouched && email !== '' && !emailFormatValid && (
-            <p>이메일 형식이 올바르지 않습니다</p>
+            <p className={styles.fieldError}>이메일 형식이 올바르지 않습니다</p>
           )}
         </div>
-        <div>
+        <div className={styles.field}>
           <label htmlFor="login-password">비밀번호</label>
           <input
             id="login-password"
@@ -124,11 +131,13 @@ export function LoginForm() {
             onChange={(event) => setPassword(event.target.value)}
           />
         </div>
-        <button type="submit" disabled={!canSubmit}>
+        <button type="submit" className={styles.submit} disabled={!canSubmit}>
           {status === 'submitting' ? '로그인 중…' : '로그인'}
         </button>
       </form>
-      <a href="/signup">회원가입</a>
+      <a href="/signup" className={styles.bottomLink}>
+        회원가입
+      </a>
     </main>
   );
 }
