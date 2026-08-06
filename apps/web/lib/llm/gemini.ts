@@ -50,12 +50,31 @@ import {
 } from './storage';
 
 /**
- * `openai.ts`의 `REQUEST_TIMEOUT_MS`(3000ms)와 같은 소프트 타깃을 그대로 적용한다 — 근거는
- * 그 파일의 동일 주석(PRD NFR "체감 5초"). `@google/genai`의 `httpOptions.timeout`은 알려진
- * 이슈(googleapis/js-genai#1277)로 항상 보장되지는 않지만, 로컬 테스트 전용 도구이므로
- * best-effort로 설정해 둔다 — 실제 타임아웃 신뢰성이 필요해지면 그때 재검토한다.
+ * 🔴 `openai.ts`의 `REQUEST_TIMEOUT_MS`(3000ms, PRD NFR "체감 5초" 근거)와 **다른 값이어야
+ * 한다** — 이 파일(`gemini.ts`)에 그 값을 그대로 옮겨 쓰면 안 된다.
+ *
+ * 과거 이 주석은 `httpOptions.timeout`이 "알려진 이슈(googleapis/js-genai#1277)로 항상
+ * 보장되지는 않는다"며 3000ms를 "소프트 타깃, best-effort"로 취급했다 — **이는 설치된 SDK
+ * 버전(`@google/genai@2.15.0`)에서는 틀렸다.** 실제로는 두 겹으로 엄격하게 강제된다:
+ *
+ * 1. **클라이언트 SDK가 강제한다.** `node_modules/@google/genai/dist/node/index.cjs` 약
+ *    13882번째 줄에서 `setTimeout(() => abortController.abort(), httpOptions.timeout)`로
+ *    `AbortController`에 연결해 정확히 그 시간에 요청을 중단시킨다.
+ * 2. **Gemini API 서버 자신이 하한을 강제한다(실측, 2026-08-06 진단 세션).** `timeout`을
+ *    10000ms 미만으로 설정해 실제 API를 호출하면, 생성이 시작되기도 전에 매번
+ *    `HTTP 400 INVALID_ARGUMENT`로 즉시 거부된다 — 에러 메시지 원문:
+ *    `"Manually set deadline 3s is too short. Minimum allowed deadline is 10s."`
+ *    이전 값(3000ms)에서는 T11 라이브 회귀(`npm run test:regression-c2`, 53건) 중
+ *    Gemini로 나간 73번의 `llm.complete('c2', ...)` 호출 **전부**가 이 오류로
+ *    `outcome:'fallback'`이 됐다(관측 지연시간 404–2514ms — 실제 3초 타임아웃이 발동한 게
+ *    아니라 API 쪽에서 즉시 거부된 패턴과 일치). 그 결과가 4/53 통과였다.
+ *
+ * 그래서 10000ms(문서화된 서버 하한)를 그대로 쓴다 — 그 이상으로 여유를 더 주지 않는 이유는,
+ * 이 값이 어차피 로컬 테스트 전용 어댑터(파일 헤더 주석)의 상한일 뿐 PRD NFR과 무관하고,
+ * 하한보다 큰 임의의 여유값을 추가하면 그 값 자체가 왜 그 숫자인지 근거 없는 매직넘버가
+ * 되기 때문이다. 10_000 미만으로 낮추면 `gemini.test.ts`의 상수 가드 테스트가 즉시 실패한다.
  */
-const REQUEST_TIMEOUT_MS = 3000;
+export const REQUEST_TIMEOUT_MS = 10_000;
 
 export interface GeminiLLMClientDeps {
   supabase?: SupabaseClient;
