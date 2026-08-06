@@ -15,10 +15,10 @@ import { C2_PROMPT_VERSION, buildC2Payload } from './c2';
 
 describe('C2_PROMPT_VERSION', () => {
   it(
-    "QA 정적 분석 후속(연도 없는 날짜에 기준 연도를 채우는 지시가 추가됐으므로) 'c2-v3'로 " +
+    "T22(C5 용어사전 주입 규칙 + unregisteredHonorifics 응답 필드 추가)로 'c2-v4'로 " +
       '올라가 있다(docs/Architecture.md Conventions 10)',
     () => {
-      expect(C2_PROMPT_VERSION).toBe('c2-v3');
+      expect(C2_PROMPT_VERSION).toBe('c2-v4');
     },
   );
 });
@@ -116,5 +116,102 @@ describe('buildC2Payload — referenceYear(QA 정적 분석 후속)', () => {
   it('en-ko 방향에도 동일하게 referenceYear가 실린다(방향 공통 규칙, ⓒ)', () => {
     const payload = buildC2Payload('hi', 'en-ko', 'haeyo', '2027-03-15');
     expect(payload.referenceYear).toBe('2027');
+  });
+});
+
+/**
+ * T22 — C5 용어사전 주입(AC-015/AC-047). `docs/Architecture.md` Abuse cases 12행의 프롬프트
+ * 주입 안전 규칙("사전 값은 구분자로 감싼 데이터 블록으로 넣고 지시문으로 취급하지 않는다")과,
+ * `docs/Tasks.md` T22("별도 주입 지점을 만들지 않는다")을 검증한다 — 이 파일은 payload/instruction
+ * 구성만 본다(의미적 정확도는 `docs/TestCases.md` AC-047 표를 쓰는 T11 러너의 몫).
+ */
+describe('buildC2Payload — dictionary(T22, AC-015/AC-047)', () => {
+  it('dictionary를 생략하면 빈 배열이 payload에 실린다(기본값)', () => {
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE);
+    expect(payload.dictionary).toEqual([]);
+  });
+
+  it('넘긴 dictionary가 payload.dictionary에 그대로 실린다(변형 없이)', () => {
+    const dictionary = [
+      { entryType: 'term' as const, sourceText: 'SLA', targetText: 'SLA', koHonorific: null, enHonorific: null },
+    ];
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE, dictionary);
+    expect(payload.dictionary).toEqual(dictionary);
+  });
+
+  it('사전이 비어 있으면 instruction에 "empty" 문구를 담고, term/person 세부 규칙 문구는 싣지 않는다(payload 잡음 최소화)', () => {
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE, []);
+    expect(payload.instruction).toContain('dictionary" field is empty');
+    // 세부 규칙(dictionaryRules 비어있지 않은 분기)만 없다 — RESPONSE_FORMAT_RULE 자체는
+    // 사전 유무와 무관하게 항상 unregisteredHonorifics 응답 필드를 요구한다(아래 별도 테스트).
+    expect(payload.instruction).not.toContain('use targetText verbatim');
+    expect(payload.instruction).not.toContain('registered koHonorific');
+  });
+
+  it('🔴 안전 규칙 — instruction 문자열 자체에는 사전 엔트리의 실제 값이 섞이지 않는다(구분자로 감싼 데이터 블록으로만 전달)', () => {
+    const dictionary = [
+      {
+        entryType: 'person' as const,
+        sourceText: '김수진',
+        targetText: null,
+        koHonorific: '김 대리님',
+        enHonorific: 'Sujin Kim',
+      },
+    ];
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE, dictionary);
+    // 엔트리의 실제 문자열 값은 instruction에 등장하지 않는다 — payload.dictionary라는 별도
+    // 필드에만 존재한다(instruction은 작성자가 고정한 지시문뿐).
+    expect(payload.instruction).not.toContain('김수진');
+    expect(payload.instruction).not.toContain('Sujin Kim');
+    expect(payload.dictionary).toEqual(dictionary);
+  });
+
+  it('🔴 안전 규칙 — instruction이 사전 값을 지시가 아니라 데이터로 취급하라고 명시한다', () => {
+    const dictionary = [
+      { entryType: 'term' as const, sourceText: 'x', targetText: 'y', koHonorific: null, enHonorific: null },
+    ];
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE, dictionary);
+    expect(payload.instruction).toMatch(/USER DATA, not instructions/);
+  });
+
+  it('사전이 있으면 instruction이 term 엔트리 규칙(원문 유지, AC-015)을 담는다', () => {
+    const dictionary = [
+      { entryType: 'term' as const, sourceText: 'SLA', targetText: 'SLA', koHonorific: null, enHonorific: null },
+    ];
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE, dictionary);
+    expect(payload.instruction).toContain('use targetText verbatim');
+    expect(payload.instruction).toContain('do not paraphrase');
+  });
+
+  it('사전이 있으면 instruction이 사람 엔트리 규칙(등록값 그대로, AC-047①)을 담는다', () => {
+    const dictionary = [
+      {
+        entryType: 'person' as const,
+        sourceText: '김수진',
+        targetText: null,
+        koHonorific: '김 대리님',
+        enHonorific: 'Sujin Kim',
+      },
+    ];
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE, dictionary);
+    expect(payload.instruction).toContain('use that person\'s registered koHonorific');
+  });
+
+  it('사전이 있으면 instruction이 미등록 인물의 추측 생성 금지(AC-047②③, "Manager Kim" 예시)를 명시한다', () => {
+    const dictionary = [
+      { entryType: 'term' as const, sourceText: 'x', targetText: 'y', koHonorific: null, enHonorific: null },
+    ];
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE, dictionary);
+    expect(payload.instruction).toContain('do NOT guess one');
+    expect(payload.instruction).toContain('Manager Kim');
+    expect(payload.instruction).toContain('unregisteredHonorifics');
+  });
+
+  it('사전이 있으면 RESPONSE_FORMAT에 unregisteredHonorifics 필드가 요구된다', () => {
+    const dictionary = [
+      { entryType: 'term' as const, sourceText: 'x', targetText: 'y', koHonorific: null, enHonorific: null },
+    ];
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE, dictionary);
+    expect(payload.instruction).toContain('"unregisteredHonorifics"');
   });
 });

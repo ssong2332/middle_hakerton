@@ -1,17 +1,26 @@
 /**
  * `POST /api/mediate` — `docs/API.md` "POST /api/mediate" · `docs/Architecture.md` Data Flow ①.
  *
- * 🔴 **범위 경계(T5+T7+T9+T10 누적).** 최종 계약은 C1 분류 → C3 프로필 → C5 용어 주입 → C2 변환 →
+ * 🔴 **범위 경계(T5+T7+T9+T10+T22 누적).** 최종 계약은 C1 분류 → C3 프로필 → C5 용어 주입 → C2 변환 →
  * C4 역번역을 고정 순서로 실행하지만(AC-032), 그 오케스트레이션(`packages/core/src/pipeline.ts`의
  * `run()`)은 **T28의 범위**로 명시돼 있다(그 파일 헤더 주석 "이 파일에 구현이 없는 것은 의도다").
- * C3(T19)·C5(T22)·C6(T24)는 아직 없다. 이 라우트는 **지금 실제로 동작하는 세 스텝인
- * C1(T7)·C2(T10)·C4(T5)만 수행**하고, 나머지 필드는 `MediationResult`(F1) 계약을 만족시키는 선에서
- * placeholder로 채운다 — 각 필드 옆 주석이 소유 태스크를 가리킨다. 해당 태스크가 착수되면
- * 그 줄만 교체하면 된다(`packages/core/src/pipeline.ts`가 준비되면 이 라우트는 그것을 호출하는
- * 형태로 바뀐다 — T28 완료 시 이 파일도 함께 정리 대상).
+ * C3(T19)·C6(T24)는 아직 없다. 이 라우트는 **지금 실제로 동작하는 스텝인 C1(T7)·C2(T10)·C4(T5)와
+ * C5(T22, C2 프롬프트에 주입되는 형태라 별도 스텝이 아니다)만 수행**하고, 나머지 필드는
+ * `MediationResult`(F1) 계약을 만족시키는 선에서 placeholder로 채운다 — 각 필드 옆 주석이 소유
+ * 태스크를 가리킨다. 해당 태스크가 착수되면 그 줄만 교체하면 된다(`packages/core/src/pipeline.ts`가
+ * 준비되면 이 라우트는 그것을 호출하는 형태로 바뀐다 — T28 완료 시 이 파일도 함께 정리 대상).
  *
  * 근거: `docs/Tasks.md` T6 원문 "T5는 [BE-B] 라우트만 만들고 그것을 호출하는 브라우저 화면이
  * 없다" — T5가 실제 HTTP 라우트를 만든다는 것을 그 다음 태스크(T6)가 전제하고 있다.
+ *
+ * 🔴 **T22 배선 — C5 용어사전.** `docs/Architecture.md` Data Flow ①의 "🔴 조회는 여기서 끝난다"
+ * 규칙대로, `dictionary_terms`는 `runToneTransform()` 호출 **전에** 여기서 조회를 끝낸다
+ * (`lib/dictionary/storage.ts` `fetchDictionaryEntries()`, AC-028 — core는 조회하지 않는다).
+ * `session.client`가 없으면(테스트 목이 `{ userId }`만 돌려주는 경우, `lib/auth.ts` `Session`
+ * JSDoc 참조) 빈 배열로 대체한다 — 사전 조회 실패가 아니라 **테스트/타입 레벨의 선택적 필드**를
+ * 방어하는 것이며, 빈 배열은 "사전 미등록"과 동치인 정상 상태다(`MediationData.dictionary` 주석).
+ * `POST /api/messages`(`applyPatternLearningSafe`)처럼 실제 쓰기 실패를 삼키는 것과는 성격이
+ * 다르다 — 여기는 읽기이고, 읽지 못하면 "사전 없음"과 구분되지 않는 것이 이 기능의 정의 자체다.
  *
  * 🔴 **T10 배선 — 발신자 프로필이 아직 없다.** C2의 존댓말 레벨 입력(`honorificLevel`)은
  * `sender.profile.honorificLevel`에서 와야 하지만(AC-046②), 그 값을 채우는 C3 온보딩(T19)과
@@ -37,6 +46,7 @@ import {
   assessEmotionalSignal,
   combineSource,
   honorificMixedWarning,
+  honorificNotRegisteredWarnings,
   resolveEffectiveUrgency,
   runBackTranslation,
   runToneTransform,
@@ -51,6 +61,8 @@ import { withApi } from '../../../lib/http';
 // `apps/web/lib/llm/create-client.ts` 파일 헤더 주석 참조. Vercel 프로덕션에는 이 변수를
 // 설정하지 않으므로 배포 경로는 그대로 OpenAI로 간다.
 import { createLLMClient } from '../../../lib/llm/create-client';
+// 🔴 T22 — C5 용어사전 조회. core 호출 전에 여기서 조회를 끝낸다(AC-028, 파일 헤더 주석 참조).
+import { fetchDictionaryEntries } from '../../../lib/dictionary/storage';
 
 const mediateRequestSchema = z.object({
   // 🔴 길이 상한 검증을 걸지 않는다 — 5,000자는 소프트 캡이며 변환을 막지 않는다(AC-061②).
@@ -96,19 +108,27 @@ export const POST = withApi<MediateRequest, MediationResult>(
       input.context.urgencyOverride ?? null,
     );
 
-    // C2(T10) — 보존 대상(마감일·수치·필수 액션)을 먼저 추출해 고정한 뒤 톤을 변환하고, 같은
-    // 호출 안에서 오해 사전 경고(misreadRisks)를 함께 산출한다(AC-006/043/045/046/049). 프로필의
-    // 존댓말 레벨은 세션에서 아직 조회하지 않는다(파일 상단 "T10 배선" 주석 참조) — `null`을
-    // 넘겨도 `runToneTransform`은 기본 레지스터로 대체하지 않는다. 대신 특정 레벨을 지정하지
-    // 않은 채 "한 메시지 안에서 하나의 종결어미 레벨을 끝까지 유지하라"는 일관성 지시만 프롬프트에
-    // 싣는다(`docs/DECISIONS.md` #40, `docs/adr/0007-honorific-level-resolution-boundary.md` D2 —
-    // 기본값을 채우면 "프로필 없음"과 "프로필=특정값"의 payload가 같아져 캐시 키가 두 상태를
-    // 구분하지 못하게 된다).
+    // C5(T22) — `dictionary_terms`를 C2 호출 전에 조회한다(파일 헤더 "T22 배선" 주석 참조,
+    // AC-028 — core는 조회하지 않는다). `session.client`가 없는 경우(테스트 목)는 사전 없음(`[]`)
+    // 과 동치로 취급한다.
+    const dictionaryTerms = session?.client
+      ? await fetchDictionaryEntries(session.client, session.userId)
+      : [];
+
+    // C2(T10+T22) — 보존 대상(마감일·수치·필수 액션)을 먼저 추출해 고정한 뒤 톤을 변환하고, 같은
+    // 호출 안에서 오해 사전 경고(misreadRisks)와 C5 용어사전 주입(AC-015/047)을 함께 산출한다
+    // (AC-006/043/045/046/049). 프로필의 존댓말 레벨은 세션에서 아직 조회하지 않는다(파일 상단
+    // "T10 배선" 주석 참조) — `null`을 넘겨도 `runToneTransform`은 기본 레지스터로 대체하지
+    // 않는다. 대신 특정 레벨을 지정하지 않은 채 "한 메시지 안에서 하나의 종결어미 레벨을 끝까지
+    // 유지하라"는 일관성 지시만 프롬프트에 싣는다(`docs/DECISIONS.md` #40,
+    // `docs/adr/0007-honorific-level-resolution-boundary.md` D2 — 기본값을 채우면 "프로필 없음"과
+    // "프로필=특정값"의 payload가 같아져 캐시 키가 두 상태를 구분하지 못하게 된다).
     const {
       transformed,
       reason,
       preserved,
       misreadRisks,
+      unregisteredHonorifics,
       source: toneSource,
     } = await runToneTransform(
       {
@@ -119,6 +139,7 @@ export const POST = withApi<MediateRequest, MediationResult>(
         // (`8월 12일`, `8/8` 등)를 모델이 지어내지 않고 채울 수 있게 하는 값이다
         // (`packages/core/src/prompts/c2.ts` `C2Payload.referenceYear` 주석 참조).
         referenceDate: new Date().toISOString().slice(0, 10),
+        dictionary: dictionaryTerms,
       },
       llm,
     );
@@ -140,6 +161,11 @@ export const POST = withApi<MediateRequest, MediationResult>(
       const warning = honorificMixedWarning(transformed);
       if (warning) warnings.push(warning);
     }
+    // AC-047② — C2가 원문과 교차 검증까지 마치고 넘긴 미등록 호칭 목록을 `Warning[]`으로 조립한다
+    // (`honorificNotRegisteredWarnings`, `packages/core/src/rules/honorific.ts`). 방향과 무관하게
+    // 항상 검사한다 — 등록/미등록 인물은 두 방향 모두에서 나타날 수 있다(TestCases N-01~N-06이
+    // ko-en·en-ko 양쪽 케이스를 섞어 둔 것과 같은 이유).
+    warnings.push(...honorificNotRegisteredWarnings(unregisteredHonorifics));
 
     const result: MediationResult = {
       // AC-003 — C1 판정. override가 있으면 그 값이 반영된다(AC-004, `resolveEffectiveUrgency`).

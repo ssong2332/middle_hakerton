@@ -10,6 +10,7 @@
  * `resolveSession()`(T45 스텁)과 OpenAI 호출(`createOpenAiLLMClient`)은 모킹한다.
  */
 import { describe, expect, it, vi } from 'vitest';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 vi.mock('../../../lib/auth', () => ({
   resolveSession: vi.fn(),
@@ -62,6 +63,8 @@ function fakeLlm(
     toneReason?: string;
     tonePreserved?: unknown[];
     toneMisreadRisks?: unknown[];
+    // 🔴 T22 — AC-047②. C2 mock 응답에 미등록 호칭 자기신고를 실을 수 있게 한다.
+    toneUnregisteredHonorifics?: unknown[];
     toneSource?: Source;
     toneContent?: string;
     backTranslation?: string;
@@ -78,6 +81,7 @@ function fakeLlm(
     toneReason = '톤을 다듬었습니다.',
     tonePreserved = [],
     toneMisreadRisks = [],
+    toneUnregisteredHonorifics = [],
     toneSource = 'live',
     toneContent,
     backTranslation = 'back',
@@ -102,6 +106,7 @@ function fakeLlm(
               reason: toneReason,
               preserved: tonePreserved,
               misreadRisks: toneMisreadRisks,
+              unregisteredHonorifics: toneUnregisteredHonorifics,
             }),
           source: toneSource,
         });
@@ -120,6 +125,31 @@ function postRequest(body: unknown): Request {
     body: JSON.stringify(body),
     headers: { 'content-type': 'application/json' },
   });
+}
+
+/**
+ * 🔴 T22 — `dictionary_terms` 조회를 흉내내는 최소 페이크(`apps/web/lib/dictionary/storage.test.ts`
+ * 와 같은 모킹 정책). `session.client`로 넘기면 `fetchDictionaryEntries()`가 이 체이닝을 탄다.
+ */
+function fakeSupabaseWithDictionary(rows: unknown[]): {
+  client: SupabaseClient;
+  eqCalls: Array<[string, unknown]>;
+} {
+  const eqCalls: Array<[string, unknown]> = [];
+  const client = {
+    from(table: string) {
+      if (table !== 'dictionary_terms') throw new Error(`unexpected table: ${table}`);
+      return {
+        select: () => ({
+          eq: (column: string, value: unknown) => {
+            eqCalls.push([column, value]);
+            return Promise.resolve({ data: rows, error: null });
+          },
+        }),
+      };
+    },
+  } as unknown as SupabaseClient;
+  return { client, eqCalls };
 }
 
 describe('POST /api/mediate', () => {
@@ -538,5 +568,98 @@ describe('POST /api/mediate', () => {
     const body = await response.json();
 
     expect(body.ticketOption).toEqual({ offered: false, basis: 'signal_absent' });
+  });
+
+  // 🔴 T22 — C5 용어사전 주입(AC-015/AC-047) 배선. 의미적 정확도(LLM이 실제로 사전 값을 지킬지)는
+  // `docs/TestCases.md` AC-047 표를 쓰는 T11 러너의 몫이다 — 여기서는 (a) 사전 조회가 실제로
+  // 일어나고 그 결과가 C2 payload로 전달되는지, (b) C2가 자기신고한 `unregisteredHonorifics`가
+  // `warnings[]`의 `honorificNotRegistered` 항목으로 조립되는지만 본다.
+  it('AC-015/047 — session.client가 있으면 dictionary_terms를 owner_user_id로 조회해 C2 payload에 싣는다', async () => {
+    const { client, eqCalls } = fakeSupabaseWithDictionary([
+      {
+        entry_type: 'person',
+        source_text: '김수진',
+        target_text: null,
+        ko_honorific: '김 대리님',
+        en_honorific: 'Sujin Kim',
+      },
+    ]);
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client });
+    const llm = fakeLlm();
+    mockCreateClient(llm);
+
+    await POST(
+      postRequest({
+        text: '김 대리님이 확인해 주셔야 합니다.',
+        context: { languageDirection: 'ko-en', channel: 'web' },
+      }),
+    );
+
+    expect(eqCalls).toEqual([['owner_user_id', 'user-1']]);
+    expect(llm.complete).toHaveBeenCalledWith(
+      'c2',
+      expect.any(String),
+      expect.objectContaining({
+        dictionary: [
+          {
+            entryType: 'person',
+            sourceText: '김수진',
+            targetText: null,
+            koHonorific: '김 대리님',
+            enHonorific: 'Sujin Kim',
+          },
+        ],
+      }),
+    );
+  });
+
+  it('session.client가 없으면(테스트 목이 { userId }만 반환) 사전 조회를 건너뛰고 빈 배열을 싣는다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+    const llm = fakeLlm();
+    mockCreateClient(llm);
+
+    await POST(
+      postRequest({ text: 'hello', context: { languageDirection: 'ko-en', channel: 'web' } }),
+    );
+
+    expect(llm.complete).toHaveBeenCalledWith(
+      'c2',
+      expect.any(String),
+      expect.objectContaining({ dictionary: [] }),
+    );
+  });
+
+  it('AC-047② — C2가 보고한 unregisteredHonorifics가 warnings[]에 honorificNotRegistered로 담긴다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+    mockCreateClient(
+      fakeLlm({
+        toneTransformed: 'Hi Minho, could you take a look?',
+        toneUnregisteredHonorifics: ['Minho'],
+      }),
+    );
+
+    const response = await POST(
+      postRequest({
+        text: 'Hi Minho, could you take a look?',
+        context: { languageDirection: 'en-ko', channel: 'web' },
+      }),
+    );
+    const body = await response.json();
+
+    expect(body.warnings).toContainEqual(
+      expect.objectContaining({ type: 'honorificNotRegistered', subject: 'Minho' }),
+    );
+  });
+
+  it('unregisteredHonorifics가 비어 있으면 honorificNotRegistered 경고가 없다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+    mockCreateClient(fakeLlm({ toneUnregisteredHonorifics: [] }));
+
+    const response = await POST(
+      postRequest({ text: 'hello', context: { languageDirection: 'ko-en', channel: 'web' } }),
+    );
+    const body = await response.json();
+
+    expect(body.warnings).toEqual([]);
   });
 });
