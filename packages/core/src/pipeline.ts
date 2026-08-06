@@ -45,8 +45,16 @@
  * 가정 위에 서게 된다. 형태 자체가 곧 계약인 쪽을 택했다.
  */
 
-import type { MediationInput, MediationResult } from './contract';
+import type { MediationInput, MediationResult, Warning } from './contract';
 import type { LLMClient } from './llm/client';
+import { runUrgencyClassification } from './steps/c1';
+import { runToneTransform } from './steps/c2';
+import { runBackTranslation } from './steps/c4';
+import { assessEmotionalSignal } from './steps/c6';
+import { resolveDeliveryPath, resolveEffectiveUrgency } from './rules/urgency-routing';
+import { combineSource } from './rules/response-source';
+import { honorificMixedWarning, honorificNotRegisteredWarnings } from './rules/honorific';
+import { ticketOptionFrom } from './rules/ticket-gate';
 
 /**
  * `run()` 의 두 번째 인자 — **실행 수단과 조회 결과**.
@@ -66,6 +74,15 @@ export interface MediationDeps {
    * 조회는 Route Handler가 `run()` 호출 *전에* 끝낸다(`docs/API.md` `POST /api/mediate` "읽는 테이블" 행).
    */
   data: MediationData;
+  /**
+   * 🔴 F1-d(2026-08-05 추가 — ADR-0008 · DECISIONS #46) — 호출 시점의 기준일(ISO `YYYY-MM-DD`,
+   * UTC 기준). 당사자 서술도 조회물도 아니다 — **호출자만 알 수 있고 core가 만들어서는 안 되는
+   * 값**이다(ADR-0008 D1). C2가 날짜 정규화에 쓰는 연도(`prompts/c2.ts` `C2Payload.referenceYear`)를
+   * 여기서 뽑는다. 🔴 **`run()` 안에 `new Date()`/`Date.now()` 를 만들지 않는다** — core는 시스템
+   * 시계를 직접 읽지 않는다(Conventions 11, ADR-0008 사실 7). 호출자(Route Handler)가
+   * `new Date().toISOString().slice(0, 10)` 로 만들어 넘긴다.
+   */
+  referenceDate: string;
 }
 
 /**
@@ -134,3 +151,133 @@ export type MediationPipeline = (
   input: MediationInput,
   deps: MediationDeps,
 ) => Promise<MediationResult>;
+
+/**
+ * 🔴 T28 — `docs/Tasks.md` T28 · AC-032. 명세 순서
+ * `C1 → (CRITICAL 즉시) → C3 → C5 → C2 → C4 → (감정형이면 C6) → 승인 → 전송 + diff 저장`을
+ * 그대로 코드 구조로 옮긴다. 아래 각 스텝 주석의 번호(①~⑦)가 그 순서와 1:1이다.
+ *
+ * 🔴 **"승인 → 전송 + diff 저장"은 이 함수의 범위가 아니다.** `docs/Architecture.md` Data Flow
+ * ①은 그 두 단계를 `POST /api/mediate`(이 함수가 호출되는 라우트) 응답 **이후**, 사용자의
+ * "Approve & Send" 클릭으로 별도 호출되는 `POST /api/messages`(T14/T20, `apps/web/app/api/
+ * messages/route.ts`)로 그린다 — "이 클릭 없이 실행되는 저장/발송 경로가 코드에 존재하지 않는다"
+ * (AC-010)는 그 라우트가 이미 지킨다. 두 엔드포인트를 하나로 합치는 것은 그 분리를 깨는 것이라
+ * 하지 않는다.
+ *
+ * 🔴 **C3(프로필)·C5(사전)는 별도 LLM 호출이 아니다.** `docs/Architecture.md` Data Flow ①⑤ —
+ * 조회는 Route Handler가 `run()` 호출 *전에* 끝내고(F1-b "조회는 여기서 끝난다"), 그 결과가
+ * `input.sender.profile`(C3)·`deps.data.dictionary`(C5)로 이미 채워져 들어온다. 이 함수 안에서
+ * 이 둘의 역할은 **C2 호출의 입력으로 흘려보내는 것**뿐이다 — 그래서 AC-032의 핵심 증거는
+ * "LLM 호출이 C1 → C2 → C4 순서로 일어난다"는 사실이다(`pipeline.test.ts`가 그 순서를 고정한다).
+ *
+ * 🔴 **`deps.data.learnedItems`(profile_learned_items) 소비 여부 — 이번 태스크의 판단.**
+ * `docs/Architecture.md:384`가 "C3 단계에서 `profiles`/`profile_learned_items`를 함께 조회한다"고
+ * 적어 두었지만, 그 값을 **변환 로직이 어떻게 반영해야 하는지 정의한 AC·태스크가 없다** —
+ * `packages/core/src/prompts/c2.ts`의 `C2Payload`에는 `honorificLevel`(프로필 자기신고 값) 자리만
+ * 있고 `directness`/`emojiPreference`에 대응하는 자리가 없으며(`pattern-detection.ts`의
+ * `profileValueForPattern` 헤더 주석도 "이 함수는 `profile_learned_items` 테이블에 쓸 값만
+ * 만든다 … `profiles` 테이블 자체를 갱신하는 것은 이 태스크(T20)의 범위가 아니다"라고 명시한다),
+ * `docs/TestCases.md`에도 learnedItems가 변환 결과를 바꾸는 케이스가 없다. 즉 **T20이 쓰기
+ * 측만 만들었고 읽어서 변환에 반영하는 태스크는 아직 어디에도 배정되지 않았다.** 이 함수는
+ * 계약대로 `deps.data.learnedItems`를 받기만 하고(타입 체크 통과), **소비 로직을 지어내지
+ * 않는다** — 근거 없는 개인화 동작을 만드는 것은 Conventions 9 위반이다. 소비 지점이 정해지면
+ * 그 태스크가 이 자리에 로직을 추가한다.
+ */
+export const run: MediationPipeline = async (input, deps) => {
+  const { llm } = deps;
+
+  // ① C1 — 원문의 긴급도를 분류한다(AC-003). 변환 전 원문을 판정하는 스텝이라 항상 맨 앞이다.
+  const classification = await runUrgencyClassification({ text: input.text }, llm);
+  // AC-004 — 사용자 override가 있으면 C1 판정 대신 그 값을 쓴다. 판정 로직의 단일 출처는
+  // `resolveEffectiveUrgency`(이 파일이 다시 구현하지 않는다).
+  const effectiveUrgency = resolveEffectiveUrgency(
+    classification.urgency,
+    input.context.urgencyOverride,
+  );
+
+  // ② (CRITICAL 즉시) — AC-005 분기점. 예약 발송(T32)·기한 협상(T39/T40)이 이 리포에서 전부
+  // `todo`라 지금 건너뛸 코드 경로 자체가 없다(`rules/urgency-routing.ts` 헤더 주석 — 억지로
+  // 스킵 로직을 만들지 않는다, `docs/Architecture.md` 설계 제1원칙 R2). 판정 자체는 여기서 항상
+  // 계산해 순서를 로그/테스트로 확인할 수 있게 한다(AC-032) — 그 단계들이 생기면
+  // `deliveryPath === 'immediate'`일 때 자기 자신을 건너뛰어야 한다.
+  const deliveryPath = resolveDeliveryPath(effectiveUrgency);
+  if (deliveryPath === 'immediate') {
+    // 🔴 건너뛸 예약·지연 코드가 아직 없다 — 지금은 그대로 톤 정제로 진행한다(의도적 스텁).
+  }
+
+  // ③ C3 — 발신자 프로필. `input.sender.profile`은 Route Handler가 `run()` 호출 전에 이미
+  // `profiles`/`profile_learned_items`를 조회해 채운 값이다(F1-b, AC-028 — core는 조회하지
+  // 않는다). 이 스텝의 역할은 그 값(`honorificLevel`)을 아래 C2 호출의 입력으로 넘기는 것뿐이다
+  // — 프로필이 비어 있으면(`skipped`/`not_started`) `honorificLevel`도 `null`이고, C2는 기본
+  // 레벨을 지어내지 않는다(`docs/Architecture.md` Data Flow 1-a, DECISIONS #40).
+
+  // ④ C5 — 용어사전. `deps.data.dictionary`도 Route Handler가 이미 조회를 마친 값이다(AC-028).
+  // 별도 LLM 호출이 아니라 아래 C2 프롬프트에 구조화된 데이터로 주입된다(T22).
+
+  // ⑤ C2 — 보존 대상(마감일·수치·필수 액션)을 먼저 고정한 뒤 톤을 변환하고, 같은 호출 안에서
+  // 오해 사전 경고와 C5 사전 주입 결과를 함께 산출한다(AC-006/043/045/046/049, 추가 호출 금지).
+  const tone = await runToneTransform(
+    {
+      text: input.text,
+      languageDirection: input.context.languageDirection,
+      honorificLevel: input.sender.profile.honorificLevel,
+      referenceDate: deps.referenceDate,
+      dictionary: deps.data.dictionary,
+    },
+    llm,
+  );
+
+  // ⑥ C4 — 변환문을 발신자 원문 언어로 역번역해 발신자가 스스로 검증할 수 있게 한다(AC-001).
+  const backTranslation = await runBackTranslation(
+    { text: tone.transformed, targetLanguage: input.sender.language },
+    llm,
+  );
+
+  // F1-e — 세 스텝(C1/C2/C4)의 출처를 계약 필드(`stepSources`)로 먼저 채우고, 화면 레벨 단일
+  // `source`는 그 세 값에서 파생시킨다(`source = worst(stepSources)`, `combineSource` 참조).
+  const stepSources = { c1: classification.source, c2: tone.source, c4: backTranslation.source };
+  const source = combineSource(stepSources.c1, stepSources.c2, stepSources.c4);
+
+  // AC-046③ — EN→KO 변환문의 종결어미 레벨 혼용 감지. 방향이 en-ko일 때만 검사한다(AC-046이
+  // EN→KO 전용이므로).
+  const warnings: Warning[] = [];
+  if (input.context.languageDirection === 'en-ko') {
+    const warning = honorificMixedWarning(tone.transformed);
+    if (warning) warnings.push(warning);
+  }
+  // AC-047② — C2가 원문과 교차 검증까지 마치고 넘긴 미등록 호칭 목록을 `Warning[]`으로 조립한다.
+  // 방향과 무관하게 항상 검사한다.
+  warnings.push(...honorificNotRegisteredWarnings(tone.unregisteredHonorifics));
+
+  // ⑦ (감정형이면 C6) — AC-058 게이트. `assessEmotionalSignal`은 추가 LLM 호출 없이 원문에서
+  // 감정 신호 유무를 판정하는 순수 함수이고, `ticketOptionFrom`이 그 결과를 판별 유니온으로만
+  // 조립하는 유일한 통로다(F1-c). "제시만" 한다 — 항상 제시/항상 미제시가 아니다.
+  const ticketOption = ticketOptionFrom(assessEmotionalSignal(input.text));
+
+  // 개인화 적용 여부(`contract.ts` `MediationResult.personalizationApplied` 주석이 유일한 출처) —
+  // `false`가 되는 두 경우: ① 발신자 프로필이 비었거나 온보딩을 건너뛴 상태(AC-059③) ② 수신자가
+  // 미지정(AC-066③). 두 조건을 모두 벗어나야(온보딩 완료 + 수신자 지정) `true`다. 추측 기본값을
+  // 채우지 않는다.
+  const personalizationApplied =
+    input.sender.profile.onboardingState === 'completed' && input.recipient !== null;
+
+  return {
+    urgency: effectiveUrgency,
+    // override 여부와 무관하게 C1이 실제로 그 등급을 고른 근거 문장을 그대로 담는다 — override
+    // 자체의 "판단 근거 문장"은 존재하지 않으며, 지어내면 Error Handling "없는 값을 지어내지
+    // 않는다" 위반이다.
+    urgencyReason: classification.reason,
+    transformed: tone.transformed,
+    reason: tone.reason,
+    preserved: tone.preserved,
+    backTranslation: backTranslation.backTranslation,
+    warnings,
+    misreadRisks: tone.misreadRisks,
+    // 🔴 수신자 국가 연동(T22/T41)이 아직 없어 항상 빈 배열이다 — 현재 상태의 정확한 값(AC-063①).
+    holidayConflicts: [],
+    personalizationApplied,
+    source,
+    stepSources,
+    ticketOption,
+  };
+};

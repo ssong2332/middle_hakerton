@@ -128,25 +128,63 @@ function postRequest(body: unknown): Request {
 }
 
 /**
- * 🔴 T22 — `dictionary_terms` 조회를 흉내내는 최소 페이크(`apps/web/lib/dictionary/storage.test.ts`
- * 와 같은 모킹 정책). `session.client`로 넘기면 `fetchDictionaryEntries()`가 이 체이닝을 탄다.
+ * 🔴 T28 — `dictionary_terms`(T22) · `profiles`/`profile_learned_items`(T28) 조회를 흉내내는
+ * 최소 페이크(`apps/web/lib/dictionary/storage.test.ts`·`apps/web/lib/profile/storage.test.ts`와
+ * 같은 모킹 정책). `session.client`로 넘기면 `fetchDictionaryEntries()`/`fetchSenderProfile()`/
+ * `fetchLearnedItems()`가 이 체이닝을 탄다. 테이블별로 `eqCalls`를 따로 기록해 어느 쿼리가 실제로
+ * 일어났는지 구분한다.
  */
-function fakeSupabaseWithDictionary(rows: unknown[]): {
+function fakeSupabase(
+  options: {
+    dictionaryRows?: unknown[];
+    profileRow?: unknown | null;
+    learnedItemRows?: unknown[];
+  } = {},
+): {
   client: SupabaseClient;
-  eqCalls: Array<[string, unknown]>;
+  eqCalls: { dictionary_terms: Array<[string, unknown]>; profiles: Array<[string, unknown]>; profile_learned_items: Array<[string, unknown]> };
 } {
-  const eqCalls: Array<[string, unknown]> = [];
+  const eqCalls = {
+    dictionary_terms: [] as Array<[string, unknown]>,
+    profiles: [] as Array<[string, unknown]>,
+    profile_learned_items: [] as Array<[string, unknown]>,
+  };
   const client = {
     from(table: string) {
-      if (table !== 'dictionary_terms') throw new Error(`unexpected table: ${table}`);
-      return {
-        select: () => ({
-          eq: (column: string, value: unknown) => {
-            eqCalls.push([column, value]);
-            return Promise.resolve({ data: rows, error: null });
-          },
-        }),
-      };
+      if (table === 'dictionary_terms') {
+        return {
+          select: () => ({
+            eq: (column: string, value: unknown) => {
+              eqCalls.dictionary_terms.push([column, value]);
+              return Promise.resolve({ data: options.dictionaryRows ?? [], error: null });
+            },
+          }),
+        };
+      }
+      if (table === 'profiles') {
+        return {
+          select: () => ({
+            eq: (column: string, value: unknown) => {
+              eqCalls.profiles.push([column, value]);
+              return {
+                maybeSingle: () =>
+                  Promise.resolve({ data: options.profileRow ?? null, error: null }),
+              };
+            },
+          }),
+        };
+      }
+      if (table === 'profile_learned_items') {
+        return {
+          select: () => ({
+            eq: (column: string, value: unknown) => {
+              eqCalls.profile_learned_items.push([column, value]);
+              return Promise.resolve({ data: options.learnedItemRows ?? [], error: null });
+            },
+          }),
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
     },
   } as unknown as SupabaseClient;
   return { client, eqCalls };
@@ -575,15 +613,17 @@ describe('POST /api/mediate', () => {
   // 일어나고 그 결과가 C2 payload로 전달되는지, (b) C2가 자기신고한 `unregisteredHonorifics`가
   // `warnings[]`의 `honorificNotRegistered` 항목으로 조립되는지만 본다.
   it('AC-015/047 — session.client가 있으면 dictionary_terms를 owner_user_id로 조회해 C2 payload에 싣는다', async () => {
-    const { client, eqCalls } = fakeSupabaseWithDictionary([
-      {
-        entry_type: 'person',
-        source_text: '김수진',
-        target_text: null,
-        ko_honorific: '김 대리님',
-        en_honorific: 'Sujin Kim',
-      },
-    ]);
+    const { client, eqCalls } = fakeSupabase({
+      dictionaryRows: [
+        {
+          entry_type: 'person',
+          source_text: '김수진',
+          target_text: null,
+          ko_honorific: '김 대리님',
+          en_honorific: 'Sujin Kim',
+        },
+      ],
+    });
     mockResolveSession.mockResolvedValue({ userId: 'user-1', client });
     const llm = fakeLlm();
     mockCreateClient(llm);
@@ -595,7 +635,7 @@ describe('POST /api/mediate', () => {
       }),
     );
 
-    expect(eqCalls).toEqual([['owner_user_id', 'user-1']]);
+    expect(eqCalls.dictionary_terms).toEqual([['owner_user_id', 'user-1']]);
     expect(llm.complete).toHaveBeenCalledWith(
       'c2',
       expect.any(String),
@@ -611,6 +651,105 @@ describe('POST /api/mediate', () => {
         ],
       }),
     );
+  });
+
+  // 🔴 T28 — C3 프로필 배선. session.client가 있으면 profiles/profile_learned_items를
+  // user_id로 조회하고, 실제 존댓말 레벨이 하드코딩 null 대신 C2 payload로 전달된다.
+  it('T28 — session.client가 있으면 profiles를 user_id로 조회해 honorificLevel을 C2 payload에 싣는다', async () => {
+    const { client, eqCalls } = fakeSupabase({
+      profileRow: {
+        onboarding_state: 'completed',
+        directness: 'direct',
+        emoji_preference: 'avoids',
+        formality: 'high',
+        honorific_level: 'hapsyo',
+      },
+    });
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client });
+    const llm = fakeLlm();
+    mockCreateClient(llm);
+
+    await POST(
+      postRequest({ text: '확인 부탁드립니다.', context: { languageDirection: 'en-ko', channel: 'web' } }),
+    );
+
+    expect(eqCalls.profiles).toEqual([['user_id', 'user-1']]);
+    expect(llm.complete).toHaveBeenCalledWith(
+      'c2',
+      expect.any(String),
+      expect.objectContaining({ honorificLevel: 'hapsyo' }),
+    );
+  });
+
+  it('T28 — session.client가 있어도 profiles 행이 없으면(온보딩 전) honorificLevel은 null이다(AC-059②)', async () => {
+    const { client } = fakeSupabase({ profileRow: null });
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client });
+    const llm = fakeLlm();
+    mockCreateClient(llm);
+
+    await POST(
+      postRequest({ text: 'hello', context: { languageDirection: 'en-ko', channel: 'web' } }),
+    );
+
+    expect(llm.complete).toHaveBeenCalledWith(
+      'c2',
+      expect.any(String),
+      expect.objectContaining({ honorificLevel: null }),
+    );
+  });
+
+  it('T28 — session.client가 없으면(테스트 목이 { userId }만 반환) honorificLevel도 null이다(기존 동작 보존)', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+    const llm = fakeLlm();
+    mockCreateClient(llm);
+
+    await POST(
+      postRequest({ text: 'hello', context: { languageDirection: 'en-ko', channel: 'web' } }),
+    );
+
+    expect(llm.complete).toHaveBeenCalledWith(
+      'c2',
+      expect.any(String),
+      expect.objectContaining({ honorificLevel: null }),
+    );
+  });
+
+  it('T28 — session.client가 있으면 profile_learned_items도 user_id로 조회한다(deps.data.learnedItems 배선)', async () => {
+    const { client, eqCalls } = fakeSupabase({
+      learnedItemRows: [{ pattern_key: 'emoji_removed', value: 'avoids', observed_count: 3 }],
+    });
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client });
+    mockCreateClient(fakeLlm());
+
+    await POST(
+      postRequest({ text: 'hello', context: { languageDirection: 'ko-en', channel: 'web' } }),
+    );
+
+    expect(eqCalls.profile_learned_items).toEqual([['user_id', 'user-1']]);
+  });
+
+  // 🔴 T28 — recipient는 아직 배선하지 않는다(T41, route.ts 헤더 주석 참조). 프로필이 완료
+  // 상태여도 personalizationApplied는 항상 false다 — placeholder가 아니라 현재 상태의 정확한 값
+  // (AC-066③, `MediationResult.personalizationApplied` 계약 주석).
+  it('T28 — 프로필이 완료 상태여도 recipient가 배선되지 않아 personalizationApplied는 여전히 false다', async () => {
+    const { client } = fakeSupabase({
+      profileRow: {
+        onboarding_state: 'completed',
+        directness: 'direct',
+        emoji_preference: 'avoids',
+        formality: 'high',
+        honorific_level: 'hapsyo',
+      },
+    });
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client });
+    mockCreateClient(fakeLlm());
+
+    const response = await POST(
+      postRequest({ text: 'hello', context: { languageDirection: 'en-ko', channel: 'web' } }),
+    );
+    const body = await response.json();
+
+    expect(body.personalizationApplied).toBe(false);
   });
 
   it('session.client가 없으면(테스트 목이 { userId }만 반환) 사전 조회를 건너뛰고 빈 배열을 싣는다', async () => {
