@@ -34,6 +34,7 @@
  */
 import { z } from 'zod';
 import {
+  assessEmotionalSignal,
   combineSource,
   honorificMixedWarning,
   resolveEffectiveUrgency,
@@ -168,9 +169,11 @@ export const POST = withApi<MediateRequest, MediationResult>(
       // 🔴 13번째 필드(F1-e, DECISIONS #48 · ADR-0009) — 스텝별 출처. `source`는 이 값에서
       // 파생된다(위 `combineSource` 호출 참조). 세 키 모두 AC-032 고정 순서상 항상 채워진다.
       stepSources,
-      // 🔴 C6 게이트(T24) 대기 — 판정 근거를 얻지 못했으므로 fail-closed(undetermined)가
-      // 정답이다(AC-058, `ticketOptionFrom`은 이 조합만 만드는 유일한 통로).
-      ticketOption: ticketOptionFrom('undetermined'),
+      // 🔴 T24 — AC-058 게이트. `assessEmotionalSignal`(core, `steps/c6.ts`)은 추가 LLM 호출 없이
+      // 원문에서 감정 신호 유무를 판정하는 순수 함수다(`docs/adr/0005-c6-ticket-gate-field.md`
+      // Follow-up #2 "산출 위치는 구현 판단" + "추가 호출 금지"). `ticketOptionFrom`은 그 결과를
+      // 판별 유니온으로만 조립하는 유일한 통로다(F1-c).
+      ticketOption: ticketOptionFrom(assessEmotionalSignal(input.text)),
     };
 
     return result;

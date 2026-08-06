@@ -20,6 +20,8 @@ export * from './data/fallback-responses';
 export * from './steps/c1';
 export * from './steps/c2';
 export * from './steps/c4';
+export * from './steps/c6';
 export * from './prompts/c1';
 export * from './prompts/c2';
 export * from './prompts/c4';
+export * from './prompts/c6';

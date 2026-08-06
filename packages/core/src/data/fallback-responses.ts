@@ -101,6 +101,28 @@ export const FALLBACK_RESPONSES: FallbackResponseEntry[] = [
       backTranslation: '오늘 중으로 필요합니다. 어려우시면 알려주세요.',
     }),
   },
+  /**
+   * 🔴 T24(2026-08-06) — C6 폴백. 위 c1/c2/c4와 같은 이유로 **실제 입력을 본 적이 없다는 사실만
+   * 말한다** — 근거 없는 섹션 내용을 지어내지 않는다(AC-062와 같은 "없는 값을 지어내지 않는다"
+   * 원칙). 4개 섹션 전부 "없음"이 아니라 "폴백이라 원문을 확인하지 못했다"는 사실을 각 섹션에
+   * 채운 이유: 섹션이 "없음"이면 "원문에 근거가 없다"는 뜻인데, 폴백은 원문 자체를 본 적이 없으므로
+   * 그 주장도 할 수 없다 — 두 상태(근거 없음 vs 폴백이라 판단 불가)를 섞지 않는다.
+   * `decisionAuthority`는 `'불명'`(AC-050①과 동일 — 근거를 확인할 수 없으므로 임의 판정 금지),
+   * `decisionAuthorityEvidence`는 `null`이다(F1-c 불변식 — `'불명'`일 때만 허용되는 조합).
+   */
+  {
+    step: 'c6',
+    content: JSON.stringify({
+      sections: {
+        problem: '폴백 응답이라 실제 입력을 확인하지 못했습니다.',
+        impact: '폴백 응답이라 실제 입력을 확인하지 못했습니다.',
+        request: '폴백 응답이라 실제 입력을 확인하지 못했습니다.',
+        concernLevel: '폴백 응답이라 실제 입력을 확인하지 못했습니다.',
+      },
+      decisionAuthority: '불명',
+      decisionAuthorityEvidence: null,
+    }),
+  },
 ];
 
 /**
