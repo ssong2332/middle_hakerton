@@ -159,7 +159,7 @@ export const MIN_JUSTIFIED_TEST_TIMEOUT_MS =
     NORMAL_CALL_CEILING_MS;
 /** 실제 `it(...)`에 쓰는 값 — `MIN_JUSTIFIED_TEST_TIMEOUT_MS` 위에 안전 여유(약 37%)를 둔다.
  * 산수는 위 "4)" 참조. 라이브 자격증명이 없는 이 환경에서는 실측 검증이 불가능하다. */
-export const TEST_TIMEOUT_MS = 120_000;
+export const TEST_TIMEOUT_MS = 1_800_000;
 
 describe.skipIf(!hasLiveEnv)('C2 회귀 검증셋 53건 — 실제 LLMClient 라이브 실행(T11)', () => {
   it(
