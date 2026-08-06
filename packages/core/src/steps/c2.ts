@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import type { LLMClient } from '../llm/client';
 import type { LanguageDirection, MisreadRisk, PreservedItem, ResponseSource } from '../contract';
+import type { DictionaryEntry } from '../pipeline';
 import { LLMMalformedResponseError } from '../errors';
 import { buildC2Payload, C2_PROMPT_VERSION, type HonorificLevel } from '../prompts/c2';
 import { preservedItemsSchema } from '../rules/preservation';
@@ -59,6 +60,13 @@ export interface RunToneTransformInput {
    * 호출자(`apps/web/app/api/mediate/route.ts`)가 `new Date()`로 만들어 넘긴다.
    */
   referenceDate: string;
+  /**
+   * 🔴 T22 — C5 용어사전(`deps.data.dictionary`). core는 조회하지 않고 호출자가 이미 조회를
+   * 마친 값을 그대로 받는다(AC-028). 생략하면 `[]`(사전 없음과 동치, `MediationData.dictionary`
+   * 주석 "비어 있으면 [] 가 정상 상태") — 기본값을 둔 이유는 `buildC2Payload`와 같다(이 필드와
+   * 무관한 기존 테스트 다수를 깨지 않기 위함, `prompts/c2.ts` `buildC2Payload` JSDoc 참조).
+   */
+  dictionary?: DictionaryEntry[];
 }
 
 export interface RunToneTransformResult {
@@ -67,6 +75,15 @@ export interface RunToneTransformResult {
   reason: string;
   preserved: PreservedItem[];
   misreadRisks: MisreadRisk[];
+  /**
+   * 🔴 T22 — AC-047②. 등록되지 않은 인물의 호칭/직급을 LLM이 원문 그대로 유지하며 자기신고한
+   * 목록(`prompts/c2.ts` `dictionaryRules()`의 `unregisteredHonorifics` 필드). 호출부
+   * (`apps/web/app/api/mediate/route.ts`)가 이 값을 `honorificNotRegisteredWarnings()`
+   * (`rules/honorific.ts`)에 넘겨 `MediationResult.warnings[]`의 `honorificNotRegistered` 항목을
+   * 만든다. 이 스텝 자신은 `Warning`(계약 타입)을 조립하지 않는다 — `honorificMixedWarning`이
+   * 이미 스텝 밖(route.ts)에서 조립되는 것과 같은 경계다.
+   */
+  unregisteredHonorifics: string[];
   source: ResponseSource;
 }
 
@@ -81,6 +98,12 @@ const c2ResponseSchema = z.object({
   reason: z.string().min(1),
   preserved: preservedItemsSchema,
   misreadRisks: misreadRisksSchema,
+  // 🔴 T22 — AC-047②. `.optional().default([])`인 이유: `packages/core/src/data/fallback-responses.ts`
+  // 의 c2 폴백 콘텐츠와 이 스텝의 기존 테스트(`c2.test.ts`) 다수가 이 필드 없이 만들어진 JSON을
+  // 그대로 쓴다 — 필드를 필수로 두면 그 데이터·테스트가 전부 "스키마 검증 실패"로 깨진다. 없는
+  // 값을 지어내지 않는다는 원칙과 상충하지 않는다 — 필드 자체가 없을 때의 기본값은 "0건 보고"이며,
+  // 이는 "사전에 없는 인물의 호칭이 하나도 없었다"는 것과 동치이지 근거 없는 주장을 만드는 게 아니다.
+  unregisteredHonorifics: z.array(z.string()).optional().default([]),
 });
 
 type ParsedC2Response = Omit<RunToneTransformResult, 'source'>;
@@ -104,11 +127,27 @@ function filterPreservedByTransformedText(
 }
 
 /**
+ * 🔴 T22 — `unregisteredHonorifics`도 LLM의 자기신고다. 같은 이유(`filterPreservedByTransformedText`
+ * 주석 참조)로, 원문(`ORIGINAL text`, 변환 전 `input.text`)에 실제로 없는 문구를 "원문에서 유지한
+ * 호칭"이라고 주장하면 그 항목을 제외한다 — 근거 없는 경고 subject를 만들지 않는다.
+ */
+function filterUnregisteredHonorificsByOriginalText(
+  originalText: string,
+  unregisteredHonorifics: string[],
+): string[] {
+  const haystack = originalText.toLowerCase();
+  return unregisteredHonorifics.filter((subject) => haystack.includes(subject.toLowerCase()));
+}
+
+/**
  * `response.content`(또는 폴백 항목의 `content`)를 C2 스키마로 파싱한다. 실패하면 `null`
  * — 실패 시 던지지 않는 이유는 `c1.ts`·`c4.ts`의 동명 함수와 같다: 호출부가 "원 응답 실패 →
  * 폴백 조회 → 폴백도 실패하면 던지기" 순서를 조립해야 한다.
+ *
+ * @param originalText 🔴 T22 — 변환 전 원문. `unregisteredHonorifics` 자기신고를 원문과 교차
+ *   검증하는 데만 쓴다(`filterUnregisteredHonorificsByOriginalText` 참조).
  */
-function parseToneTransform(content: string): ParsedC2Response | null {
+function parseToneTransform(content: string, originalText: string): ParsedC2Response | null {
   let raw: unknown;
   try {
     raw = JSON.parse(content);
@@ -120,6 +159,10 @@ function parseToneTransform(content: string): ParsedC2Response | null {
   return {
     ...parsed.data,
     preserved: filterPreservedByTransformedText(parsed.data.transformed, parsed.data.preserved),
+    unregisteredHonorifics: filterUnregisteredHonorificsByOriginalText(
+      originalText,
+      parsed.data.unregisteredHonorifics,
+    ),
   };
 }
 
@@ -158,16 +201,17 @@ export async function runToneTransform(
     input.languageDirection,
     input.honorificLevel,
     input.referenceDate,
+    input.dictionary ?? [],
   );
   const response = await llm.complete('c2', C2_PROMPT_VERSION, payload);
 
-  const parsed = parseToneTransform(response.content);
+  const parsed = parseToneTransform(response.content, input.text);
   if (parsed !== null) {
     return { ...parsed, source: response.source };
   }
 
   const fallback = fallbackLookup('c2', NO_STEP_CACHE_KEY);
-  const fallbackParsed = fallback ? parseToneTransform(fallback.content) : null;
+  const fallbackParsed = fallback ? parseToneTransform(fallback.content, input.text) : null;
   if (fallbackParsed !== null) {
     return { ...fallbackParsed, source: 'fallback' };
   }

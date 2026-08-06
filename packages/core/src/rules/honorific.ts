@@ -1,5 +1,6 @@
-// 존댓말/호칭 규칙 — AC-046③ "EN→KO 변환문의 종결어미 레벨(합쇼체/해요체) 혼용 감지".
-// 담당: [BE-B] T5. 호칭 미등록 경고(AC-047②)는 T22가 채운다(그 스텁은 그대로 남긴다).
+// 존댓말/호칭 규칙 — AC-046③ "EN→KO 변환문의 종결어미 레벨(합쇼체/해요체) 혼용 감지"
+// + AC-047② "호칭 미등록 경고"(T22가 `honorificNotRegisteredWarnings()`로 채웠다).
+// 담당: [BE-B] T5(혼용 감지) / [BE-A] T22(호칭 미등록 경고).
 //
 // 🔴 규칙 기반(표층 문자열의 종결어미 정규식 매칭)이며 형태소 분석기를 쓰지 않는다 — 새 의존성
 // 0개(`docs/DECISIONS.md`에 항목 없음). 문장을 종결부호(. ! ?)나 줄바꿈으로 나눈 뒤, 각 문장의
@@ -154,4 +155,27 @@ export function honorificMixedWarning(text: string): Warning | null {
     message: '한 메시지 안에 존댓말 레벨(합쇼체/해요체)이 섞여 있습니다.',
     subject: null,
   };
+}
+
+/**
+ * T22 — AC-047②. 용어 사전에 없는 인물의 호칭을 원문 형태 그대로 유지했을 때 `warnings[]`에 넣을
+ * `Warning[]`을 만든다. `subjects`는 C2 스텝(`steps/c2.ts` `runToneTransform` 의
+ * `unregisteredHonorifics`)이 LLM 응답에서 원문과 교차 검증까지 마치고 넘긴 값이다 — 이 함수는
+ * 그 값을 계약 타입(`Warning`)으로 조립만 한다("근거 없는 값을 지어내지 않는다"는 검증은 이미
+ * 스텝에서 끝났다, `filterUnregisteredHonorificsByOriginalText` 참조).
+ *
+ * 🔴 `subjects`가 비어 있으면 빈 배열을 반환한다(`honorificMixedWarning`의 "경고 없으면 null"과
+ * 같은 취지 — 문제가 없으면 아무것도 렌더하지 않는다, `docs/Tasks.md` T6). 여러 인물이 동시에
+ * 미등록일 수 있으므로 단일 `Warning | null`이 아니라 배열을 반환한다(호칭 미등록은 인물마다
+ * 별개의 사실이라 하나로 합칠 수 없다 — `MisreadRisk`류 "다건 리스트" 원칙과 같은 이유).
+ *
+ * 🔴 문구에 국가·국민성 서술을 넣지 않는다(`docs/Architecture.md` Conventions 7).
+ */
+export function honorificNotRegisteredWarnings(subjects: string[]): Warning[] {
+  return subjects.map((subject) => ({
+    type: 'honorificNotRegistered',
+    message:
+      '용어 사전에 등록되지 않은 인물입니다(호칭 미등록) — 임의로 호칭을 만들지 않고 원문 형태를 유지했습니다.',
+    subject,
+  }));
 }

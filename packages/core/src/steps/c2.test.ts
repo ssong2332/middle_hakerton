@@ -41,6 +41,7 @@ describe('runToneTransform', () => {
       reason: '완곡한 요청을 명시적 기한과 액션 요청으로 복원했습니다.',
       preserved: [{ kind: 'deadline', sourceText: '금요일까지', transformedText: 'by Friday' }],
       misreadRisks: [],
+      unregisteredHonorifics: [],
       source: 'live',
     });
   });
@@ -311,6 +312,7 @@ describe('runToneTransform', () => {
       reason: '완곡한 요청을 명시적 기한과 액션 요청으로 복원했습니다.',
       preserved: [{ kind: 'deadline', sourceText: '금요일까지', transformedText: 'by Friday' }],
       misreadRisks: [],
+      unregisteredHonorifics: [],
       source: 'fallback',
     });
     expect(fallbackLookup).toHaveBeenCalledWith('c2', expect.any(String));
@@ -394,6 +396,126 @@ describe('runToneTransform', () => {
     it('instruction에 실제 기준 연도가 반영된다(하드코딩된 연도가 아니다)', async () => {
       const payload = (await capturePayload('2030-05-01')) as { instruction: string };
       expect(payload.instruction).toContain('2030');
+    });
+  });
+
+  /**
+   * T22 — C5 용어사전 주입(AC-015/AC-047) 배선 검증. 의미적 정확도(LLM이 실제로 사전 값을
+   * 지킬지)는 여기서 검증하지 않는다(`docs/TestCases.md` AC-047 표를 쓰는 T11 러너의 몫) —
+   * 이 스텝이 (a) `input.dictionary`를 `buildC2Payload`에 그대로 넘기는지, (b) 응답의
+   * `unregisteredHonorifics`를 원문과 교차 검증해 파싱하는지만 본다(`preserved[]`의 기존
+   * 교차 검증 테스트와 같은 경계).
+   */
+  describe('dictionary(T22, AC-015/AC-047)', () => {
+    const DICTIONARY = [
+      {
+        entryType: 'person' as const,
+        sourceText: '김수진',
+        targetText: null,
+        koHonorific: '김 대리님',
+        enHonorific: 'Sujin Kim',
+      },
+    ];
+
+    it('input.dictionary를 payload.dictionary로 그대로 LLMClient.complete()에 넘긴다', async () => {
+      const llm = fakeLlm({ content: VALID_CONTENT, source: 'live' });
+
+      await runToneTransform(
+        {
+          text: 'hi',
+          languageDirection: 'ko-en',
+          honorificLevel: null,
+          referenceDate: '2026-08-05',
+          dictionary: DICTIONARY,
+        },
+        llm,
+      );
+
+      expect(llm.complete).toHaveBeenCalledWith(
+        'c2',
+        expect.any(String),
+        expect.objectContaining({ dictionary: DICTIONARY }),
+      );
+    });
+
+    it('input.dictionary를 생략하면 payload.dictionary가 빈 배열이다', async () => {
+      const llm = fakeLlm({ content: VALID_CONTENT, source: 'live' });
+
+      await runToneTransform(
+        { text: 'hi', languageDirection: 'ko-en', honorificLevel: null, referenceDate: '2026-08-05' },
+        llm,
+      );
+
+      expect(llm.complete).toHaveBeenCalledWith(
+        'c2',
+        expect.any(String),
+        expect.objectContaining({ dictionary: [] }),
+      );
+    });
+
+    it('AC-047② — 응답의 unregisteredHonorifics를 결과에 그대로 반환한다(원문에 실제로 있는 경우)', async () => {
+      const llm = fakeLlm({
+        content: JSON.stringify({
+          transformed: 'Hi Minho, could you take a look?',
+          reason: 'x',
+          preserved: [],
+          misreadRisks: [],
+          unregisteredHonorifics: ['Minho'],
+        }),
+        source: 'live',
+      });
+
+      const result = await runToneTransform(
+        {
+          text: 'Hi Minho, could you take a look?',
+          languageDirection: 'en-ko',
+          honorificLevel: null,
+          referenceDate: '2026-08-05',
+        },
+        llm,
+      );
+
+      expect(result.unregisteredHonorifics).toEqual(['Minho']);
+    });
+
+    it('unregisteredHonorifics가 원문(input.text)에 실제로 없으면 그 항목을 제외한다(자기신고 불일치 교차 검증, reviewer Major 3과 동일 패턴)', async () => {
+      const llm = fakeLlm({
+        content: JSON.stringify({
+          transformed: 'x',
+          reason: 'y',
+          preserved: [],
+          misreadRisks: [],
+          // 날조 — '박 과장님'은 원문 어디에도 없다.
+          unregisteredHonorifics: ['박 과장님'],
+        }),
+        source: 'live',
+      });
+
+      const result = await runToneTransform(
+        {
+          text: 'Please loop in Alex.',
+          languageDirection: 'en-ko',
+          honorificLevel: null,
+          referenceDate: '2026-08-05',
+        },
+        llm,
+      );
+
+      expect(result.unregisteredHonorifics).toEqual([]);
+    });
+
+    it('응답에 unregisteredHonorifics 필드가 아예 없으면(구 폴백 데이터 등) 빈 배열로 기본값 처리한다', async () => {
+      const llm = fakeLlm({
+        content: JSON.stringify({ transformed: 'x', reason: 'y', preserved: [], misreadRisks: [] }),
+        source: 'live',
+      });
+
+      const result = await runToneTransform(
+        { text: 'hi', languageDirection: 'ko-en', honorificLevel: null, referenceDate: '2026-08-05' },
+        llm,
+      );
+
+      expect(result.unregisteredHonorifics).toEqual([]);
     });
   });
 });
