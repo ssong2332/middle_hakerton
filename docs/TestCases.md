@@ -3,8 +3,8 @@
 | Item | Value |
 |---|---|
 | 기준 PRD | **docs/PRD.md v2.8** (2026-08-04) |
-| Document Version | **1.6** (v1.5 + 🔴 **AC-045 사람 판정 기록 형식 확정** — "실행 기록"에 **표 A-1** 신설(케이스당 1행 + 루브릭 H1~H3 + **자동 × 사람 합산 판정표**), "판정 방법"에 예외 2건 명시, "미확정 항목"의 해당 행 해소. **케이스 정의·건수는 변경 0건**(74건 불변, 추가·삭제·`제외` 0건). 근거: reviewer T10/T11 발견 — AC-045 10/10건이 문자열 매칭만으로 판정 불가라 자동 러너로는 `10/10 pass`에 도달할 절차가 없었다) <br>v1.5 내용: (v1.4 + **KEY 2 재정의 반영 — PRD v2.8** — 폐기 문구("우리는 추론하지 않는다") 제거, COMPARE-01의 Sarah 대조군 역할 변경, #34 3단계 케이스 미작성 상태 등재. v1.4 내용: 온보딩 스킵에 따른 **시드 계정 조건**, C6 빈 섹션 "없음" 기대값, 공휴일 미노출 판정. **기존 74건의 케이스 정의·건수는 두 번 모두 변경 없음**) |
-| Last Updated | 2026-08-05 |
+| Document Version | **1.7** (v1.6 + 🔴 **T61 시드 gap 3건 해소** — "데모 시드 데이터셋"에 ① **자기신고 프로필 4인 스키마 값 확정표**(박지훈·Sarah 신규 확정, Michael `neutral` 매핑 확인) ② **시드 계정 이메일 형식 확정**(`.example` 예약 TLD, Planning Decision #11) 추가. **케이스 정의·건수는 변경 0건**(74건 불변). 근거: implementer T61 보고 — 시드 4인 중 2인의 자기신고 값과 식별자 형식이 문서에 없어 코드가 값을 지어내야 하는 상태였다) <br>v1.6 내용: (v1.5 + 🔴 **AC-045 사람 판정 기록 형식 확정** — "실행 기록"에 **표 A-1** 신설(케이스당 1행 + 루브릭 H1~H3 + **자동 × 사람 합산 판정표**), "판정 방법"에 예외 2건 명시, "미확정 항목"의 해당 행 해소. **케이스 정의·건수는 변경 0건**(74건 불변, 추가·삭제·`제외` 0건). 근거: reviewer T10/T11 발견 — AC-045 10/10건이 문자열 매칭만으로 판정 불가라 자동 러너로는 `10/10 pass`에 도달할 절차가 없었다) <br>v1.5 내용: (v1.4 + **KEY 2 재정의 반영 — PRD v2.8** — 폐기 문구("우리는 추론하지 않는다") 제거, COMPARE-01의 Sarah 대조군 역할 변경, #34 3단계 케이스 미작성 상태 등재. v1.4 내용: 온보딩 스킵에 따른 **시드 계정 조건**, C6 빈 섹션 "없음" 기대값, 공휴일 미노출 판정. **기존 74건의 케이스 정의·건수는 두 번 모두 변경 없음**) |
+| Last Updated | 2026-08-07 |
 | Owner | **planner** — 사용자 지시로 2026-08-04에 planner가 인수했다(docs/PRD.md Planning Decision #69). ✅ **AGENTS.md 문서 소유표 등재 완료**(2026-08-04, 커밋 `88125f1` — 오케스트레이터가 사용자 지시로 AGENTS.md를 직접 수정. Agent Contract 표의 planner 행 Input/Output/May modify 3열도 함께 갱신됐다) |
 | 쓰기 권한 예외 | **케이스 정의는 planner 전용**이나, **implementer·quality-assurance는 아래 "실행 기록" 표에 행을 추가할 수 있다.** 케이스 자체의 추가·수정·삭제는 불가하며, 부적절한 케이스는 **삭제하지 말고 사유를 적어 `제외` 표시만** 한다. ⚠️ **이 예외 조항은 오케스트레이터의 판단으로 들어간 것이며 사용자가 명시적으로 지시한 내용은 아니다** |
 | Status | **명세이며 실행 결과가 아님.** 아래 "기대 출력"은 AC 조건에서 도출한 설계값이고, 실제 LLM 출력으로 검증된 바 없다 |
@@ -193,10 +193,10 @@ AC 통과   = 해당 AC의 케이스가 요구 건수만큼 전부 통과
 
 | 인물 | 소속·역할 | 타임존 | 자기신고 프로필 | interaction_count |
 |---|---|---|---|---|
-| 박지훈 | 아라소프트 / **발신자(데모 주체)** | Asia/Seoul | — (발신자) | — |
+| 박지훈 | 아라소프트 / **발신자(데모 주체)** | Asia/Seoul | **(v1.7 확정)** 직설 선호 · 이모지 보통 · 격식 보통 · 합쇼체 | — (발신자) |
 | 타나카 유키 | Sakura Digital / UX 리드 | Asia/Tokyo | 완곡 선호 · 이모지 거의 안 씀 · 격식 높음 | 14 |
 | Michael Chen | Vertex Labs / PM | America/Los_Angeles | 직설 선호 · 이모지 가끔 · 격식 낮음 | 11 |
-| Sarah Willis | Vertex Labs / QA 리드 | America/New_York | **학습 데이터 없음 — cold start 대조군** | 0 |
+| Sarah Willis | Vertex Labs / QA 리드 | America/New_York | **(v1.7 확정)** 직설 선호 · 이모지 보통 · 격식 낮음 — **자기신고는 있고 학습 데이터(diff·규약)만 0건 = cold start 대조군** | 0 |
 
 > Sarah가 이 시드의 핵심이다. **"아직 학습된 내용이 없습니다"를 숨기지 않고 보여주는 것**이 AC-020·AC-043과 같은 원칙(근거 없으면 지어내지 않는다)의 실물 증거다.
 
@@ -209,6 +209,44 @@ AC 통과   = 해당 AC의 케이스가 요구 건수만큼 전부 통과
 > | Sarah의 cold start 대조군 | **diff·규약이 0건**일 뿐 **온보딩은 완료** | "학습 데이터 없음"과 "온보딩 안 함"이 화면에서 구분되지 않는다 |
 > ⚠️ **"학습 전" 상태 ≠ "온보딩 스킵" 상태다.** 두 상태를 혼동해 시드하면 C3 장면(발표 핵심 차별점)이 성립하지 않는다.
 > **판정 방법(T61 완료 조건)**: 시드 후 **각 계정의 프로필 레코드를 실제로 조회**해 비어 있지 않음을 확인하고, Sarah는 **프로필은 있고 diff·규약만 0건**임을 확인한다.
+
+### (v1.7) 자기신고 프로필 4인 — **스키마 값 확정** (T61이 그대로 쓴다)
+
+> 위 표의 한국어 서술을 `profiles` 테이블 CHECK 어휘(`docs/Database.md:60-64` · `packages/core/src/contract.ts` `CommunicationProfile`)로 확정한 값이다. **T61은 이 표 밖의 값을 만들지 않는다.** 4인 전원 `onboarding_state = 'completed'`(위 v1.4 필수 조건).
+
+| 인물 | `onboarding_state` | `directness` | `emoji_preference` | `formality` | `honorific_level` |
+|---|---|---|---|---|---|
+| 박지훈 | `completed` | `direct` | `neutral` | `medium` | `hapsyo` |
+| 타나카 유키 | `completed` | `indirect` | `avoids` | `high` | `null` |
+| Michael Chen | `completed` | `direct` | `neutral` | `low` | `null` |
+| Sarah Willis | `completed` | `direct` | `neutral` | `low` | `null` |
+
+**값 선택 근거 (바꾸기 전에 읽을 것 — 각 값이 특정 장면을 성립시킨다)**
+
+| 값 | 근거 |
+|---|---|
+| 박지훈 `directness = direct`, `formality = medium` | 🔴 **장면 5-(a) "학습 전 / 학습 후" 대비가 이 두 값에 걸려 있다**(DemoScript.md:169). 학습으로 반영되는 패턴이 **완충 삽입**(전역 3회)이므로, 자기신고가 이미 `indirect`·`high`면 **학습 전 제안문에도 완충 표현이 들어가** 대비가 사라진다. `direct`+`medium`으로 두면 "자기신고에는 없던 습관이 diff 10건에서 드러난다"가 되어 C3의 존재 이유(관찰 학습)가 화면에서 증명된다. **주의: 이것은 "온보딩 스킵"이 아니다** — 값은 채워져 있다(AC-059, v1.4 필수 조건) |
+| 박지훈 `emoji_preference = neutral` | "이모지 제거"는 diff 1회뿐이라 **미반영**이 기대값이다(위 "미반영됨" 행, AC-013). 자기신고를 `avoids`로 두면 "원래 이모지를 안 쓰는 사람"이 되어 **미반영 시연이 무의미**해진다. `likes`는 diff #3(👍 제거)과 어긋난다 → 중립값 |
+| 박지훈 `honorific_level = hapsyo` | diff 최종 발송문의 종결어미가 합쇼체다 — #1 "…어려울 것 같**습니다**" · #3 "확인했**습니다**. 감사합**니다**." · #5 "연결해 드리겠**습니다**"(위 diff 표). AC-046 ②(EN→KO 종결어미 기본값)의 입력으로 이 값이 실제로 쓰인다 |
+| 타나카·Michael·Sarah `honorific_level = null` | 한국어 화자가 아니어서 이 축의 근거가 없다. **`null`은 "온보딩 스킵"이 아니라 "이 축만 미응답"이며 둘은 `onboarding_state`가 구분한다**(contract.ts `CommunicationProfile` 주석) |
+| Michael `emoji_preference = neutral` | ✅ **implementer 판단 확인·확정.** CHECK 어휘는 `likes`/`neutral`/`avoids` 3값뿐이고 원문 표기는 **"가끔"** 이다. "가끔"은 선호(`likes`)도 회피(`avoids`)도 아니므로 중간값이 정확하다 — 어느 한쪽으로 밀면 없는 강도를 지어내는 것이 된다. 그의 **규약** `이모지 = 가끔 허용`(`emoji_policy = ok`)이 AC-056 ② 경고 억제를 이미 담당하므로, 프로필을 `likes`로 강하게 잡을 실익도 없다 |
+| Sarah = Michael과 3축 동일(`direct`/`neutral`/`low`) | 🔴 **COMPARE-01의 "Michael ↔ Sarah 차이의 근거는 #24 규약뿐"이라는 반박 대비 논지**(아래 표 ①②③)를 데이터로도 성립시키기 위해서다. 두 사람의 자기신고가 다르면 발표에서 "프로필이 달라서 아닌가요?"가 나온다. **수신자 프로필은 애초에 중재 입력이 아니지만**(contract.ts `RecipientContext`에 profile 필드가 없다 — 규약·국가·타임존뿐), 화면에 나란히 놓이는 값이므로 **변수를 규약 하나로 줄여 둔다.** Sarah가 cold start인 것은 **diff 0건 + 규약 미합의**이지 자기신고 공백이 아니다 |
+
+### (v1.7) 시드 계정 식별자(이메일) — **형식 확정**
+
+> implementer가 T61에서 임시로 고른 형식을 **문서 값으로 승격**한다(이후 이 표가 단일 출처이며 코드가 아니다). `sent_messages.recipient_identifier` · `pair_protocols.party_a/party_b`가 전부 자유 텍스트 이메일이라 값이 반드시 있어야 시드가 성립한다.
+
+**규칙**: `{이름}.{성}@{회사}.example` — 전부 **소문자 ASCII**, 도메인은 **RFC 2606 예약 TLD `.example`** 를 쓴다(실제로 라우팅되지 않음을 형식만 보고 알 수 있다). **PRD Planning Decision #11(합성 데이터만, 실제 인물·기업 반입 금지)** 의 요구를 형식 차원에서 만족시킨다 — 실재 도메인(`.com`/`.co.kr` 등)은 쓰지 않는다.
+
+| 인물 | 식별자 |
+|---|---|
+| 박지훈 | `jihoon.park@arasoft.example` |
+| 타나카 유키 | `yuki.tanaka@sakuradigital.example` |
+| Michael Chen | `michael.chen@vertexlabs.example` |
+| Sarah Willis | `sarah.willis@vertexlabs.example` |
+
+> ⚠️ **잔여 확인 1건(T61 완료 판정에 포함)**: 실제 회원가입 플로우(T46)가 `.example` TLD를 거부하면 이 형식을 쓸 수 없다. **거부될 경우 임의로 실재 도메인으로 바꾸지 말고** planner에 되돌린다 — 대체안은 RFC 2606의 `example.com` 서브주소(`jihoon.park+arasoft@example.com` 등)이며, 어느 쪽이든 **문서를 먼저 고치고 코드를 맞춘다.**
+> ⚠️ 계정 생성 자체는 **사용자 승인 사항**이다(T74/AC-039와 같은 취급 — `auth.users` 직접 조작 금지).
 
 ### diff 학습 히스토리 10건 — **사용자 단위로 시드한다**
 
