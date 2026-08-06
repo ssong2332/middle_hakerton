@@ -10,7 +10,8 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { run } from './pipeline';
-import type { MediationDeps, MediationInput } from './pipeline';
+import type { MediationDeps } from './pipeline';
+import type { MediationInput } from './contract';
 import type { LLMClient, LLMStep } from './llm/client';
 
 function baseInput(overrides: Partial<MediationInput> = {}): MediationInput {
