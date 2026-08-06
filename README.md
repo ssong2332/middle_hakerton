@@ -87,6 +87,9 @@
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key. 서버 전용, RLS 우회 — `apps/web/lib/supabase/server.ts`의 `createServiceClient()` 한 곳에서만 사용 |
 | `MAX_LLM_CALLS_PER_USER_PER_DAY` | 사용자당 일일 LLM 호출 상한 |
 | `MAX_LLM_CALLS_GLOBAL_PER_DAY` | 전역 일일 LLM 호출 상한 |
+| `LLM_PROVIDER` | 🔴 선택·로컬 테스트 전용(정식 아키텍처 결정 아님). `'gemini'`로 설정하면 `apps/web/lib/llm/gemini.ts` 구현체를 쓴다. 그 외/미설정이면 항상 OpenAI. **Vercel 프로덕션에는 설정하지 않는다** |
+| `GEMINI_API_KEY` | 🔴 선택·로컬 테스트 전용. `LLM_PROVIDER=gemini`일 때만 쓰이는 서버 전용 키. **Vercel 프로덕션에는 설정하지 않는다** |
+| `GEMINI_MODEL` | 🔴 선택·로컬 테스트 전용. 사용할 Gemini 모델명(예: `gemini-2.5-flash`). `LLM_PROVIDER=gemini`일 때만 쓰인다. **Vercel 프로덕션에는 설정하지 않는다** |
 
 Supabase URL/키, OpenAI 키 등 실제 값은 이 저장소에 없습니다 — 팀 내부에서 직접 전달받아 로컬 `.env`에 채워 넣으세요.
 

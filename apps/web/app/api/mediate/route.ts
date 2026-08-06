@@ -46,7 +46,10 @@ import {
   type Warning,
 } from '@cross-border/core';
 import { withApi } from '../../../lib/http';
-import { createOpenAiLLMClient } from '../../../lib/llm/openai';
+// 🔴 로컬 테스트 전용 provider 스위치(`LLM_PROVIDER` 환경변수) — 기본값은 항상 OpenAI다.
+// `apps/web/lib/llm/create-client.ts` 파일 헤더 주석 참조. Vercel 프로덕션에는 이 변수를
+// 설정하지 않으므로 배포 경로는 그대로 OpenAI로 간다.
+import { createLLMClient } from '../../../lib/llm/create-client';
 
 const mediateRequestSchema = z.object({
   // 🔴 길이 상한 검증을 걸지 않는다 — 5,000자는 소프트 캡이며 변환을 막지 않는다(AC-061②).
@@ -79,7 +82,7 @@ export const POST = withApi<MediateRequest, MediationResult>(
   async ({ input, session }) => {
     const senderLanguage = senderLanguageOf(input.context.languageDirection);
 
-    const llm = createOpenAiLLMClient(session?.userId);
+    const llm = await createLLMClient(session?.userId);
 
     // C1(T7) — 원문의 긴급도를 분류한다(AC-003). C1은 변환 전 원문의 긴급도를 판정하는 스텝이라
     // 이 순서는 C2가 붙은 뒤에도 바뀌지 않는다(`docs/Architecture.md` Data Flow ①이 C1을 항상

@@ -17,13 +17,33 @@ vi.mock('../../../lib/auth', () => ({
 vi.mock('../../../lib/llm/openai', () => ({
   createOpenAiLLMClient: vi.fn(),
 }));
+// 🔴 M-4(reviewer 라운드) — `route.ts`는 실제로 `openai.ts`를 직접 부르지 않고
+// `create-client.ts`의 `createLLMClient`(provider 스위치)를 거친다. 위 `../../../lib/llm/openai`
+// mock만으로는 그 배선(route.ts가 create-client.ts를 실제로 호출하는지)을 검증하지 못한다 —
+// route.ts가 openai.ts를 다시 직접 부르도록 되돌려도 이 mock은 여전히 통과했을 것이다.
+// `create-client`를 직접 mock해 `createLLMClient`가 호출되는지 별도로 단언한다.
+vi.mock('../../../lib/llm/create-client', () => ({
+  createLLMClient: vi.fn(),
+}));
 
 import { resolveSession } from '../../../lib/auth';
 import { createOpenAiLLMClient } from '../../../lib/llm/openai';
+import { createLLMClient } from '../../../lib/llm/create-client';
 import { POST } from './route';
 
 const mockResolveSession = vi.mocked(resolveSession);
-const mockCreateClient = vi.mocked(createOpenAiLLMClient);
+const mockCreateOpenAiClient = vi.mocked(createOpenAiLLMClient);
+const mockCreateLLMClient = vi.mocked(createLLMClient);
+
+/**
+ * 기존 테스트들은 전부 `mockCreateClient`(이제 `mockCreateOpenAiClient`)로 `fakeLlm()`을
+ * 주입해 왔다 — 그 테스트들의 의도(C1/C2/C4 배선 검증)는 그대로 두되, provider 스위치를
+ * 우회하지 않도록 `mockCreateLLMClient`도 같은 `LLMClient`를 반환하게 위임한다.
+ */
+function mockCreateClient(llm: ReturnType<typeof createOpenAiLLMClient>) {
+  mockCreateOpenAiClient.mockReturnValue(llm);
+  mockCreateLLMClient.mockResolvedValue(llm);
+}
 
 type Source = 'live' | 'cache' | 'fallback';
 
@@ -128,7 +148,7 @@ describe('POST /api/mediate', () => {
 
   it('AC-001 — backTranslation을 응답에 담아 200을 반환한다', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(fakeLlm({ backTranslation: 'Please confirm by tomorrow.' }));
+    mockCreateClient(fakeLlm({ backTranslation: 'Please confirm by tomorrow.' }));
 
     const response = await POST(
       postRequest({
@@ -147,7 +167,7 @@ describe('POST /api/mediate', () => {
   // 12개 → 13개로 늘었다(테스트 이름도 갱신). 기존 12개 필드는 이름·순서·타입 그대로다.
   it('T1 계약의 13개 필드를 모두 채운다(C3/C5/C6 대기 중에도 스키마는 만족)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(fakeLlm());
+    mockCreateClient(fakeLlm());
 
     const response = await POST(
       postRequest({ text: 'hello', context: { languageDirection: 'en-ko', channel: 'web' } }),
@@ -184,7 +204,7 @@ describe('POST /api/mediate', () => {
 
   it('AC-003 — C1이 분류한 urgency와 근거 문장을 그대로 응답에 담는다', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(
+    mockCreateClient(
       fakeLlm({ urgency: 'LOW', urgencyReason: '시간 압박이 없는 참고 메시지입니다.' }),
     );
 
@@ -206,7 +226,7 @@ describe('POST /api/mediate', () => {
   // 참조). 여기서 확인하는 것은 AC-003(C1 판정을 그대로 응답에 담는다)의 CRITICAL 케이스뿐이다.
   it('AC-003 — C1이 CRITICAL로 판정하면 override 없이도 응답 urgency가 CRITICAL이다', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(
+    mockCreateClient(
       fakeLlm({ urgency: 'CRITICAL', urgencyReason: '프로덕션 장애로 즉시 대응이 필요합니다.' }),
     );
 
@@ -223,7 +243,7 @@ describe('POST /api/mediate', () => {
 
   it('AC-004 — urgencyOverride가 있으면 C1 판정 대신 override 값이 응답에 반영된다', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(
+    mockCreateClient(
       fakeLlm({ urgency: 'NORMAL', urgencyReason: '일반 업무 요청으로 보입니다.' }),
     );
 
@@ -248,7 +268,7 @@ describe('POST /api/mediate', () => {
 
   it('urgencyOverride가 null이면(명시적으로 override하지 않음) C1 판정을 그대로 쓴다', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(fakeLlm({ urgency: 'LOW', urgencyReason: '근거' }));
+    mockCreateClient(fakeLlm({ urgency: 'LOW', urgencyReason: '근거' }));
 
     const response = await POST(
       postRequest({
@@ -266,7 +286,7 @@ describe('POST /api/mediate', () => {
   // `toneTransformed`로 검사 대상 텍스트를 직접 지정한다.
   it('AC-046③ — en-ko 방향에서 C2 변환문에 존댓말 혼용이 있으면 warnings에 경고가 담긴다', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(
+    mockCreateClient(
       fakeLlm({ toneTransformed: '확인 부탁드립니다. 편하실 때 연락 주세요.' }),
     );
 
@@ -283,7 +303,7 @@ describe('POST /api/mediate', () => {
 
   it('ko-en 방향에서는 존댓말 혼용 검사를 실행하지 않는다(AC-046은 EN→KO 전용)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(
+    mockCreateClient(
       fakeLlm({ toneTransformed: '확인 부탁드립니다. 편하실 때 연락 주세요.' }),
     );
 
@@ -300,7 +320,7 @@ describe('POST /api/mediate', () => {
 
   it('경고가 없으면 warnings는 빈 배열이다', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(fakeLlm({ toneTransformed: '확인해 주세요.' }));
+    mockCreateClient(fakeLlm({ toneTransformed: '확인해 주세요.' }));
 
     const response = await POST(
       postRequest({
@@ -321,7 +341,7 @@ describe('POST /api/mediate', () => {
     const misreadRisks = [
       { quote: '확인 부탁드립니다', misreading: '단순 참고로 읽힘', evidence: '명시적 기한 없음' },
     ];
-    mockCreateClient.mockReturnValue(
+    mockCreateClient(
       fakeLlm({
         toneTransformed: 'Please confirm by Friday.',
         toneReason: '완곡한 요청을 명시적 요청으로 복원했습니다.',
@@ -351,7 +371,7 @@ describe('POST /api/mediate', () => {
   // 폴백 200이 우선" — `docs/API.md:48`). 이 테스트는 그 동작 변경을 고정한다.
   it('C2 응답이 스키마 검증에 실패해도 실 FALLBACK_RESPONSES로 폴백해 200을 반환한다(T16, AC-041)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(fakeLlm({ toneContent: '유효하지 않은 JSON' }));
+    mockCreateClient(fakeLlm({ toneContent: '유효하지 않은 JSON' }));
 
     const response = await POST(
       postRequest({ text: 'hello', context: { languageDirection: 'ko-en', channel: 'web' } }),
@@ -368,7 +388,7 @@ describe('POST /api/mediate', () => {
     const previous = process.env.OPENAI_API_KEY;
     process.env.OPENAI_API_KEY = 'sk-test-secret-value-should-not-leak';
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(fakeLlm());
+    mockCreateClient(fakeLlm());
 
     const response = await POST(
       postRequest({ text: 'hello', context: { languageDirection: 'ko-en', channel: 'web' } }),
@@ -381,7 +401,7 @@ describe('POST /api/mediate', () => {
 
   it('C1 응답이 스키마 검증에 실패해도 실 FALLBACK_RESPONSES로 폴백해 200을 반환한다(T16, AC-041)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(fakeLlm({ urgencyContent: '유효하지 않은 JSON' }));
+    mockCreateClient(fakeLlm({ urgencyContent: '유효하지 않은 JSON' }));
 
     const response = await POST(
       postRequest({ text: 'hello', context: { languageDirection: 'ko-en', channel: 'web' } }),
@@ -395,7 +415,7 @@ describe('POST /api/mediate', () => {
 
   it('C4 응답이 스키마 검증에 실패해도 실 FALLBACK_RESPONSES로 폴백해 200을 반환한다(T16, AC-041)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(fakeLlm({ backTranslationContent: '유효하지 않은 JSON' }));
+    mockCreateClient(fakeLlm({ backTranslationContent: '유효하지 않은 JSON' }));
 
     const response = await POST(
       postRequest({ text: 'hello', context: { languageDirection: 'ko-en', channel: 'web' } }),
@@ -410,7 +430,7 @@ describe('POST /api/mediate', () => {
 
   it('C1이 fallback이고 C4가 live면 응답 source는 신뢰도가 낮은 쪽(fallback)을 따른다(AC-041)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(
+    mockCreateClient(
       fakeLlm({ urgencySource: 'fallback', backTranslationSource: 'live' }),
     );
 
@@ -424,7 +444,7 @@ describe('POST /api/mediate', () => {
 
   it('C1이 live이고 C4가 cache면 응답 source는 신뢰도가 낮은 쪽(cache)을 따른다(AC-041)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(
+    mockCreateClient(
       fakeLlm({ urgencySource: 'live', backTranslationSource: 'cache' }),
     );
 
@@ -438,7 +458,7 @@ describe('POST /api/mediate', () => {
 
   it('C1·C4가 live여도 C2가 fallback이면 응답 source는 fallback을 따른다(AC-041, 세 스텝 모두 대상)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(
+    mockCreateClient(
       fakeLlm({ urgencySource: 'live', toneSource: 'fallback', backTranslationSource: 'live' }),
     );
 
@@ -456,7 +476,7 @@ describe('POST /api/mediate', () => {
   // 잘못된 매핑(예: c2와 c4가 뒤바뀜)을 잡을 수 있다.
   it('stepSources는 C1/C2/C4 각각의 출처를 뒤섞지 않고 그대로 담는다(F1-e)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
-    mockCreateClient.mockReturnValue(
+    mockCreateClient(
       fakeLlm({ urgencySource: 'cache', toneSource: 'fallback', backTranslationSource: 'live' }),
     );
 
@@ -469,5 +489,20 @@ describe('POST /api/mediate', () => {
     // 합쳐진 값은 세 스텝 중 가장 신뢰도가 낮은 fallback(AC-041) — stepSources와 source가 함께
     // 검증되어야 F1-e의 파생 불변식(`source = worst(stepSources)`)이 이 라우트에서도 지켜진다.
     expect(body.source).toBe('fallback');
+  });
+
+  // 🔴 M-4(reviewer 라운드) — route.ts가 openai.ts를 직접 부르지 않고 provider 스위치
+  // (`create-client.ts`의 `createLLMClient`)를 거쳐 LLMClient를 얻는지 배선 자체를 검증한다.
+  // 이 단언이 없으면 route.ts가 `createOpenAiLLMClient`를 다시 직접 호출하도록 되돌려도
+  // 위 테스트들은 `../../../lib/llm/openai` mock 덕분에 여전히 통과해 회귀를 잡지 못한다.
+  it('M-4 — route.ts는 createOpenAiLLMClient를 직접 부르지 않고 createLLMClient(userId)를 거친다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-42' });
+    mockCreateClient(fakeLlm());
+
+    await POST(
+      postRequest({ text: 'hello', context: { languageDirection: 'ko-en', channel: 'web' } }),
+    );
+
+    expect(mockCreateLLMClient).toHaveBeenCalledWith('user-42');
   });
 });
