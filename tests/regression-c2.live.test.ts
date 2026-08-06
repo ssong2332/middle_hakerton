@@ -2,9 +2,17 @@
  * T11 — C2 회귀 검증셋 53건의 **실제 LLMClient 라이브 실행 진입점**. reviewer 후속 Major 4
  * (`docs/Tasks.md` T11): "러너에 실행 진입점이 없다"의 구현이다.
  *
- * 🔴 이 파일은 `tests/regression-c2.ts`의 `C2Invoker`에 실제 `createOpenAiLLMClient`(T4,
- * `apps/web/lib/llm/openai.ts`)를 물려 진짜 OpenAI 호출로 53건을 돌린다 — 모킹된 러너 정확성
- * 검증(`regression-c2.test.ts`)과는 목적이 다르다(그 파일 헤더 주석 참조).
+ * 🔴 이 파일은 `tests/regression-c2.ts`의 `C2Invoker`에 실제 `LLMClient`를 물려 53건을 돌린다 —
+ * 모킹된 러너 정확성 검증(`regression-c2.test.ts`)과는 목적이 다르다(그 파일 헤더 주석 참조).
+ *
+ * 🔴 T11 후속 fix(2026-08-07) — 이전에는 `createOpenAiLLMClient`(`apps/web/lib/llm/openai.ts`)를
+ * 직접 호출해 항상 OpenAI로만 실행됐다. 이제 provider-switching 팩토리
+ * `createLLMClient()`(`apps/web/lib/llm/create-client.ts`)를 통해 `LLMClient`를 얻는다 —
+ * `LLM_PROVIDER=gemini`일 때는 Gemini(`apps/web/lib/llm/gemini.ts`)로, 그 외/미설정(기본값)일
+ * 때는 여전히 OpenAI로 실행된다. OpenAI가 프로덕션 기본 경로라는 사실은 바뀌지 않는다 — 이 변경은
+ * 로컬 테스트 편의일 뿐 아키텍처 결정이 아니다(`create-client.ts` 파일 헤더 주석과 같은 성격).
+ * `createLLMClient()`는 async다(Gemini 분기에서만 `gemini.ts`를 동적 import — 프로덕션 번들 크기
+ * 최적화 근거는 `create-client.ts` M-1 주석 참조) — 그래서 `buildLiveInvoker()`도 async로 바뀌었다.
  *
  * 🔴 **필요한 환경 변수가 없으면 skip된다.** `docs/Architecture.md` Tech Stack "테스트" 행 ·
  * `docs/DECISIONS.md` #13(웹앱·확장·코어가 한 러너를 쓴다)에 따라 별도 실행 메커니즘(별도 node
@@ -32,7 +40,7 @@ import {
   type MisreadRisk,
   type PreservedItem,
 } from '@cross-border/core';
-import { createOpenAiLLMClient } from '../apps/web/lib/llm/openai';
+import { createLLMClient } from '../apps/web/lib/llm/create-client';
 import { formatReport, runC2Regression, type C2Invoker } from './regression-c2';
 import {
   describeLiveEnvSkipReason,
@@ -42,8 +50,8 @@ import {
 const missingLiveEnvKeys = getMissingLiveEnvKeys(process.env);
 const hasLiveEnv = missingLiveEnvKeys.length === 0;
 
-function buildLiveInvoker(): C2Invoker {
-  const llm = createOpenAiLLMClient();
+async function buildLiveInvoker(): Promise<C2Invoker> {
+  const llm = await createLLMClient();
   return {
     async transform(input: {
       text: string;
@@ -65,13 +73,16 @@ function buildLiveInvoker(): C2Invoker {
 
 // 🔴 reviewer 후속 Major B — 스킵될 때도 어떤 환경 변수가 빠졌는지 제목에 그대로 남긴다(빈
 // 문자열이면 라이브 실행 조건을 충족한 것이라 제목이 그대로 유지된다).
+// 🔴 T11 후속 fix(2026-08-07) — provider가 고정 OpenAI가 아니게 되어, 실제로 어떤 provider로
+// 실행되는지도 제목에 반영한다(`create-client.ts`와 동일한 판정 기준).
+const providerLabel = process.env.LLM_PROVIDER === 'gemini' ? 'Gemini' : 'OpenAI';
 const testTitle =
-  `53건을 실제 OpenAI 호출로 실행하고 하나의 실행 출력으로 보고한다` +
+  `53건을 실제 ${providerLabel} 호출로 실행하고 하나의 실행 출력으로 보고한다` +
   (hasLiveEnv ? '' : ` — ${describeLiveEnvSkipReason(missingLiveEnvKeys)}`);
 
 describe.skipIf(!hasLiveEnv)('C2 회귀 검증셋 53건 — 실제 LLMClient 라이브 실행(T11)', () => {
   it(testTitle, async () => {
-    const invoker = buildLiveInvoker();
+    const invoker = await buildLiveInvoker();
     const report = await runC2Regression(invoker);
     // docs/TestCases.md "실행 기록" 표에 붙여넣을 출력.
     console.log(formatReport(report));
