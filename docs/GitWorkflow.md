@@ -50,6 +50,15 @@ Refs: {{task ID}}
 ```
 Types: `feat` / `fix` / `refactor` / `docs` / `test` / `chore`
 
+### Red→Green 증거 (v3, 2026-08-06, 사용자 결정)
+🔴 **implementer는 새 테스트를 작성한 시점의 실패 상태를 반드시 별도 커밋으로 남긴다** — 구현을 끝낸 뒤 한 번에 스쿼시해 커밋하지 않는다. 최소 형태:
+1. `test: add failing test(s) for {{task ID}}` — 새/수정 테스트만 커밋. 이 시점에 실제로 fail해야 하며, 통과하는 테스트를 이 커밋에 넣지 않는다.
+2. `feat`/`fix: implement {{task ID}}` (또는 여러 커밋) — 구현을 추가해 1의 테스트를 통과시킨다.
+
+**이유**: T20/T22/T24(2026-08-06)가 태스크당 단일 스쿼시 커밋만 남기는 바람에, quality-assurance가 "새 테스트가 실제로 버그를 잡는지"(red→green)를 매번 재현하지 못하고 "선례와 동일 기준으로 비차단 처리"만 반복했다 — 3연속 같은 공백이 누적됐다. 커밋을 나누면 QA가 `git show {{red-commit}}`으로 실제 실패 로그를 재현할 수 있다.
+
+**적용 범위**: 새 태스크(이 결정 이후 착수하는 것)부터 적용한다. 기존에 이미 `done`으로 병합된 태스크(T2~T24 등)를 소급해 재작업하지 않는다.
+
 ## Merge Rules
 - One task (docs/Tasks.md ID) = one branch = one PR.
 - **작업 브랜치는 `dev`에서 따고 `dev`로 머지한다.** `main`은 배포 시점에만 `dev`를 받는다.
