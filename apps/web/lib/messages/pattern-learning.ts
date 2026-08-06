@@ -101,3 +101,41 @@ export async function applyPatternLearning(
   await upsertProfileLearnedItem(client, userId, patternKey, observedCount);
   return true;
 }
+
+/**
+ * 🔴 Reviewer Major(REJECTED → 수정) — `applyPatternLearning`은 `sent_messages`/`diff_records`
+ * 원자적 커밋(`insertSentMessageAndDiffRecord`) **이후**, 멱등성 캐시 저장
+ * (`saveIdempotentResponse`) **이전**에 호출된다(`app/api/messages/route.ts`). 그 사이에서
+ * 던지면: 발송은 이미 커밋됐는데 멱등성 캐시는 아직 없어, 클라이언트가 같은
+ * `Idempotency-Key`로 재시도하면 캐시 미스로 `insertSentMessageAndDiffRecord`가 다시
+ * 실행되어 **중복 발송**이 된다. 이 실패 창을 없애기 위해 이 함수가 내부 에러를 여기서
+ * 잡아 로그만 남기고 `false`로 안전하게 되돌린다 — 발송 성공 자체를 절대 500으로 만들지
+ * 않는다.
+ *
+ * `docs/CodingRules.md` Error Handling "부분 실패는 실패가 아니다"(공휴일 조회·이모지
+ * 판정·C6 옵션 산출과 동일 범주 — "선택 단계의 실패가 5xx를 만들면 위반")와 같은 원칙을
+ * 적용한 것이다. 패턴 학습은 발송의 파생 enrichment이지 발송 자체가 아니다.
+ *
+ * `catch`는 여기 한 곳(`apps/web/lib`)에만 있다 — Route Handler 본문에는 여전히 `try`가
+ * 없다(`docs/CodingRules.md` "던지는 쪽/잡는 쪽" — 잡는 곳은 원칙적으로 `withApi()` 한
+ * 곳뿐이지만, 그 규칙의 의도(에러를 삼키지 않고 로그를 남긴다)를 그대로 지키면서 이
+ * 호출부만 "부분 실패는 실패가 아니다" 규칙에 따라 여기서 흡수한다).
+ */
+export async function applyPatternLearningSafe(
+  client: SupabaseClient,
+  userId: string,
+  patternKey: string | null,
+): Promise<boolean> {
+  try {
+    return await applyPatternLearning(client, userId, patternKey);
+  } catch (error) {
+    // 에러 삼키기 금지(`docs/CodingRules.md` Error Handling) — 로그 없이 삼키면 Critical.
+    // 메시지 원문은 로그 금지 항목이라 patternKey/userId·에러 메시지만 남긴다.
+    console.error('[messages] pattern learning failed — send already committed, continuing', {
+      userId,
+      patternKey,
+      error: (error as { message?: unknown } | null)?.message ?? String(error),
+    });
+    return false;
+  }
+}

@@ -17,20 +17,21 @@ vi.mock('../../../lib/auth', () => ({
 vi.mock('../../../lib/messages/storage', () => ({
   insertSentMessageAndDiffRecord: vi.fn(),
 }));
-// T20 — 3회 반복 판정(`applyPatternLearning`)은 별도 모듈이라 여기서는 배선만 확인한다.
-// 실제 임계값 동작(2회 미반영/3회 반영)은 `lib/messages/pattern-learning.test.ts`가 검증한다.
+// T20 — 3회 반복 판정(`applyPatternLearningSafe`)은 별도 모듈이라 여기서는 배선만 확인한다.
+// 실제 임계값 동작(2회 미반영/3회 반영)과 내부 에러 흡수 동작은
+// `lib/messages/pattern-learning.test.ts`가 검증한다.
 vi.mock('../../../lib/messages/pattern-learning', () => ({
-  applyPatternLearning: vi.fn(),
+  applyPatternLearningSafe: vi.fn(),
 }));
 
 import { resolveSession } from '../../../lib/auth';
 import { insertSentMessageAndDiffRecord } from '../../../lib/messages/storage';
-import { applyPatternLearning } from '../../../lib/messages/pattern-learning';
+import { applyPatternLearningSafe } from '../../../lib/messages/pattern-learning';
 import { POST } from './route';
 
 const mockResolveSession = vi.mocked(resolveSession);
 const mockInsertSentMessageAndDiffRecord = vi.mocked(insertSentMessageAndDiffRecord);
-const mockApplyPatternLearning = vi.mocked(applyPatternLearning);
+const mockApplyPatternLearningSafe = vi.mocked(applyPatternLearningSafe);
 
 const fakeClient = { from: vi.fn() } as never;
 
@@ -58,7 +59,7 @@ const validBody = {
 describe('POST /api/messages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockApplyPatternLearning.mockResolvedValue(false);
+    mockApplyPatternLearningSafe.mockResolvedValue(false);
   });
 
   it('AC-010/AC-012 — sent_messages·diff_records를 원자적으로 저장하고 201로 결과를 반환한다', async () => {
@@ -121,37 +122,37 @@ describe('POST /api/messages', () => {
     expect(mockInsertSentMessageAndDiffRecord).not.toHaveBeenCalled();
   });
 
-  // T20 — 배선 확인: applyPatternLearning이 false를 돌려주면 응답도 false를 그대로 담는다.
+  // T20 — 배선 확인: applyPatternLearningSafe가 false를 돌려주면 응답도 false를 그대로 담는다.
   // 실제 3회 판정 로직은 `lib/messages/pattern-learning.test.ts`가 검증한다.
-  it('applyPatternLearning이 false를 반환하면 learnedApplied도 false다', async () => {
+  it('applyPatternLearningSafe가 false를 반환하면 learnedApplied도 false다', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
     mockInsertSentMessageAndDiffRecord.mockResolvedValue({
       sentMessage: { id: 'msg-2', sentAt: '2026-08-05T11:00:00Z' },
       diffRecord: { id: 'diff-2', patternKey: null },
     });
-    mockApplyPatternLearning.mockResolvedValue(false);
+    mockApplyPatternLearningSafe.mockResolvedValue(false);
 
     const response = await POST(jsonRequest(validBody));
     const body = await response.json();
 
     expect(body.learnedApplied).toBe(false);
-    expect(mockApplyPatternLearning).toHaveBeenCalledWith(fakeClient, 'user-1', null);
+    expect(mockApplyPatternLearningSafe).toHaveBeenCalledWith(fakeClient, 'user-1', null);
   });
 
-  // T20 — 배선 확인: applyPatternLearning이 true(3회 도달)를 돌려주면 응답도 true를 담는다.
-  it('applyPatternLearning이 true를 반환하면(3회 도달) learnedApplied도 true고 patternKey를 그대로 넘긴다', async () => {
+  // T20 — 배선 확인: applyPatternLearningSafe가 true(3회 도달)를 돌려주면 응답도 true를 담는다.
+  it('applyPatternLearningSafe가 true를 반환하면(3회 도달) learnedApplied도 true고 patternKey를 그대로 넘긴다', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
     mockInsertSentMessageAndDiffRecord.mockResolvedValue({
       sentMessage: { id: 'msg-2b', sentAt: '2026-08-05T11:05:00Z' },
       diffRecord: { id: 'diff-2b', patternKey: 'emoji_removed' },
     });
-    mockApplyPatternLearning.mockResolvedValue(true);
+    mockApplyPatternLearningSafe.mockResolvedValue(true);
 
     const response = await POST(jsonRequest(validBody));
     const body = await response.json();
 
     expect(body).toMatchObject({ patternKey: 'emoji_removed', learnedApplied: true });
-    expect(mockApplyPatternLearning).toHaveBeenCalledWith(fakeClient, 'user-1', 'emoji_removed');
+    expect(mockApplyPatternLearningSafe).toHaveBeenCalledWith(fakeClient, 'user-1', 'emoji_removed');
   });
 
   // Major 2(reviewer REJECTED → 수정) — `docs/API.md` Conventions "멱등성": `Idempotency-Key`

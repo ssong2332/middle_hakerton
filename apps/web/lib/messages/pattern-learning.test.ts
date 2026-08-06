@@ -7,10 +7,11 @@
  * "profile_learned_items 3회 미만에서는 미반영" / "3회 이상이면 반영" 두 describe 블록이
  * 각각 그 케이스다.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   applyPatternLearning,
+  applyPatternLearningSafe,
   countDiffRecordsForPattern,
   upsertProfileLearnedItem,
 } from './pattern-learning';
@@ -206,5 +207,65 @@ describe('applyPatternLearning — 2회/3회 경계값 대조 (AC-013)', () => {
 
     expect(learnedApplied).toBe(expected);
     expect(learnedItemUpserts).toHaveLength(expected ? 1 : 0);
+  });
+});
+
+/**
+ * 🔴 Reviewer Major(REJECTED → 수정) 회귀 — `applyPatternLearningSafe`는 `POST /api/messages`의
+ * `insertSentMessageAndDiffRecord`(발송 커밋, 이미 durable) 직후·`saveIdempotentResponse`(멱등성
+ * 캐시 저장) 직전에 호출된다(`app/api/messages/route.ts`). 이 구간에서 예외가 그대로 전파되면
+ * 발송은 이미 커밋됐는데 멱등성 캐시는 없어, 같은 `Idempotency-Key`로 재시도할 때 캐시 미스로
+ * 저장소가 다시 호출되어 중복 발송이 된다. `applyPatternLearningSafe`가 내부(`applyPatternLearning`
+ * → `countDiffRecordsForPattern`/`upsertProfileLearnedItem`)의 에러를 여기서 흡수해 그 실패
+ * 창을 없앤다 — 아래 두 테스트가 "에러를 삼키지 않는다(로그를 남긴다)"와 "그럼에도 호출자에게는
+ * 절대 던지지 않는다(false로 안전 반환)"를 각각 증명한다.
+ */
+describe('applyPatternLearningSafe — 내부 실패를 흡수해 발송 성공/멱등성을 보호한다', () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('countDiffRecordsForPattern이 던져도(diff_records 쿼리 실패) 예외를 전파하지 않고 false를 반환한다', async () => {
+    const { client } = createFakeSupabase({ countError: { message: 'query failed' } });
+
+    await expect(
+      applyPatternLearningSafe(client, 'user-1', 'emoji_removed'),
+    ).resolves.toBe(false);
+  });
+
+  it('upsertProfileLearnedItem이 던져도(3회 도달했지만 upsert 실패) 예외를 전파하지 않고 false를 반환한다', async () => {
+    const { client } = createFakeSupabase({
+      diffRecordCount: 3,
+      upsertError: { message: 'upsert failed' },
+    });
+
+    await expect(
+      applyPatternLearningSafe(client, 'user-1', 'emoji_removed'),
+    ).resolves.toBe(false);
+  });
+
+  it('내부 실패를 무로그로 삼키지 않는다 — console.error에 userId/patternKey/에러 메시지를 남긴다', async () => {
+    const { client } = createFakeSupabase({ countError: { message: 'query failed' } });
+
+    await applyPatternLearningSafe(client, 'user-1', 'emoji_removed');
+
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    const [, details] = consoleErrorSpy.mock.calls[0] as [string, Record<string, unknown>];
+    expect(details).toMatchObject({ userId: 'user-1', patternKey: 'emoji_removed' });
+    expect(details.error).toBeTruthy();
+  });
+
+  it('내부가 정상 동작하면(에러 없음) 기존 applyPatternLearning과 동일하게 판정 결과를 그대로 반환한다', async () => {
+    const { client } = createFakeSupabase({ diffRecordCount: 3 });
+
+    await expect(
+      applyPatternLearningSafe(client, 'user-1', 'emoji_removed'),
+    ).resolves.toBe(true);
   });
 });
