@@ -76,6 +76,64 @@ import {
  */
 export const REQUEST_TIMEOUT_MS = 10_000;
 
+/**
+ * 🔴 T49 — 무료 티어 API 키의 **분당** 요청 상한(HTTP 429)에 재시도/백오프를 붙인다(실측,
+ * 2026-08-07 진단 세션). 위 `REQUEST_TIMEOUT_MS` 수정 이후 T11 라이브 회귀
+ * (`npm run test:regression-c2`, `LLM_PROVIDER=gemini`)를 재실행하자 처음 ~8건은
+ * `outcome:'live'`로 실제 모델 응답(지연시간 6.5–9.9초)을 받았지만, call #154부터는 거의
+ * 전부 `outcome:'fallback', error_code:'HTTP_429'`로 떨어졌다 — Supabase `llm_call_log`
+ * 직접 조회로 확인. 그 지연시간이 ~420–470ms로 **균일**했다는 점이 중요하다: 지수 백오프가
+ * 조금이라도 있었다면 재시도마다 지연시간이 늘어나는 패턴이 보였어야 하는데, 그런 패턴이
+ * 전혀 없었다 — 즉시 거부만 반복됐다.
+ *
+ * 원인을 `node_modules/@google/genai/dist/node/index.cjs`에서 직접 읽어 확인했다(추측이 아님):
+ * - 14022–14025행 `async apiCall(url, requestInit, retryOptions) { if (!retryOptions) {
+ *   return fetch(url, requestInit); } ...}` — **`httpOptions.retryOptions` 키 자체가
+ *   없으면(undefined) 재시도 로직을 아예 타지 않고 평범한 `fetch` 한 번으로 끝난다.**
+ *   `HttpRetryOptions`의 "기본값"(5회, 1초~60초 지수 백오프 등, .d.ts:7103-7118 문서화)은
+ *   이 객체가 **존재할 때** 그 내부 필드들에 대한 기본값일 뿐, 객체 자체를 자동으로 만들어
+ *   주지 않는다. 즉 opt-in은 필드 값이 아니라 **키의 존재 여부**로 결정된다 — 이전까지
+ *   `new GoogleGenAI({ apiKey, httpOptions: { timeout } })`처럼 `retryOptions`를 아예 주지
+ *   않았으므로 재시도가 전혀 동작하지 않았다. 관측된 균일 지연시간(즉시 거부, 백오프 없음)과
+ *   정확히 일치한다.
+ * - 13802–13823행 `request(request)`가 `this.clientOptions.httpOptions`(=생성자에 넘긴
+ *   `opts.httpOptions`가 `patchHttpOptions`로 병합된 값)의 `.retryOptions`를 그대로
+ *   `unaryApiCall`에 전달한다 — 즉 여기 생성자에서 준 값이 실제로 매 요청까지 흘러간다
+ *   (13632–13685행 생성자가 `initHttpOptions`에 `retryOptions`를 채우지 않으므로, 우리가
+ *   명시하지 않으면 계속 `undefined`로 남는다).
+ * - 13612–13624행 SDK 기본값: `DEFAULT_RETRY_ATTEMPTS=5`(초회 포함), `initialDelay=1.0초`,
+ *   `maxDelay=60.0초`, `expBase=2`, `jitter=1`, 재시도 대상 상태코드
+ *   `[408,429,500,502,503,504]`(429 포함, 우리 사례와 일치).
+ *
+ * 아래 값은 그 SDK 기본값을 그대로 베끼지 않고 이 파일의 실제 쓰임(로컬 개발자가 53건짜리
+ * `test:regression-c2`를 돌리는 것, 프로덕션 트래픽이 아님)에 맞춰 고른 것이다:
+ * - `attempts: 4`(초회 1 + 재시도 3) — SDK 기본 5회보다 적다. 429가 뜬 호출마다 최대
+ *   3번씩 재시도가 붙으면, 53건 중 다수가 429였던 이번 실측 사례처럼 대량으로 걸릴 때
+ *   전체 실행 시간이 과도하게 늘어난다. 반면 1회조차 재시도하지 않으면(현재 상태) 백오프가
+ *   전혀 없어 분당 상한이 절대 안 풀린다 — 3번의 재시도가 "전혀 안 함"과 "SDK 기본 5회"
+ *   사이의 절충.
+ * - `initialDelay: 3`(초), `maxDelay: 20`(초) — 재시도 간격이 대략 3초 → 6초(2번째,
+ *   `expBase` 기본값 2 적용) → 12초(3번째, 20초 상한 미도달)로 커진다. 실패 1건당 최대
+ *   추가 지연은 약 21초. Gemini 무료 티어 분당 상한은 일반적으로 60초 창에서 리셋되므로,
+ *   한 번의 재시도열만으로 창을 완전히 비우진 못할 수 있지만(21초 < 60초), 회귀 스위트가
+ *   순차적으로 여러 케이스를 도는 동안 그 사이 시간이 누적되어 분당 창이 자연스럽게 갱신될
+ *   가능성을 높인다 — 완전한 보장이 아니라 부분적 완화라는 점을 명시한다.
+ * - `expBase`, `jitter`, 재시도 대상 상태코드는 SDK 기본값(2 / jitter>0 / 429 포함 목록)을
+ *   그대로 쓴다 — 굳이 다르게 정할 근거가 없다.
+ *
+ * 🔴 **프로덕션과 무관** — 프로덕션은 항상 `openai.ts`(`create-client.ts`)로 가고, 그 SDK는
+ * 이미 자체 재시도(`maxRetries: 1`, `openai.ts:56-58` 주석 참조 — 이 코드베이스에서 이미 확립된
+ * "SDK 기본 재시도 대상에 맡긴다" 선례)를 갖고 있다. 이 파일(`gemini.ts`)은 파일 헤더 주석대로
+ * 로컬 테스트 전용이므로, 이 값들도 그 범위를 벗어나지 않는다.
+ */
+const RETRY_OPTIONS: NonNullable<
+  ConstructorParameters<typeof GoogleGenAI>[0]['httpOptions']
+>['retryOptions'] = {
+  attempts: 4,
+  initialDelay: 3,
+  maxDelay: 20,
+};
+
 export interface GeminiLLMClientDeps {
   supabase?: SupabaseClient;
   geminiClient?: Pick<GoogleGenAI, 'models'>;
@@ -180,7 +238,7 @@ export function createGeminiLLMClient(userId?: string, deps: GeminiLLMClientDeps
     deps.geminiClient ??
     new GoogleGenAI({
       apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: { timeout: REQUEST_TIMEOUT_MS },
+      httpOptions: { timeout: REQUEST_TIMEOUT_MS, retryOptions: RETRY_OPTIONS },
     });
 
   /** `openai.ts`의 `log()`와 동일 — 관측 로깅은 부수 효과일 뿐이다. 실패해도 응답 반환을 막지 않는다. */

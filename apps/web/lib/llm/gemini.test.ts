@@ -8,7 +8,24 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ApiError } from '@google/genai';
+
+// 🔴 T49 — `deps.geminiClient`는 실제 `new GoogleGenAI(...)` 생성자를 완전히 우회하므로(기존
+// 5개 경로 테스트는 전부 이 주입을 쓴다), 그 경로로는 실제 생성자에 어떤 `httpOptions`가
+// 전달되는지 검증할 수 없다. `apps/web/lib/supabase/server.test.ts`가 `@supabase/ssr`의
+// `createServerClient`를 모킹해 생성자 호출 인자를 검사하는 것과 동일한 패턴으로, 여기서는
+// `@google/genai`의 `GoogleGenAI`만 스파이로 교체하고 `ApiError` 등 나머지는 실제 모듈을 그대로
+// 쓴다(다른 테스트들이 `ApiError`로 실패를 흉내 내므로 실제 클래스가 필요하다).
+vi.mock('@google/genai', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@google/genai')>();
+  return {
+    ...actual,
+    GoogleGenAI: vi.fn().mockImplementation(function FakeGoogleGenAI() {
+      return { models: { generateContent: vi.fn() } };
+    }),
+  };
+});
+
+import { ApiError, GoogleGenAI } from '@google/genai';
 import {
   LLMUnavailableError,
   QuotaExceededError,
@@ -323,6 +340,36 @@ describe('REQUEST_TIMEOUT_MS — Gemini API 서버측 하한 가드(T49)', () =>
     // 이 값을 10000 미만으로 다시 낮추면 이 테스트가 즉시 실패해 재발을 막는다.
     expect(REQUEST_TIMEOUT_MS).toBeGreaterThanOrEqual(10_000);
   });
+});
+
+describe('createGeminiLLMClient — 실제 GoogleGenAI 생성자에 전달되는 retryOptions(T49)', () => {
+  it(
+    'deps.geminiClient를 주입하지 않으면(실제 로컬 실행 경로) GoogleGenAI 생성자에 ' +
+      'retryOptions를 명시적으로 전달한다 — 429(Gemini 무료 티어 분당 상한)를 재시도 없이 ' +
+      '즉시 폴백으로 흘려보내지 않기 위함(2026-08-07 진단: T11 라이브 회귀 53건 중 call #154부터 ' +
+      '대부분이 HTTP_429로 지연시간 420~470ms의 즉시 거부 — 백오프가 전혀 관측되지 않았다)',
+    () => {
+      const { client: supabase } = createFakeSupabase({ cacheRow: null });
+
+      createGeminiLLMClient('user-1', { supabase, fallbackLookup: noFallback });
+
+      expect(GoogleGenAI).toHaveBeenCalledTimes(1);
+      const ctorArgs = vi.mocked(GoogleGenAI).mock.calls[0][0] as {
+        httpOptions?: { timeout?: number; retryOptions?: Record<string, unknown> };
+      };
+      expect(ctorArgs.httpOptions?.timeout).toBe(REQUEST_TIMEOUT_MS);
+      // `node_modules/@google/genai/dist/node/index.cjs:14022-14025` —
+      // `if (!retryOptions) { return fetch(url, requestInit); }`: retryOptions 키 자체가
+      // 없으면(undefined) 재시도가 전혀 실행되지 않는다. 키가 "존재"하는지가 관건이므로
+      // 빈 객체({})만 있어도 이 단언은 통과하지만, 아래에서 구체적 값까지 확인한다.
+      expect(ctorArgs.httpOptions?.retryOptions).toBeDefined();
+      expect(ctorArgs.httpOptions?.retryOptions).toMatchObject({
+        attempts: 4,
+        initialDelay: 3,
+        maxDelay: 20,
+      });
+    },
+  );
 });
 
 describe('createGeminiLLMClient — GEMINI_MODEL 미설정', () => {
