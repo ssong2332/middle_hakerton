@@ -13,16 +13,13 @@
  * 만든 것과 같은 방식으로, 이 태스크가 `supabase/migrations/0002_sent_messages_and_diff_
  * records.sql`을 작성한다(파일만 — 실제 적용은 오케스트레이터 판단).
  *
- * 🔴 **`learnedApplied`는 이 라우트 범위에서 항상 `false`다.** `docs/API.md` Response 201의
- * `learnedApplied` = "이 diff로 어떤 패턴이 3회에 도달해 프로필에 반영되었는지" — 그 판정
- * (`pattern_key` 분류 + `GROUP BY pattern_key HAVING count(*) >= 3` + `profile_learned_items`
- * 쓰기)은 `docs/Tasks.md` **T20**("diff 저장 + 3회 반복 패턴 감지", AC-012/AC-013)의 범위다.
- * T20은 아직 `todo`이고 `profile_learned_items` 테이블도 T18 의존이라 존재하지 않는다.
- * `diff_records.pattern_key`를 분류할 분류기 자체가 리포에 없으므로(패턴 분류 로직 0건,
- * `packages/core`에 grep으로 확인 가능) 지금 이 값을 지어내면 `docs/CodingRules.md` Error
- * Handling "없는 값을 지어내지 않는다"를 어긴다 — `pattern_key`는 항상 `null`로 저장되고
- * (`lib/messages/storage.ts` 참조), `learnedApplied`는 항상 `false`로 반환한다. T20이 착수되면
- * 이 라우트가 그 결과를 읽어 반영하도록 교체한다.
+ * 🔴 **`learnedApplied`(T20, AC-012/AC-013).** `docs/API.md` Response 201의 `learnedApplied`
+ * = "이 diff로 어떤 패턴이 3회에 도달해 프로필에 반영되었는지". `diff_records` insert 시점에
+ * `pattern_key`가 분류되고(`packages/core/src/rules/pattern-detection.ts`
+ * `classifyDiffPattern`, `lib/messages/storage.ts` `insertDiffRecord`), 이 라우트는 그 결과를
+ * `applyPatternLearning`(`lib/messages/pattern-learning.ts`)에 넘겨 "같은 패턴이 사용자 전체
+ * 발송에서 3회 이상 나왔는가"를 판정한다. 3회 미만이면 `profile_learned_items`에 아무것도
+ * 쓰지 않고 `learnedApplied: false`, 3회 이상이면 그 테이블에 upsert한 뒤 `true`를 반환한다.
  */
 import { z } from 'zod';
 import type { CountryCode, UrgencyLevel } from '@cross-border/core';
@@ -32,6 +29,7 @@ import {
   type SentMessageChannel,
 } from '../../../lib/messages/storage';
 import { getIdempotentResponse, saveIdempotentResponse } from '../../../lib/messages/idempotency';
+import { applyPatternLearning } from '../../../lib/messages/pattern-learning';
 
 const messagesRequestSchema = z.object({
   originalText: z.string().min(1),
@@ -111,13 +109,17 @@ export const POST = withApi<MessagesRequest, MessagesResponse>(
       }),
     );
 
+    // T20 — 3회 반복 판정 + profile_learned_items 반영(파일 헤더 주석 참조). diff 저장 자체의
+    // 원자성(위 insertSentMessageAndDiffRecord)과 달리, 이 단계는 파생 데이터 쓰기라 실패해도
+    // sent_messages/diff_records 저장을 되돌리지 않는다 — 실패하면 그대로 던져 500이 된다.
+    const learnedApplied = await applyPatternLearning(client, session.userId, diffRecord.patternKey);
+
     const responseBody: MessagesResponse = {
       messageId: sentMessage.id,
       diffId: diffRecord.id,
       sentAt: sentMessage.sentAt,
       patternKey: diffRecord.patternKey,
-      // 🔴 T20 미도달 — 파일 헤더 주석 참조. 지어내지 않고 항상 false.
-      learnedApplied: false,
+      learnedApplied,
     };
 
     if (idempotencyKey) {

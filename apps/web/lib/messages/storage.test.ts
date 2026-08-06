@@ -174,7 +174,11 @@ const baseDiffInput: CreateDiffRecordInput = {
 };
 
 describe('insertDiffRecord', () => {
-  it('diff_records에 insert하고 id를 반환하며, 패턴 분류기가 없어 pattern_key는 항상 NULL이다', async () => {
+  // T20 — `classifyDiffPattern`(`packages/core/src/rules/pattern-detection.ts`)이 이제
+  // pattern_key를 채운다. baseDiffInput의 텍스트에는 이모지·완충 표현 신호가 없어 분류
+  // 결과가 여전히 NULL이다(분류 불가는 지어내지 않는다) — 아래 두 테스트가 실제로 신호가
+  // 있을 때 채워짐을 보인다.
+  it('diff_records에 insert하고 id를 반환하며, 분류 가능한 신호가 없으면 pattern_key는 NULL이다', async () => {
     const { client, diffRecordsInserts } = createFakeSupabase({ diffRecordRow: { id: 'diff-9' } });
 
     const result = await insertDiffRecord(client, baseDiffInput);
@@ -191,6 +195,32 @@ describe('insertDiffRecord', () => {
         channel: 'web',
       },
     ]);
+  });
+
+  it('T20 — AI 제안문의 이모지가 최종문에서 전부 사라지면 pattern_key=emoji_removed로 저장한다', async () => {
+    const { client, diffRecordsInserts } = createFakeSupabase({ diffRecordRow: { id: 'diff-10' } });
+
+    const result = await insertDiffRecord(client, {
+      ...baseDiffInput,
+      aiText: '확인했습니다 👍',
+      finalText: '확인했습니다',
+    });
+
+    expect(result).toEqual({ id: 'diff-10', patternKey: 'emoji_removed' });
+    expect((diffRecordsInserts[0] as { pattern_key: unknown }).pattern_key).toBe('emoji_removed');
+  });
+
+  it('T20 — AI 제안문에 없던 완충 표현이 최종문에 추가되면 pattern_key=cushion_insert로 저장한다', async () => {
+    const { client, diffRecordsInserts } = createFakeSupabase({ diffRecordRow: { id: 'diff-11' } });
+
+    const result = await insertDiffRecord(client, {
+      ...baseDiffInput,
+      aiText: '내일까지 회신 부탁드립니다.',
+      finalText: '혹시 괜찮으시다면 내일까지 회신 부탁드립니다.',
+    });
+
+    expect(result).toEqual({ id: 'diff-11', patternKey: 'cushion_insert' });
+    expect((diffRecordsInserts[0] as { pattern_key: unknown }).pattern_key).toBe('cushion_insert');
   });
 
   it('sent_messages.channel(web_mock/extension_insert/extension_clipboard)을 diff_records.channel(web/extension) 어휘로 매핑한다', async () => {
