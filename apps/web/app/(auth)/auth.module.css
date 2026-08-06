@@ -24,10 +24,11 @@
 }
 
 .retryButton {
+  min-height: 44px;
   padding: 6px 10px;
-  background: var(--color-focus);
+  background: var(--color-accent);
   color: var(--color-surface);
-  border: 1px solid var(--color-focus);
+  border: 1px solid var(--color-accent);
   font: 800 11px var(--font-sans);
 }
 
@@ -67,6 +68,8 @@
 }
 
 .toggleButton {
+  min-height: 44px;
+  min-width: 44px;
   padding: 6px 9px;
   background: transparent;
   border: 1px solid var(--border-strong);
@@ -75,7 +78,7 @@
 
 .hint {
   font: 400 11px var(--font-sans);
-  color: var(--text-muted-60);
+  color: var(--text-muted-75);
 }
 
 .fieldError {
@@ -88,11 +91,12 @@
   align-items: center;
   justify-content: center;
   width: 100%;
+  min-height: 44px;
   padding: 10px 12px;
   margin-top: 4px;
-  background: var(--color-focus);
+  background: var(--color-accent);
   color: var(--color-surface);
-  border: 1px solid var(--color-focus);
+  border: 1px solid var(--color-accent);
   font: 800 13px var(--font-sans);
 }
 

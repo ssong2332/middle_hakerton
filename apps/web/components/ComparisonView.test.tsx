@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { PreservedItem } from '@cross-border/core';
 import { ComparisonView } from './ComparisonView';
+import styles from './ComparisonView.module.css';
 
 describe('ComparisonView', () => {
   it('AC-008 — 원문/변환문/변환 이유 3열을 나란히 표시한다', () => {
@@ -51,7 +52,7 @@ describe('ComparisonView', () => {
     );
 
     const container = screen.getByLabelText('원문·변환문·변환 이유 비교');
-    expect(container.className).not.toBe('');
+    expect(container.className).toContain(styles.columns);
     // 3열(원문/변환문/변환 이유) 각각이 flex 컨테이너의 직계 자식이어야 "나란히"가 성립한다.
     expect(container.children).toHaveLength(3);
   });

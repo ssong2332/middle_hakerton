@@ -7,6 +7,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MediationWorkspace } from './MediationWorkspace';
+import styles from './MediationWorkspace.module.css';
 
 function mediateSuccessResponse(overrides: Record<string, unknown> = {}) {
   return {
@@ -610,7 +611,7 @@ describe('MediationWorkspace', () => {
     const container = senderColumn?.parentElement ?? null;
     expect(container).not.toBeNull();
     expect(container).toBe(recipientColumn?.parentElement);
-    expect(container?.className).not.toBe('');
+    expect(container?.className).toContain(styles.twoPanel);
   });
 
   // Major 6①(reviewer REJECTED → 수정) — UX-004 Accessibility "A live region announces

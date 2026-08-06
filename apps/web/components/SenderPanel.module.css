@@ -30,11 +30,12 @@
   display: flex;
   align-items: center;
   width: 100%;
+  min-height: 44px;
   padding: 10px 12px;
   margin-top: 4px;
-  background: var(--color-focus);
+  background: var(--color-accent);
   color: var(--color-surface);
-  border: 1px solid var(--color-focus);
+  border: 1px solid var(--color-accent);
   font: 800 13px var(--font-sans);
   text-align: left;
 }
@@ -51,7 +52,7 @@
 .loadingText {
   margin-top: 10px;
   font: 400 11px var(--font-mono);
-  color: var(--text-muted-60);
+  color: var(--text-muted-75);
 }
 
 .errorText {

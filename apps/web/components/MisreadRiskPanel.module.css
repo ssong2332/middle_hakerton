@@ -46,7 +46,7 @@
 .riskDetails dt {
   font: 800 9px var(--font-mono);
   letter-spacing: 0.06em;
-  color: var(--text-muted-60);
+  color: var(--text-muted-75);
 }
 
 .riskDetails dd {

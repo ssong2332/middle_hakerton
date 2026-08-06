@@ -13,7 +13,7 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   margin-bottom: 6px;
-  color: var(--text-muted-60);
+  color: var(--text-muted-75);
 }
 
 .column p {
@@ -36,7 +36,7 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-bottom: 4px;
-  color: var(--text-muted-60);
+  color: var(--text-muted-75);
 }
 
 .preserved ul {
