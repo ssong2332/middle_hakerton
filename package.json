@@ -1,0 +1,32 @@
+{
+  "name": "cross-border-mediator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit -p tsconfig.root.json && npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspace apps/web",
+    "build:ext": "npm run build --workspace apps/extension",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:regression-c2": "vitest run tests/regression-c2.live.test.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.14.0",
+    "eslint": "^10.8.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "jsdom": "^30.0.1",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^4.1.10"
+  }
+}

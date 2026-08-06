@@ -1,5 +1,10 @@
 # Environment variables — never commit real secrets
+# QA(2026-08-04, T3/T4) found docs/Architecture.md:673 names the local source `.env.local`
+# while README.md/이 프로젝트의 실제 사용은 `.env`다 — 문서 불일치는 architect 대기열로 넘겼다.
+# 여기서는 확정 전까지 방어적으로 둘 다 막는다.
 .env
+.env.local
+.env.*.local
 
 # Dependencies
 node_modules/
@@ -7,6 +12,19 @@ node_modules/
 # OS artifacts
 .DS_Store
 Thumbs.db
+
+# Build output
+apps/web/.next/
+apps/web/out/
+apps/extension/dist/
+packages/*/dist/
+coverage/
+*.tsbuildinfo
+
+# next dev가 실행마다 자동 생성 — 루트 AGENTS.md/CLAUDE.md(User 소유)와 이름이 겹치므로
+# 리포에 절대 들어가면 안 된다 (QA 2026-08-04, T3/T4 발견).
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
 
 # AI 개발 도구 설정 — 로컬 전용 (팀원마다 사용하는 도구가 다름)
 # 디스크에는 남아 로컬에서 그대로 동작하며, 리포에만 올리지 않는다.

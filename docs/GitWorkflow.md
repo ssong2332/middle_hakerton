@@ -6,7 +6,6 @@ Owner: User. implementer follows; reviewer checks compliance.
 - No direct commits to `main`.
 - **No direct commits to `dev`.** 작업 브랜치를 거쳐 PR로만 들어간다.
 - **작업 브랜치를 `dev`를 건너뛰고 `main`에 머지하지 않는다.**
-- **본인 PR을 본인이 승인·머지하지 않는다** — 다른 팀원 1명의 승인이 필요하다.
 - No force-push to shared branches (`main`, `dev` 포함).
 - No `--no-verify` / hook skipping.
 - No commit without a passing local test run.
@@ -54,17 +53,16 @@ Types: `feat` / `fix` / `refactor` / `docs` / `test` / `chore`
 ## Merge Rules
 - One task (docs/Tasks.md ID) = one branch = one PR.
 - **작업 브랜치는 `dev`에서 따고 `dev`로 머지한다.** `main`은 배포 시점에만 `dev`를 받는다.
-- **PR에는 다른 팀원 1명의 승인이 필요하다.** 승인 없이 머지하지 않는다.
-  - 이 규칙은 코드 품질만을 위한 것이 아니다. 트랙 심사 기준 "협업"(결과물 안에 실제로 함께 일한 흔적이 보이는가, 배점 20점 중 일부)에 대응하는 **유일한 실질 근거**가 PR 리뷰 기록이다. 브랜치가 갈라졌다 합쳐진 그래프는 분업의 증거일 뿐 협업의 증거가 아니다. 자세한 근거는 docs/PRD.md "심사 기준 ↔ 우리 근거 대조" 참조.
-  - 승인은 형식이 아니다 — **읽고 코멘트를 남긴다.** "LGTM" 한 줄만 반복되면 흔적으로서의 값이 없다.
-  - 4명이 물리적으로 불가능한 시점(심야·마감 직전)에는 승인 없이 머지할 수 있으나, **PR에 그 사실과 이유를 적는다.** 조용히 건너뛰지 않는다.
+- **(v2, 2026-08-05) 자가 머지를 허용한다.** 팀원 승인 없이 본인 PR을 본인이 머지할 수 있다 — **사용자 결정**: 실제 협업(다른 팀원의 PR 리뷰)이 이루어지지 않을 것으로 판단해, 동료 승인을 머지 조건에서 제거했다.
+  - **주의**: 이 규칙 완화로 `docs/PRD.md` "심사 기준 ↔ 우리 근거 대조" 절이 트랙 심사 기준 "협업"의 근거로 지목했던 PR 리뷰 기록이 더 이상 쌓이지 않는다. PRD.md 쪽 반영은 planner 소관이며 별도 처리가 필요하다(아직 미반영).
+  - PR 자체(설명·커밋 이력)는 계속 남긴다 — 리뷰가 없어도 변경 이유를 기록하는 습관은 유지한다.
 - PR merges only after the docs/DefinitionOfDone.md Gate checklist passes (Closure items complete at the docs step after merge).
 - Fast-forward merge when possible (preserves per-task commits for individual revert/bisect); merge-commit when fast-forward is not possible. Never squash — intermediate commits (review fixes, attribution corrections) are part of the audit trail.
 
 ## Who Merges
 | 머지 | 누가 | 조건 |
 |---|---|---|
-| 작업 브랜치 → `dev` | 해당 태스크 담당자 | 다른 팀원 1명 PR 승인 후 |
+| 작업 브랜치 → `dev` | 해당 태스크 담당자 | 승인 불요(자가 머지 허용, v2 2026-08-05). DoD Gate는 여전히 통과해야 한다 |
 | `dev` → `main` | 오케스트레이터(메인 세션) 또는 사용자 | 배포 시점에만. **implementer는 절대 하지 않는다** |
 
 - Merges into `main` are performed by the orchestrator (main session) or the user — never by implementer. The permission system blocks subagent merges; implementer commits on its task branch, stops, and reports.
