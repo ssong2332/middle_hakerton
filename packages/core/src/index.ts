@@ -12,6 +12,7 @@ export * from './errors';
 export * from './rules/decision-authority';
 export * from './rules/ticket-gate';
 export * from './rules/honorific';
+export * from './rules/pattern-detection';
 export * from './rules/urgency-routing';
 export * from './rules/preservation';
 export * from './rules/misread-risk';
