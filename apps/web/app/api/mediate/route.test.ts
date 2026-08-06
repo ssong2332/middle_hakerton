@@ -191,8 +191,9 @@ describe('POST /api/mediate', () => {
         'warnings',
       ].sort(),
     );
-    // 🔴 C6(T24) 대기 — 판정 근거가 없으므로 fail-closed(undetermined)가 정답이다(AC-058).
-    expect(body.ticketOption).toEqual({ offered: false, basis: 'undetermined' });
+    // 🔴 T24 — 'hello'는 감정 신호 키워드가 없으므로 대조군(signal_absent)이 정답이다(AC-058①).
+    // 게이트 판정 자체의 케이스별 검증(T-E01~T-E04)은 `packages/core/src/steps/c6.test.ts`가 한다.
+    expect(body.ticketOption).toEqual({ offered: false, basis: 'signal_absent' });
     // 🔴 프로필/규약이 아직 연결되지 않아 개인화가 적용되지 않는다 — 현재 상태에서는 정확한 값.
     expect(body.personalizationApplied).toBe(false);
     expect(body.holidayConflicts).toEqual([]);
@@ -504,5 +505,38 @@ describe('POST /api/mediate', () => {
     );
 
     expect(mockCreateLLMClient).toHaveBeenCalledWith('user-42');
+  });
+
+  // 🔴 T24 — AC-058 게이트가 이 라우트에 실제로 배선됐는지 확인한다(단위 케이스 자체의 소유자는
+  // `packages/core/src/steps/c6.test.ts`의 `assessEmotionalSignal` — 여기서는 원문(`input.text`)이
+  // 그 함수에 실제로 전달되는지만 본다). `docs/TestCases.md` T-E02/T-E03을 그대로 쓴다.
+  it('AC-058② — 감정형 원문(T-E02)이면 ticketOption.offered가 true다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+    mockCreateClient(fakeLlm());
+
+    const response = await POST(
+      postRequest({
+        text: '이건 명백히 그쪽 실수입니다',
+        context: { languageDirection: 'ko-en', channel: 'web' },
+      }),
+    );
+    const body = await response.json();
+
+    expect(body.ticketOption).toEqual({ offered: true, basis: 'signal_present' });
+  });
+
+  it('AC-058① — 대조군 원문(T-E03)이면 ticketOption.offered가 false다(항상 제시가 아님을 증명)', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+    mockCreateClient(fakeLlm());
+
+    const response = await POST(
+      postRequest({
+        text: '확인 부탁드립니다',
+        context: { languageDirection: 'ko-en', channel: 'web' },
+      }),
+    );
+    const body = await response.json();
+
+    expect(body.ticketOption).toEqual({ offered: false, basis: 'signal_absent' });
   });
 });
