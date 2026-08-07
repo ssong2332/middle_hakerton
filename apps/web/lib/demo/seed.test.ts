@@ -51,8 +51,6 @@ function createFakeSupabase(): { client: SupabaseClient; calls: FakeCalls } {
 
 const DEMO_INPUT: DemoSeedInput = {
   userIds: { jihoon: 'u-jihoon', tanaka: 'u-tanaka', michael: 'u-michael', sarah: 'u-sarah' },
-  jihoonSelfReport: { directness: 'direct', emojiPreference: 'neutral', formality: 'medium', honorificLevel: 'haeyo' },
-  sarahSelfReport: { directness: 'direct', emojiPreference: 'neutral', formality: 'medium', honorificLevel: null },
 };
 
 describe('seedProfiles', () => {
@@ -66,6 +64,34 @@ describe('seedProfiles', () => {
     for (const row of rows) {
       expect(row.onboarding_state).toBe('completed');
     }
+  });
+
+  it('박지훈·Sarah 자기신고 값이 TestCases.md "(v1.7) 스키마 값 확정" 표와 일치한다(QA F-1 회귀 방지)', async () => {
+    const { client, calls } = createFakeSupabase();
+    await seedProfiles(client, DEMO_INPUT);
+
+    const rows = calls.upserts.profiles as Array<{
+      user_id: string;
+      directness: string;
+      emoji_preference: string;
+      formality: string;
+      honorific_level: string | null;
+    }>;
+    const jihoon = rows.find((r) => r.user_id === 'u-jihoon');
+    const sarah = rows.find((r) => r.user_id === 'u-sarah');
+
+    expect(jihoon).toMatchObject({
+      directness: 'direct',
+      emoji_preference: 'neutral',
+      formality: 'medium',
+      honorific_level: 'hapsyo',
+    });
+    expect(sarah).toMatchObject({
+      directness: 'direct',
+      emoji_preference: 'neutral',
+      formality: 'low',
+      honorific_level: null,
+    });
   });
 });
 

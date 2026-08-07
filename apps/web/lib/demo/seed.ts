@@ -5,15 +5,11 @@
  * `apps/web/lib/dictionary/storage.ts`(T22)와 같은 "core 밖 DB I/O 전담 파일" 관례,
  * `SupabaseClient`를 인자로 받는다(생성처는 `apps/web/lib/supabase/` 한 곳뿐).
  *
- * 🔴 **실행 전제 — 이 파일은 아직 실제 Supabase 프로젝트에 실행되지 않았다.** `profiles`·
- * `profile_learned_items`·`dictionary_terms`(간접, FK 없음이지만 owner) 는 전부
- * `auth.users(id)`를 참조한다(`supabase/migrations/0003_...sql`). 즉 이 스크립트를 실제로
- * 돌리려면 **박지훈·타나카·Michael·Sarah 4개의 실제 Supabase Auth 계정**이 먼저 있어야 한다.
- * T74(AC-039)의 선례와 같은 이유로 `auth.users`에 직접 INSERT하는 경로는 만들지 않았다 —
- * 계정은 실제 회원가입 플로우(T46)로만 만들어야 하고, **계정 생성은 세션마다 사용자 재승인이
- * 필요한 행위**다(`docs/DECISIONS.md` #50 Why 열, T74 각주). 이 파일의 함수들은 그 승인이
- * 나고 4개 계정의 `user_id`(UUID)가 확보된 뒤 `seedDemoData()`에 넘기면 되도록 이미
- * 파라미터화해 두었다 — 계정이 생기기 전까지는 fake client로만 검증된 상태다(`seed.test.ts`).
+ * 🔴 **실행 상태(2026-08-07 갱신)** — 이 함수들은 실제 Supabase 프로젝트(`aranhwommpaphkxdfjuf`)에
+ * 오케스트레이터가 직접 파생한 SQL로 1회 실행됐다(`docs/TestCases.md` "실행 기록" 표 C).
+ * 이 파일의 함수 자체는 여전히 **fake client로만 테스트되며 프로덕션 호출자가 없다**
+ * (QA M-5 지적, 해결은 후속 라운드) — 계정 4개는 실제 회원가입 플로우(T46)로 만들었다
+ * (`docs/DECISIONS.md` #50과 같은 원칙, 계정 생성은 세션별 사용자 재승인 사항).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
@@ -23,9 +19,10 @@ import {
   countByPatternKey,
   DEMO_IDENTIFIERS,
   DIFF_HISTORY_SOURCE,
+  JIHOON_SELF_REPORT,
   MICHAEL_SELF_REPORT,
+  SARAH_SELF_REPORT,
   TANAKA_SELF_REPORT,
-  type SelfReportInput,
 } from './seed-data';
 import { profileValueForPattern, type DiffPatternKey } from '@cross-border/core';
 
@@ -38,19 +35,15 @@ export interface DemoUserIds {
 
 export interface DemoSeedInput {
   userIds: DemoUserIds;
-  /** `seed-data.ts` 헤더의 gap ① — TestCases.md에 없는 값이라 호출자가 명시적으로 채운다. */
-  jihoonSelfReport: SelfReportInput;
-  /** gap ② — 마찬가지. */
-  sarahSelfReport: SelfReportInput;
 }
 
 /** ① 프로필 4인 — 전부 온보딩 완료 상태로 upsert한다(AC-059⑦). */
 export async function seedProfiles(client: SupabaseClient, input: DemoSeedInput): Promise<void> {
   const rows = [
-    buildProfileRow({ userId: input.userIds.jihoon, selfReport: input.jihoonSelfReport }),
+    buildProfileRow({ userId: input.userIds.jihoon, selfReport: JIHOON_SELF_REPORT }),
     buildProfileRow({ userId: input.userIds.tanaka, selfReport: TANAKA_SELF_REPORT }),
     buildProfileRow({ userId: input.userIds.michael, selfReport: MICHAEL_SELF_REPORT }),
-    buildProfileRow({ userId: input.userIds.sarah, selfReport: input.sarahSelfReport }),
+    buildProfileRow({ userId: input.userIds.sarah, selfReport: SARAH_SELF_REPORT }),
   ];
   const { error } = await client.from('profiles').upsert(rows, { onConflict: 'user_id' });
   if (error) throw error;

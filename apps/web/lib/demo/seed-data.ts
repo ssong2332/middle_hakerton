@@ -3,20 +3,15 @@
  * DB I/O는 `./seed.ts`(같은 디렉터리)에 있다(`apps/web/lib/messages/pattern-learning.ts`와 같은
  * "core 밖 DB I/O 전담 파일" 관례).
  *
- * 출처: `docs/TestCases.md:176-427` "(v1.1) 데모 시드 데이터셋" 절. **이 파일은 그 절에 없는
- * 값을 만들지 않는다** — 아래 두 항목은 소스에 없어 시드가 완결되지 않는 **알려진 gap**이며,
- * 값을 지어내는 대신 타입으로 "필수 입력"을 강제해 호출자가 빠뜨리면 즉시 드러나게 한다:
+ * 출처: `docs/TestCases.md`(v1.7 이상) "데모 시드 데이터셋" 절. **이 파일은 그 절에 없는 값을
+ * 만들지 않는다.**
  *
- * 1. **박지훈(발신자)의 온보딩 자기신고 값** — TestCases.md:196 "자기신고 프로필" 열이 "—"다.
- *    AC-059/#85가 요구하는 "학습 전 = 자기신고는 있음 + diff 0건" 상태를 만들려면 그의
- *    `directness`/`emoji_preference`/`formality`/`honorific_level` 값이 필요한데, 소스 문서
- *    어디에도 구체값이 없다. → `buildProfileRow()`가 `selfReport`를 **필수 인자**로 요구한다.
- * 2. **Sarah Willis의 온보딩 자기신고 값** — TestCases.md:199도 "학습 데이터 없음"만 적혀 있고
- *    자기신고 자체의 구체값은 없다("cold start"는 diff·규약이 0건이라는 뜻이지 자기신고가
- *    없다는 뜻이 아니다 — TestCases.md:203-211 참조). → 마찬가지로 `selfReport` 필수.
- *
- * 실행 시 이 두 값을 채우려면 planner가 TestCases.md에 값을 추가하거나, 사용자가 직접 값을
- * 확정해야 한다(구현 판단으로 채울 성질의 데이터가 아니다 — 발표 화면에 그대로 노출된다).
+ * 🔴 **정정(2026-08-07, QA F-1 지적)**: 이전 버전의 이 주석은 "박지훈·Sarah의 자기신고 값이
+ * 소스 문서에 없다"고 적어뒀으나, **TestCases.md v1.7이 이미 그 값을 확정**했다(아래
+ * `JIHOON_SELF_REPORT`/`SARAH_SELF_REPORT` 참조 — "(v1.7) 자기신고 프로필 4인 — 스키마 값
+ * 확정" 절, "T61이 그대로 쓴다 … T61은 이 표 밖의 값을 만들지 않는다"). 그 사실이 갱신되지
+ * 않은 채로 `apps/web/lib/demo/seed.test.ts`가 다른 값(`honorificLevel: 'haeyo'`, Sarah
+ * `formality: 'medium'`)을 fixture로 써왔다 — 확정값과 불일치하는 잘못된 값이었다(수정됨).
  */
 import type { DiffPatternKey } from '@cross-border/core';
 import { classifyDiffPattern } from '@cross-border/core';
@@ -127,6 +122,27 @@ export function buildProfileRow(input: ProfileRowInput): ProfileRow {
     honorific_level: input.selfReport.honorificLevel,
   };
 }
+
+/**
+ * TestCases.md "(v1.7) 자기신고 프로필 4인 — 스키마 값 확정" 표 — 박지훈 "직설 선호 · 이모지
+ * 보통 · 격식 보통 · 합쇼체". 🔴 **장면 5-(a) "학습 전/학습 후" 대비가 이 값에 걸려 있다** —
+ * 자기신고가 이미 완곡/고격식이면 학습 전 제안문에도 완충 표현이 들어가 대비가 사라진다.
+ */
+export const JIHOON_SELF_REPORT: SelfReportInput = {
+  directness: 'direct',
+  emojiPreference: 'neutral',
+  formality: 'medium',
+  honorificLevel: 'hapsyo',
+};
+
+/** TestCases.md "(v1.7)" 표 — Sarah "직설 선호 · 이모지 보통 · 격식 낮음". cold start
+ *  대조군의 자기신고는 채워져 있다 — 비어있는 것은 diff·규약(학습 데이터)뿐이다. */
+export const SARAH_SELF_REPORT: SelfReportInput = {
+  directness: 'direct',
+  emojiPreference: 'neutral',
+  formality: 'low',
+  honorificLevel: null,
+};
 
 /** TestCases.md:197 타나카 자기신고 — "완곡 선호 · 이모지 거의 안 씀 · 격식 높음". 한국어
  *  존댓말 축은 근거가 없어 `null`(비한국어 화자, TestCases에 값 없음). */
