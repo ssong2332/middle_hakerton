@@ -123,6 +123,21 @@ export const FALLBACK_RESPONSES: FallbackResponseEntry[] = [
       decisionAuthorityEvidence: null,
     }),
   },
+  /**
+   * 🔴 T26(2026-08-07) — C7 폴백. 위 c1/c2/c4/c6과 같은 이유로 **실제 입력을 본 적이 없다는
+   * 사실만 말한다** — 근거 없는 결정 항목을 지어내지 않는다(AC-020/AC-038과 같은 "없는 값을
+   * 지어내지 않는다" 원칙). `decisions: []`가 자연스러운 값인 이유: 폴백은 스레드 원문을 본 적이
+   * 없으므로 어떤 결정이 있었는지 자체를 말할 근거가 없다 — 빈 배열은 "결정 없음"이 아니라
+   * "폴백이라 판단 불가"에 해당하지만, `SummaryResult.decisions`는 항목이 있을 때만 내용을
+   * 담는 구조라 근거 없이 항목을 채우는 대신 빈 배열로 둔다(`unresolved`도 `decisions`에서
+   * 파생되므로 함께 빈 배열이 된다, `steps/c7.ts` `toUnresolved()` 참조).
+   */
+  {
+    step: 'c7',
+    content: JSON.stringify({
+      decisions: [],
+    }),
+  },
 ];
 
 /**
