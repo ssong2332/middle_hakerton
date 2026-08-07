@@ -188,7 +188,7 @@ describe('DecisionsWorkspace', () => {
     expect(secondDataRow.queryByText('undefined')).toBeNull();
     expect(secondDataRow.queryByText('null')).toBeNull();
     // 근거 셀 안에 상태값('불명') 외의 다른 텍스트 노드가 없어야 한다 — 빈 문자열을 지어내지 않는다.
-    const authorityCell = rows[2].cells[3];
+    const authorityCell = (rows[2] as HTMLTableRowElement).cells[3];
     expect(authorityCell.textContent).toBe('불명');
   });
 

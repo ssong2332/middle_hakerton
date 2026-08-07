@@ -67,6 +67,22 @@
   text-transform: uppercase;
 }
 
+.authorityValue {
+  font: 700 12px var(--font-sans);
+}
+
+.authorityEvidence {
+  font: 400 11px var(--font-sans);
+  color: var(--text-muted-75);
+  margin-top: 4px;
+}
+
+.decisionsEmpty {
+  font: 400 12px var(--font-sans);
+  color: var(--text-muted-75);
+  margin-bottom: 20px;
+}
+
 .unresolvedSection {
   border: 1px solid var(--border-strong);
   padding: 12px 14px;

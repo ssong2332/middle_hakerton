@@ -115,21 +115,28 @@ function SummaryResultView({ summary }: { summary: SummaryResult }) {
         </p>
       )}
 
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th scope="col">Decision</th>
-            <th scope="col">Owner</th>
-            <th scope="col">Deadline</th>
-            <th scope="col">결정 권한 상태</th>
-          </tr>
-        </thead>
-        <tbody>
-          {summary.decisions.map((item, index) => (
-            <DecisionRow key={index} item={item} />
-          ))}
-        </tbody>
-      </table>
+      {/* M-1, `docs/UX.md:923` — "정상적으로 판정됐지만 비어 있음"과 "렌더링 버그로 빈 화면"이
+          똑같이 보이면 안 된다. `decisions: []`는 유효한 정상 응답(AC-020 원칙)이므로 표 대신
+          그 사실을 명시한다 — 아래 미확정 목록의 빈 상태 처리(:139)와 같은 패턴. */}
+      {summary.decisions.length === 0 ? (
+        <p className={styles.decisionsEmpty}>결정사항이 발견되지 않았습니다.</p>
+      ) : (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th scope="col">Decision</th>
+              <th scope="col">Owner</th>
+              <th scope="col">Deadline</th>
+              <th scope="col">결정 권한 상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.decisions.map((item, index) => (
+              <DecisionRow key={index} item={item} />
+            ))}
+          </tbody>
+        </table>
+      )}
 
       {/* UX.md:544 — 표와 "별도"의 미확정 경고 목록. T44(planner Decision #121)가 더 정교하게
           다듬을 예정이지만, UX-008 States 자체가 Result 상태에 이 목록을 요구하므로 단순하고
@@ -159,10 +166,20 @@ function DecisionRow({ item }: { item: DecisionItem }) {
       <td>{item.decision}</td>
       <td>{cellText(item.owner)}</td>
       <td>{cellText(item.dueDate)}</td>
-      {/* AC-050①/AC-064②⑤ — `authorityStatus`는 판별 유니온이라 `불명`이면 근거가 없을 수
+      {/* AC-050①②/AC-064②⑤ — `authorityStatus`는 판별 유니온이라 `불명`이면 근거가 없을 수
           있고, 판정값이면 근거가 항상 함께 있다. 값 자체는 `불명`을 포함해 항상 문자열로
-          렌더한다 — 빈칸·아이콘 단독 표시 금지. */}
-      <td>{item.authorityStatus}</td>
+          렌더한다 — 빈칸·아이콘 단독 표시 금지. 근거 문장은 같은 셀 안에 상태값 아래로
+          쌓는다(5번째 열을 새로 만들지 않는다) — `TicketWorkspace.tsx`(T25)가 이미 값+근거를
+          같은 블록에 쌓는 관례를 쓰고, 이 표는 4열 헤더가 AC-019로 고정돼 있어 열을 늘리면
+          그 표를 스캔하기 어렵게 만들 뿐 UX.md가 요구하는 바도 아니다(UX-008은 이 배치를
+          명시하지 않는다 — UX-007과 달리). 근거가 없으면(`불명`+`null`) 아무것도 지어내지
+          않는다(AC-020 원칙과 동일). */}
+      <td>
+        <p className={styles.authorityValue}>{item.authorityStatus}</p>
+        {item.authorityEvidence && (
+          <p className={styles.authorityEvidence}>{item.authorityEvidence}</p>
+        )}
+      </td>
     </tr>
   );
 }
