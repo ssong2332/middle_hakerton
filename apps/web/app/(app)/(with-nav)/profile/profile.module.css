@@ -140,7 +140,7 @@
 
 .editButton,
 .deleteButton {
-  min-height: 32px;
+  min-height: 44px;
   padding: 4px 10px;
   background: transparent;
   border: 1px solid var(--border-strong);
@@ -166,7 +166,7 @@
 }
 
 .saveButton {
-  min-height: 32px;
+  min-height: 44px;
   padding: 4px 10px;
   background: var(--color-accent);
   color: var(--color-surface);
@@ -179,7 +179,7 @@
 }
 
 .cancelButton {
-  min-height: 32px;
+  min-height: 44px;
   padding: 4px 10px;
   background: transparent;
   border: 1px solid var(--border-thin);
@@ -200,7 +200,7 @@
 }
 
 .confirmDeleteButton {
-  min-height: 32px;
+  min-height: 44px;
   padding: 4px 10px;
   background: var(--color-accent);
   color: var(--color-surface);

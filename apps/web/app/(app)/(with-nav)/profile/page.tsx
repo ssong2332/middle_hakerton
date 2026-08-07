@@ -45,10 +45,14 @@ const FIELD_DELETE_FAILED_MESSAGE = '삭제하지 못했습니다, 다시 시도
 const EMPTY_VALUE_ERROR = '값을 선택해주세요';
 const CONFIRM_DELETE_MESSAGE = '삭제하시겠습니까?';
 // M-4 — `not_started`는 "건너뛰었다"가 아니라 "아직 완료하지 않았다"이므로 별도 문구를 쓴다.
-// `skipped`와 "completed인데 자기신고 4항목이 모두 null"(M-3)은 같은 문구를 공유한다 — 두 경우
-// 모두 "자기신고로 채워질 값이 없다"는 같은 사실이며, 이 이상의 세분화는 이번 수정 범위 밖이다.
 const SKIPPED_MESSAGE = '온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다';
 const NOT_STARTED_MESSAGE = '온보딩이 아직 완료되지 않았습니다 — 개인화가 꺼져 있습니다';
+// F-3(QA) — completed인데 자기신고 4항목을 전부 삭제한 경우(M-3)는 "건너뛰었다"가 사실과
+// 다르다(이 사용자는 온보딩을 완료했다) — SKIPPED_MESSAGE를 재사용하지 않고 전용 문구를 쓴다.
+// 이 문구는 오케스트레이터가 확정한 카피이며 `docs/UX.md` 동기화는 별도 ux-design 패스에서
+// 처리한다(이 커밋은 UX.md를 건드리지 않는다).
+const ALL_FIELDS_DELETED_MESSAGE =
+  '입력한 프로필 항목이 모두 삭제되어 개인화가 꺼져 있습니다 — 항목을 다시 입력하면 켜집니다';
 
 type Directness = 'direct' | 'indirect';
 type EmojiPreference = 'likes' | 'neutral' | 'avoids';
@@ -190,6 +194,10 @@ export default function ProfilePage() {
   }
 
   function startEdit(key: FieldKey) {
+    // F-1 — 편집과 삭제-확인은 같은(또는 다른) 행에서도 동시에 열려 있으면 안 된다. 삭제
+    // 확인이 열린 채로 편집을 시작하면, 확인을 누른 뒤 편집 폼의 저장이 삭제 직전의 값으로
+    // PUT을 다시 보내 삭제를 되돌릴 수 있었다 — 편집을 시작할 때 진행 중인 삭제 확인을 닫는다.
+    setDeleteTarget(null);
     setFieldErrors((previous) => ({ ...previous, [key]: undefined }));
     setEditingField(key);
     setEditDraft(profile ? profile[key] : null);
@@ -207,6 +215,17 @@ export default function ProfilePage() {
       return;
     }
     const key = editingField;
+    // F-4 — 이 함수는 PUT body에 `onboardingState: 'completed'`를 하드코딩해 보낸다. 이는
+    // 렌더 시점 게이트(canManageSelfReport)가 이미 completed가 아닌 프로필의 편집을 막고
+    // 있다는 불변식에만 기대고 있고, 그 불변식은 DB/스토리지 레벨에서 강제되지 않는다.
+    // 호출 시점에 다시 확인해, 어긋난 상태에서 호출되면 조용히 상태를 훼손하는 대신 막는다.
+    if (profile.onboardingState !== 'completed') {
+      console.warn(
+        '[profile] saveEdit() called while onboardingState !== "completed" — refusing to send PUT to avoid corrupting onboarding state',
+      );
+      setFieldErrors((previous) => ({ ...previous, [key]: FIELD_SAVE_FAILED_MESSAGE }));
+      return;
+    }
     setEditSaving(true);
     setFieldErrors((previous) => ({ ...previous, [key]: undefined }));
     try {
@@ -238,10 +257,15 @@ export default function ProfilePage() {
   }
 
   function requestDeleteField(key: FieldKey) {
+    // F-1 — 반대 방향도 배타적이어야 한다: 편집 폼이 열린 채로 삭제를 시작하면 편집을 닫는다.
+    setEditingField(null);
+    setEditDraft(null);
     setDeleteTarget({ type: 'field', key });
   }
 
   function requestDeleteLearned(id: string) {
+    setEditingField(null);
+    setEditDraft(null);
     setDeleteTarget({ type: 'learned', id });
   }
 
@@ -265,6 +289,14 @@ export default function ProfilePage() {
 
   async function deleteField(key: FieldKey) {
     if (!profile) return;
+    // F-4 — saveEdit()과 같은 이유: 호출 시점에 다시 `onboardingState`를 확인한다(위 주석 참고).
+    if (profile.onboardingState !== 'completed') {
+      console.warn(
+        '[profile] deleteField() called while onboardingState !== "completed" — refusing to send PUT to avoid corrupting onboarding state',
+      );
+      setFieldErrors((previous) => ({ ...previous, [key]: FIELD_DELETE_FAILED_MESSAGE }));
+      return;
+    }
     setFieldErrors((previous) => ({ ...previous, [key]: undefined }));
     try {
       const fields: StyleFields = {
@@ -344,8 +376,14 @@ export default function ProfilePage() {
   // 언제나"이므로, 상태값과 별개로 실제 4개 필드가 모두 null인지도 함께 본다.
   const allStyleFieldsNull = FIELD_ORDER.every((key) => profile[key] === null);
   const isSkippedOrEmpty = profile.onboardingState !== 'completed' || allStyleFieldsNull;
+  // F-3 — completed인데 4항목을 전부 지운 경우(M-3)는 skipped/not_started와 다른 문구를 쓴다
+  // (이 사용자는 온보딩을 건너뛰거나 미완료한 게 아니라, 완료 후 값을 지웠다).
   const bannerMessage =
-    profile.onboardingState === 'not_started' ? NOT_STARTED_MESSAGE : SKIPPED_MESSAGE;
+    profile.onboardingState === 'completed'
+      ? ALL_FIELDS_DELETED_MESSAGE
+      : profile.onboardingState === 'not_started'
+        ? NOT_STARTED_MESSAGE
+        : SKIPPED_MESSAGE;
 
   return (
     <main className={styles.page}>
