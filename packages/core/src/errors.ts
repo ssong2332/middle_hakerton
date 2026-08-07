@@ -17,6 +17,7 @@ export type ErrorCode =
   | 'AUTH_INVALID_CREDENTIALS'
   | 'NOT_FOUND'
   | 'CONFLICT_PROTOCOL_AUTHORED'
+  | 'CONFLICT_DUPLICATE_ENTRY'
   | 'LLM_TIMEOUT'
   | 'LLM_UNAVAILABLE'
   | 'LLM_MALFORMED'
@@ -92,5 +93,17 @@ export class NotFoundError extends CoreError {
 /** `docs/API.md` `CONFLICT_PROTOCOL_AUTHORED`(409) — AC-074④, 상대가 규약을 직접 작성함. */
 export class ConflictError extends CoreError {
   readonly code = 'CONFLICT_PROTOCOL_AUTHORED' as const;
+  readonly retryable = false as const;
+}
+
+/**
+ * `docs/API.md` "GET / POST /api/dictionary · PUT / DELETE /api/dictionary/{id}" 409(중복
+ * `sourceText`) — AC-016, T23이 처음 던진다(파일 상단 주석 "그 에러를 처음 던지는 태스크가
+ * 정한다"). `ConflictError`(상대가 규약을 직접 작성함, AC-074④)와는 발생 조건이 전혀 다른
+ * 별개의 409라 코드를 공유하지 않는다 — 같은 용어/실명(entryType별 대소문자 무시 비교)을
+ * 중복 등록하려 할 때만 던진다.
+ */
+export class DuplicateEntryError extends CoreError {
+  readonly code = 'CONFLICT_DUPLICATE_ENTRY' as const;
   readonly retryable = false as const;
 }

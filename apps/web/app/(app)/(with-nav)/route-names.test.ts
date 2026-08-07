@@ -38,13 +38,18 @@ describe('T73① 라우트 이름 정정 — AC-084①②③', () => {
     },
   );
 
-  it('AC-084③ — /api/* 디렉터리는 변경 전과 동일하다(mediate·messages·profile·ticket, diff 0건)', () => {
+  it('AC-084③ — /api/* 디렉터리는 T73① 시점과 동일하다(mediate·messages·profile·ticket, diff 0건)', () => {
     expect(existsSync(join(apiDir, 'mediate'))).toBe(true);
     expect(existsSync(join(apiDir, 'messages'))).toBe(true);
     expect(existsSync(join(apiDir, 'profile'))).toBe(true);
     expect(existsSync(join(apiDir, 'ticket'))).toBe(true);
-    // T73①이 새로 만들거나 지운 /api 하위 디렉터리가 없어야 한다 — 이름 4개 그대로.
-    expect(existsSync(join(apiDir, 'dictionary'))).toBe(false);
+    // T73①이 새로 만들거나 지운 /api 하위 디렉터리가 없어야 한다 — 당시 이름 4개 그대로.
+    // 🔴 T23 — `/api/dictionary`는 `docs/API.md` "GET / POST /api/dictionary · PUT / DELETE
+    // /api/dictionary/{id}"가 처음부터 명시한 계약이라 T73① 이후 T23이 정당하게 새로 만든다
+    // (페이지 경로는 UX-010 이름 정정에 따라 `/terminology`이지만 API 경로는 그대로 `dictionary`
+    // — `docs/UX.md:890` 이름 정정은 페이지 라우트에만 적용되고 API 계약은 별개다). 이 줄만
+    // T23이 갱신하고 나머지(협업 규약 등 아직 안 만든 라우트)는 T73①의 원래 단언을 유지한다.
+    expect(existsSync(join(apiDir, 'dictionary'))).toBe(true);
     expect(existsSync(join(apiDir, 'terminology'))).toBe(false);
     expect(existsSync(join(apiDir, 'protocol'))).toBe(false);
     expect(existsSync(join(apiDir, 'pair-protocols'))).toBe(false);
