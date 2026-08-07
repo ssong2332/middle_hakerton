@@ -370,6 +370,53 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
     ).toBeTruthy();
   });
 
+  it('F-1 (재발) — 삭제가 진행 중인 동안에는 같은 행의 수정 버튼이 비활성화되어, 완료된 삭제를 되살리는 stale PUT이 발생하지 않는다', async () => {
+    mockLoadSuccess(COMPLETED_PROFILE, []);
+    render(<ProfilePage />);
+    await waitFor(() => screen.getByText('직설/완곡'));
+
+    const directnessRow = screen.getByText('직설/완곡').closest('li') as HTMLElement;
+    fireEvent.click(within(directnessRow).getByRole('button', { name: '삭제' }));
+    const confirmBox = within(directnessRow).getByRole('alert');
+
+    // 삭제 PUT을 즉시 resolve하지 않는, 제어 가능한 pending promise로 대체한다 — 그
+    // resolve 시점을 직접 통제해야 "삭제 진행 중" 창을 실제로 재현할 수 있다.
+    let resolveDeletePut: (value: unknown) => void = () => {};
+    const deletePutPromise = new Promise((resolve) => {
+      resolveDeletePut = resolve;
+    });
+    mockFetch.mockImplementationOnce(() => deletePutPromise);
+    fireEvent.click(within(confirmBox).getByRole('button', { name: '삭제' }));
+
+    // 삭제 PUT이 아직 pending인 동안(deleting === true) 같은 행의 수정 버튼은 비활성화되어야 한다.
+    await waitFor(() => {
+      const editButton = within(directnessRow).getByRole('button', {
+        name: '수정',
+      }) as HTMLButtonElement;
+      expect(editButton.disabled).toBe(true);
+    });
+    fireEvent.click(within(directnessRow).getByRole('button', { name: '수정' }));
+    // 비활성화되어 있으므로 클릭해도 편집 폼이 열리지 않는다 — stale 값(editDraft='direct')을
+    // 캡처할 기회 자체가 없어야 한다.
+    expect(
+      within(directnessRow).queryByRole('radio', { name: '직설적으로 표현하는 편이에요' }),
+    ).toBeNull();
+
+    resolveDeletePut(jsonOk({ ...COMPLETED_PROFILE, directness: null }));
+    await waitFor(() => {
+      expect(within(directnessRow).getByText('미설정')).toBeTruthy();
+    });
+
+    // 삭제 완료 후에도 편집 폼이 열려 있으면 안 되고(저장 버튼 없음), delete 이후 stale
+    // 값을 되살리는 두 번째 PUT도 전혀 나가지 않아야 한다(총 PUT 호출은 삭제 1건뿐).
+    expect(within(directnessRow).queryByRole('button', { name: '저장' })).toBeNull();
+    expect(
+      mockFetch.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === 'PUT',
+      ),
+    ).toHaveLength(1);
+  });
+
   it('F-4 — 방어적 가드: onboardingState가 completed가 아닌데(불변식 위반) 삭제를 시도하면 PUT을 보내지 않고 인라인 에러를 보여준다', async () => {
     // 정상 UI 경로에서는 도달하지 않아야 하는 상태를 재현한다 — skipped인데 필드값이 남아있는
     // 불변식 위반(현재는 canManageSelfReport가 profile[key] !== null이면 컨트롤을 렌더한다).
