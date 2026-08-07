@@ -19,9 +19,16 @@
  *
  * - `TICKET_DRAFT_SESSION_KEY` — **API 소스 전용**. `MediationWorkspace`의 "Convert to Task
  *   Ticket" 클릭 시 승인 스냅샷 원문을 쓰고 `/ticket`으로 이동한다. `TicketWorkspace` 마운트
- *   시 이 키를 읽어 변환 API에 넘길 원문으로만 쓴다(값이 없으면 "원본 메시지 없음" 상태). 그
- *   외 누구도 이 키를 다시 쓰거나 지우지 않는다 — "Back to message"/"Use this ticket" 두 exit
- *   모두 건드리지 않는다.
+ *   시 이 키를 읽어 변환 API에 넘길 원문으로만 쓴다(값이 없으면 "원본 메시지 없음" 상태).
+ *   `TicketWorkspace`의 "Back to message"/"Use this ticket" 두 exit 모두 이 키를 건드리지
+ *   않는다 — 대신 `MediationWorkspace`가 마운트 시(같은 이펙트가 `TICKET_RESTORE_SESSION_KEY`를
+ *   읽고 지우는 지점) 이 키도 함께 무조건 지운다(M-A, reviewer 발견 → 수정). `/ticket`으로
+ *   이동하면 반드시 `MediationWorkspace`가 먼저 언마운트되므로, 다음에 이 값이 다시 유효해지려면
+ *   반드시 그 사이 `MediationWorkspace`가 마운트되어(이 값을 지우고) "Convert to Task Ticket"이
+ *   다시 클릭돼야 한다 — 그 클릭 없이 남아 있는 값은 언제나 이전 방문의 잔재이므로, 마운트
+ *   시점에 무조건 지워도 진행 중인 티켓 전환 흐름을 방해하지 않는다. 이렇게 해야 AC-058 게이트를
+ *   거치지 않은 이후의 `/ticket` 재진입(브라우저 Back/Forward, 북마크, 직접 URL)이 스테일 원문으로
+ *   `POST /api/ticket`을 다시 호출하지 않고 "원본 메시지 없음" 상태로 정상 귀결된다.
  * - `TICKET_RESTORE_SESSION_KEY` — **작성창 복원 전용**. "Convert to Task Ticket" 클릭 시점의
  *   **라이브** 작성창 텍스트를 쓴다. `TicketWorkspace`의 "Use this ticket"은 티켓에서 조립한
  *   텍스트로 이 키를 **덮어쓴다**(두 쓰기는 같은 방문 안에서 상호 배타적으로 일어난다 — 방문당

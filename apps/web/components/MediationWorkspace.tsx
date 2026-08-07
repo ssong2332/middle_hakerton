@@ -148,6 +148,16 @@ export function MediationWorkspace() {
       setText(draft);
       sessionStorage.removeItem(TICKET_RESTORE_SESSION_KEY);
     }
+    // M-A(reviewer 발견 → 수정) — `TICKET_DRAFT_SESSION_KEY`(API 소스 스냅샷)도 여기서 함께
+    // 지운다. 이 이펙트는 마운트 시 1회만 도므로, 이 시점 이후 "Convert to Task Ticket"을 실제로
+    // 클릭하기 전까지는 이 방문에서 그 클릭이 있었을 수 없다 — 즉 지금 이 값이 남아 있다면 그건
+    // 이전 방문(직전 티켓 전환)이 남긴 것이고, 이번 방문에서 아직 소비되지 않은 새 값일 수는
+    // 없다. 지우지 않으면 이 키가 탭 세션 내내(원래 설계는 "한 번 쓰고 한 번 읽히는" 값이었다,
+    // `apps/web/lib/ticket-draft.ts` 헤더 주석) 영구히 남아, AC-058 게이트(이 버튼 클릭)를 거치지
+    // 않은 이후의 `/ticket` 진입(브라우저 Back/Forward, 북마크, 직접 URL)이 스테일 원문으로
+    // `POST /api/ticket`을 다시 호출해버린다 — `TicketWorkspace`는 그 경우 `no-source` 상태를
+    // 보여줘야 정상이다.
+    sessionStorage.removeItem(TICKET_DRAFT_SESSION_KEY);
     // MAJ-3(reviewer follow-up) — 원문과 같은 원리로, 받는 사람 값도 있으면 복원하고 즉시
     // 소비(삭제)한다(스테일 재노출 방지, 위 원문 복원과 같은 이유).
     const recipientDraft = sessionStorage.getItem(TICKET_DRAFT_RECIPIENT_SESSION_KEY);
@@ -370,8 +380,9 @@ export function MediationWorkspace() {
   // (재실행 없이) 사용자가 원문을 더 편집했다면 그 편집분은 아직 어떤 중재 결과로도 검토되지
   // 않았으므로 `/api/ticket` 호출에는 반영하면 안 되지만(위 스냅샷 키가 그 보장을 지킨다),
   // "Back to message"로 돌아왔을 때 작성창은 사용자가 실제로 쓰고 있던 텍스트를 보여줘야 한다
-  // (`docs/UX.md` Exit "discard the ticket, return to what I was writing") — 스냅샷으로 조용히
-  // 되돌리면 그 편집을 잃는다.
+  // (`docs/UX.md:513` UX-007 Exit — "Back to message" returns to UX-004 with the original
+  // free-text message unchanged; `docs/UX.md:515` Secondary Actions — Back to message discards
+  // the ticket but keeps the free text) — 스냅샷으로 조용히 되돌리면 그 편집을 잃는다.
   function handleConvertToTicket() {
     sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, approvalSnapshot?.text ?? text);
     sessionStorage.setItem(TICKET_RESTORE_SESSION_KEY, text);
