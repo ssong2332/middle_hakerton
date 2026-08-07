@@ -160,6 +160,36 @@ describe('DecisionsWorkspace', () => {
     expect(firstDataRow.getByText('김OO')).toBeTruthy();
     expect(firstDataRow.getByText('2026-08-11')).toBeTruthy();
     expect(firstDataRow.getByText('확정')).toBeTruthy();
+    // C-1 — AC-050②: 판정된 경우 근거 문장이 함께 표시된다(상태 텍스트만으로는 불충분).
+    expect(
+      firstDataRow.getByText(
+        '"제가 최종 승인했습니다"라는 문장에서 확정임을 알 수 있습니다.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('C-1 — authorityStatus가 불명이고 authorityEvidence가 null이면 근거 문장 자리에 아무것도 지어내지 않는다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(summaryResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<DecisionsWorkspace />);
+    fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
+      target: { value: '스레드 원문' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('table')).toBeTruthy();
+    });
+
+    const rows = screen.getAllByRole('row');
+    const secondDataRow = within(rows[2]);
+    expect(secondDataRow.getByText('불명')).toBeTruthy();
+    expect(secondDataRow.queryByText('undefined')).toBeNull();
+    expect(secondDataRow.queryByText('null')).toBeNull();
+    // 근거 셀 안에 상태값('불명') 외의 다른 텍스트 노드가 없어야 한다 — 빈 문자열을 지어내지 않는다.
+    const authorityCell = rows[2].cells[3];
+    expect(authorityCell.textContent).toBe('불명');
   });
 
   it('AC-020 — 담당자·기한 근거가 없으면 빈칸이 아니라 "미정"으로 명시 표기한다', async () => {
@@ -236,6 +266,22 @@ describe('DecisionsWorkspace', () => {
 
     const unresolvedSection = screen.getByRole('region', { name: '미확정 항목' });
     expect(within(unresolvedSection).getByText(/미확정 항목이 없습니다/)).toBeTruthy();
+  });
+
+  it('M-1 — decisions가 빈 배열이면 빈 표 대신 "결정사항이 발견되지 않았습니다"를 표시한다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(summaryResponse({ decisions: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<DecisionsWorkspace />);
+    fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
+      target: { value: '스레드 원문' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('결정사항이 발견되지 않았습니다.')).toBeTruthy();
+    });
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('AC-041 — source가 fallback이면 "폴백 응답 사용 중" 라벨을 표시한다', async () => {
