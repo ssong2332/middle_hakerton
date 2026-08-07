@@ -1,0 +1,254 @@
+/**
+ * UX-009 Profile Management Screen — `docs/UX.md` Screen Catalog (Screen ID: UX-009).
+ * AC-014, AC-012/AC-013(뒷단이지만 이 화면이 노출), AC-046, AC-059. `docs/Tasks.md` T21.
+ */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+
+const mockPush = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
+
+import ProfilePage from './page';
+
+const COMPLETED_PROFILE = {
+  onboardingState: 'completed',
+  directness: 'direct',
+  emojiPreference: 'neutral',
+  formality: 'medium',
+  honorificLevel: 'hapsyo',
+  updatedAt: '2026-08-07T00:00:00Z',
+};
+
+const SKIPPED_PROFILE = {
+  onboardingState: 'skipped',
+  directness: null,
+  emojiPreference: null,
+  formality: null,
+  honorificLevel: null,
+  updatedAt: null,
+};
+
+function jsonOk(body: unknown) {
+  return { ok: true, json: async () => body };
+}
+
+function mockLoadSuccess(profile: unknown, learnedItems: unknown[] = []) {
+  mockFetch.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url === '/api/profile' && method === 'GET') {
+      return Promise.resolve(jsonOk(profile));
+    }
+    if (url === '/api/profile/learned' && method === 'GET') {
+      return Promise.resolve(jsonOk({ items: learnedItems }));
+    }
+    return Promise.reject(new Error(`unexpected fetch: ${method} ${url}`));
+  });
+}
+
+describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('Loading — 초기 렌더에서 스켈레톤을 보여준다', () => {
+    mockFetch.mockReturnValue(new Promise(() => {})); // never resolves
+    render(<ProfilePage />);
+
+    expect(screen.getByLabelText('프로필 불러오는 중')).toBeTruthy();
+  });
+
+  it('Error — 조회 실패 시 에러 배너와 재시도 버튼을 보여준다', async () => {
+    mockFetch.mockResolvedValue({ ok: false, json: async () => ({}) });
+    render(<ProfilePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('불러오지 못했습니다, 다시 시도해주세요')).toBeTruthy();
+    });
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy();
+  });
+
+  it('Error → 재시도를 누르면 다시 조회해 성공하면 화면을 보여준다', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, json: async () => ({}) });
+    render(<ProfilePage />);
+    await waitFor(() => {
+      expect(screen.getByText('불러오지 못했습니다, 다시 시도해주세요')).toBeTruthy();
+    });
+
+    mockLoadSuccess(COMPLETED_PROFILE, []);
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('직설/완곡')).toBeTruthy();
+    });
+  });
+
+  it('AC-059② — SkippedProfile: 스킵된 프로필은 전용 메시지와 온보딩 완료 버튼을 보여준다', async () => {
+    mockLoadSuccess(SKIPPED_PROFILE, []);
+    render(<ProfilePage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다'),
+      ).toBeTruthy();
+    });
+    expect(screen.queryByText('직설/완곡')).toBeNull();
+  });
+
+  it('AC-059④ — "온보딩 완료하기" 클릭 시 /onboarding으로 이동한다', async () => {
+    mockLoadSuccess(SKIPPED_PROFILE, []);
+    render(<ProfilePage />);
+    await waitFor(() => screen.getByText('온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다'));
+
+    fireEvent.click(screen.getByRole('button', { name: '온보딩 완료하기' }));
+
+    expect(mockPush).toHaveBeenCalledWith('/onboarding');
+  });
+
+  it('Empty — 완료된 프로필인데 학습 항목이 없으면 자기신고 항목은 보이고 "아직 학습된 항목이 없습니다"를 보여준다', async () => {
+    mockLoadSuccess(COMPLETED_PROFILE, []);
+    render(<ProfilePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('직설/완곡')).toBeTruthy();
+    });
+    expect(screen.getByText('아직 학습된 항목이 없습니다')).toBeTruthy();
+  });
+
+  it('Success — 자기신고 4항목(자기신고 태그) + 학습된 항목(학습됨 태그)을 모두 보여준다(AC-046②)', async () => {
+    mockLoadSuccess(COMPLETED_PROFILE, [
+      { id: 'item-1', patternKey: 'emoji_removed', value: 'avoids' },
+    ]);
+    render(<ProfilePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('존댓말 레벨')).toBeTruthy();
+    });
+    expect(screen.getAllByText('자기신고').length).toBe(4);
+    expect(screen.getByText('emoji_removed')).toBeTruthy();
+    expect(screen.getByText('학습됨')).toBeTruthy();
+  });
+
+  it('자기신고 4항목이 정확히 렌더된다(직설/완곡·이모지 선호·격식도·존댓말 레벨)', async () => {
+    mockLoadSuccess(COMPLETED_PROFILE, []);
+    render(<ProfilePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('직설/완곡')).toBeTruthy();
+    });
+    expect(screen.getByText('이모지 선호')).toBeTruthy();
+    expect(screen.getByText('격식도')).toBeTruthy();
+    expect(screen.getByText('존댓말 레벨')).toBeTruthy();
+  });
+
+  it('수정 — 항목을 편집해 저장하면 현재 값을 전부 채워 PUT하고 화면 값을 갱신한다', async () => {
+    mockLoadSuccess(COMPLETED_PROFILE, []);
+    render(<ProfilePage />);
+    await waitFor(() => screen.getByText('직설/완곡'));
+
+    const directnessRow = screen.getByText('직설/완곡').closest('li') as HTMLElement;
+    fireEvent.click(
+      within(directnessRow).getByRole('button', { name: '수정' }),
+    );
+    fireEvent.click(screen.getByLabelText('완곡하게 표현하는 편이에요'));
+
+    mockFetch.mockResolvedValueOnce(jsonOk({ ...COMPLETED_PROFILE, directness: 'indirect' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/profile',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({
+            onboardingState: 'completed',
+            directness: 'indirect',
+            emojiPreference: 'neutral',
+            formality: 'medium',
+            honorificLevel: 'hapsyo',
+          }),
+        }),
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByText('완곡하게 표현하는 편이에요')).toBeTruthy();
+    });
+  });
+
+  it('값 선택 없이 저장하면 차단되고 안내 문구를 보여준다', async () => {
+    mockLoadSuccess(COMPLETED_PROFILE, []);
+    render(<ProfilePage />);
+    await waitFor(() => screen.getByText('직설/완곡'));
+
+    const directnessRow = screen.getByText('직설/완곡').closest('li') as HTMLElement;
+    fireEvent.click(within(directnessRow).getByRole('button', { name: '수정' }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(screen.getByText('값을 선택해주세요')).toBeTruthy();
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      '/api/profile',
+      expect.objectContaining({ method: 'PUT' }),
+    );
+  });
+
+  it('삭제 — 확인 없이는 삭제되지 않고, 확인을 눌러야 필드가 비워진다', async () => {
+    mockLoadSuccess(COMPLETED_PROFILE, []);
+    render(<ProfilePage />);
+    await waitFor(() => screen.getByText('직설/완곡'));
+
+    const directnessRow = screen.getByText('직설/완곡').closest('li') as HTMLElement;
+    fireEvent.click(within(directnessRow).getByRole('button', { name: '삭제' }));
+
+    expect(screen.getByText('삭제하시겠습니까?')).toBeTruthy();
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      '/api/profile',
+      expect.objectContaining({ method: 'PUT' }),
+    );
+
+    mockFetch.mockResolvedValueOnce(jsonOk({ ...COMPLETED_PROFILE, directness: null }));
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/profile',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({
+            onboardingState: 'completed',
+            emojiPreference: 'neutral',
+            formality: 'medium',
+            honorificLevel: 'hapsyo',
+          }),
+        }),
+      );
+    });
+  });
+
+  it('학습된 항목 삭제 — 확인 후 DELETE /api/profile/learned/{id}를 호출하고 목록에서 제거한다', async () => {
+    mockLoadSuccess(COMPLETED_PROFILE, [
+      { id: 'item-1', patternKey: 'emoji_removed', value: 'avoids' },
+    ]);
+    render(<ProfilePage />);
+    await waitFor(() => screen.getByText('emoji_removed'));
+
+    const learnedRow = screen.getByText('emoji_removed').closest('li') as HTMLElement;
+    fireEvent.click(within(learnedRow).getByRole('button', { name: '삭제' }));
+
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'item-1' }) });
+    fireEvent.click(screen.getAllByRole('button', { name: '삭제' }).slice(-1)[0]);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith('/api/profile/learned/item-1', {
+        method: 'DELETE',
+      });
+    });
+    await waitFor(() => {
+      expect(screen.queryByText('emoji_removed')).toBeNull();
+    });
+  });
+});
