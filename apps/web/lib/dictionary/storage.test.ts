@@ -203,6 +203,21 @@ describe('fetchDictionaryEntriesDetailed', () => {
   });
 });
 
+// C-1 — 리뷰 지적: 현재 코드는 raw sourceText를 그대로 `.ilike()`에 넘겨 `%`/`_`/`*`를
+// LIKE 와일드카드로 해석시킨다(PostgREST가 `*`→`%`도 매핑). 아래 헬퍼는 실제 Postgres
+// ILIKE 의미를 최소한으로 흉내내, 수정 전 코드(`.ilike()` 사용)로 테스트를 돌리면 와일드카드
+// 오탐이 재현되고(red), 수정 후 코드(애플리케이션 레벨 정확 비교)로 돌리면 통과한다(green).
+function ilikePatternMatches(pattern: string, value: string): boolean {
+  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const translated = escaped.replace(/%/g, '.*').replace(/_/g, '.');
+  return new RegExp(`^${translated}$`, 'i').test(value);
+}
+
+interface DupRow {
+  id: string;
+  source_text: string;
+}
+
 // T23 — 생성(POST /api/dictionary). AC-016, AC-047.
 interface FakeCreateHandle {
   client: SupabaseClient;
@@ -213,7 +228,7 @@ interface FakeCreateHandle {
 
 function createFakeCreateSupabase(
   options: {
-    duplicateRows?: unknown[];
+    duplicateRows?: DupRow[];
     duplicateError?: { message: string } | null;
     insertedRow?: unknown;
     insertError?: { message: string } | null;
@@ -222,6 +237,7 @@ function createFakeCreateSupabase(
   const duplicateEqCalls: Array<[string, unknown]> = [];
   const ilikeCalls: Array<[string, unknown]> = [];
   const insertedRows: unknown[] = [];
+  const baseRows = options.duplicateRows ?? [];
 
   const client = {
     from(table: string) {
@@ -233,15 +249,27 @@ function createFakeCreateSupabase(
             return {
               eq: (col2: string, val2: unknown) => {
                 duplicateEqCalls.push([col2, val2]);
-                return {
-                  ilike: (col3: string, val3: unknown) => {
-                    ilikeCalls.push([col3, val3]);
-                    return Promise.resolve({
-                      data: options.duplicateError ? null : (options.duplicateRows ?? []),
-                      error: options.duplicateError ?? null,
-                    });
-                  },
+                // 새 구현(수정 후)은 owner_user_id+entry_type 스코프까지만 서버 쿼리로
+                // 걸고, 이 promise를 바로 await한다(추가 `.ilike()` 호출 없음).
+                const resultPromise = Promise.resolve({
+                  data: options.duplicateError ? null : baseRows,
+                  error: options.duplicateError ?? null,
+                }) as Promise<{ data: DupRow[] | null; error: { message: string } | null }> & {
+                  ilike: (col: string, val: unknown) => Promise<unknown>;
                 };
+                // 옛 구현(수정 전)은 여기서 `.ilike()`를 호출한다 — 실제 Postgres ILIKE처럼
+                // 와일드카드 패턴 매칭을 흉내내 리뷰가 지적한 오탐을 그대로 재현한다.
+                resultPromise.ilike = (col3: string, val3: unknown) => {
+                  ilikeCalls.push([col3, val3]);
+                  if (options.duplicateError) {
+                    return Promise.resolve({ data: null, error: options.duplicateError });
+                  }
+                  const filtered = baseRows.filter((row) =>
+                    ilikePatternMatches(String(val3), row.source_text),
+                  );
+                  return Promise.resolve({ data: filtered, error: null });
+                };
+                return resultPromise;
               },
             };
           },
@@ -305,7 +333,7 @@ describe('createDictionaryEntry — AC-016/AC-047', () => {
 
   it('term 중복(대소문자 무시)이 있으면 DuplicateEntryError("이미 등록된 용어입니다")를 던지고 insert하지 않는다', async () => {
     const { client, insertedRows } = createFakeCreateSupabase({
-      duplicateRows: [{ id: 'existing-1' }],
+      duplicateRows: [{ id: 'existing-1', source_text: 'SLA' }],
     });
 
     await expect(
@@ -315,7 +343,9 @@ describe('createDictionaryEntry — AC-016/AC-047', () => {
   });
 
   it('person 중복이 있으면 DuplicateEntryError("이미 등록된 인물입니다")를 던진다', async () => {
-    const { client } = createFakeCreateSupabase({ duplicateRows: [{ id: 'existing-1' }] });
+    const { client } = createFakeCreateSupabase({
+      duplicateRows: [{ id: 'existing-1', source_text: '김수진' }],
+    });
 
     await expect(
       createDictionaryEntry(client, 'user-1', {
@@ -326,7 +356,7 @@ describe('createDictionaryEntry — AC-016/AC-047', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT_DUPLICATE_ENTRY', message: '이미 등록된 인물입니다' });
   });
 
-  it('중복 조회를 entry_type과 sourceText(ilike)로 스코프한다(대소문자 무시 비교)', async () => {
+  it('중복 조회는 owner_user_id·entry_type으로만 서버 쿼리를 스코프하고, sourceText 비교는 애플리케이션 레벨에서 한다(C-1 — ilike 미사용)', async () => {
     const { client, duplicateEqCalls, ilikeCalls } = createFakeCreateSupabase({
       duplicateRows: [],
       insertedRow: {
@@ -346,7 +376,27 @@ describe('createDictionaryEntry — AC-016/AC-047', () => {
       ['owner_user_id', 'user-1'],
       ['entry_type', 'term'],
     ]);
-    expect(ilikeCalls).toEqual([['source_text', 'SLA']]);
+    expect(ilikeCalls).toEqual([]);
+  });
+
+  it('C-1 — LIKE 메타문자(%)를 포함한 신규 용어는 부분 매치로 오탐되지 않는다(기존 "100% 달성" + 신규 "100%"는 서로 다른 값)', async () => {
+    const { client, insertedRows } = createFakeCreateSupabase({
+      duplicateRows: [{ id: 'existing-1', source_text: '100% 달성' }],
+      insertedRow: {
+        id: 'entry-2',
+        entry_type: 'term',
+        source_text: '100%',
+        target_text: null,
+        ko_honorific: null,
+        en_honorific: null,
+        note: null,
+      },
+    });
+
+    await expect(
+      createDictionaryEntry(client, 'user-1', { entryType: 'term', sourceText: '100%' }),
+    ).resolves.toMatchObject({ sourceText: '100%' });
+    expect(insertedRows).toHaveLength(1);
   });
 
   it('중복 조회 실패 시 에러를 던진다(에러 삼키기 금지)', async () => {
@@ -375,21 +425,24 @@ describe('createDictionaryEntry — AC-016/AC-047', () => {
 interface FakeUpdateHandle {
   client: SupabaseClient;
   duplicateEqCalls: Array<[string, unknown]>;
+  ilikeCalls: Array<[string, unknown]>;
   updateEqCalls: Array<[string, unknown]>;
   updatedPayloads: unknown[];
 }
 
 function createFakeUpdateSupabase(
   options: {
-    duplicateRows?: unknown[];
+    duplicateRows?: DupRow[];
     duplicateError?: { message: string } | null;
     updatedRows?: unknown[];
     updateError?: { message: string } | null;
   } = {},
 ): FakeUpdateHandle {
   const duplicateEqCalls: Array<[string, unknown]> = [];
+  const ilikeCalls: Array<[string, unknown]> = [];
   const updateEqCalls: Array<[string, unknown]> = [];
   const updatedPayloads: unknown[] = [];
+  const baseRows = options.duplicateRows ?? [];
 
   const client = {
     from(table: string) {
@@ -401,15 +454,24 @@ function createFakeUpdateSupabase(
             return {
               eq: (col2: string, val2: unknown) => {
                 duplicateEqCalls.push([col2, val2]);
-                return {
-                  ilike: (col3: string, val3: unknown) => {
-                    duplicateEqCalls.push([col3, val3]);
-                    return Promise.resolve({
-                      data: options.duplicateError ? null : (options.duplicateRows ?? []),
-                      error: options.duplicateError ?? null,
-                    });
-                  },
+                // create fake와 같은 hybrid — 새 구현은 바로 await, 옛 구현은 `.ilike()` 호출.
+                const resultPromise = Promise.resolve({
+                  data: options.duplicateError ? null : baseRows,
+                  error: options.duplicateError ?? null,
+                }) as Promise<{ data: DupRow[] | null; error: { message: string } | null }> & {
+                  ilike: (col: string, val: unknown) => Promise<unknown>;
                 };
+                resultPromise.ilike = (col3: string, val3: unknown) => {
+                  ilikeCalls.push([col3, val3]);
+                  if (options.duplicateError) {
+                    return Promise.resolve({ data: null, error: options.duplicateError });
+                  }
+                  const filtered = baseRows.filter((row) =>
+                    ilikePatternMatches(String(val3), row.source_text),
+                  );
+                  return Promise.resolve({ data: filtered, error: null });
+                };
+                return resultPromise;
               },
             };
           },
@@ -438,7 +500,7 @@ function createFakeUpdateSupabase(
     },
   } as unknown as SupabaseClient;
 
-  return { client, duplicateEqCalls, updateEqCalls, updatedPayloads };
+  return { client, duplicateEqCalls, ilikeCalls, updateEqCalls, updatedPayloads };
 }
 
 describe('updateDictionaryEntry — AC-016/AC-047', () => {
@@ -474,7 +536,7 @@ describe('updateDictionaryEntry — AC-016/AC-047', () => {
 
   it('자기 자신을 제외하고 같은 sourceText와 중복되면(자기 자신은 예외) DuplicateEntryError를 던지지 않는다', async () => {
     const { client } = createFakeUpdateSupabase({
-      duplicateRows: [{ id: 'entry-1' }], // 조회된 중복 후보가 자기 자신뿐
+      duplicateRows: [{ id: 'entry-1', source_text: 'SLA' }], // 조회된 중복 후보가 자기 자신뿐
       updatedRows: [
         {
           id: 'entry-1',
@@ -495,13 +557,35 @@ describe('updateDictionaryEntry — AC-016/AC-047', () => {
 
   it('다른 엔트리와 중복되면 DuplicateEntryError를 던지고 update하지 않는다', async () => {
     const { client, updatedPayloads } = createFakeUpdateSupabase({
-      duplicateRows: [{ id: 'other-entry' }],
+      duplicateRows: [{ id: 'other-entry', source_text: 'SLA' }],
     });
 
     await expect(
       updateDictionaryEntry(client, 'user-1', 'entry-1', { entryType: 'term', sourceText: 'sla' }),
     ).rejects.toMatchObject({ code: 'CONFLICT_DUPLICATE_ENTRY', message: '이미 등록된 용어입니다' });
     expect(updatedPayloads).toHaveLength(0);
+  });
+
+  it('C-1 — LIKE 메타문자(%)를 포함한 값으로 수정해도 다른 항목과 오탐 중복되지 않는다', async () => {
+    const { client, updatedPayloads } = createFakeUpdateSupabase({
+      duplicateRows: [{ id: 'other-entry', source_text: '100% 달성' }],
+      updatedRows: [
+        {
+          id: 'entry-1',
+          entry_type: 'term',
+          source_text: '100%',
+          target_text: null,
+          ko_honorific: null,
+          en_honorific: null,
+          note: null,
+        },
+      ],
+    });
+
+    await expect(
+      updateDictionaryEntry(client, 'user-1', 'entry-1', { entryType: 'term', sourceText: '100%' }),
+    ).resolves.toMatchObject({ sourceText: '100%' });
+    expect(updatedPayloads).toHaveLength(1);
   });
 
   it('대상이 없으면(존재하지 않거나 타인 소유) NotFoundError를 던진다', async () => {

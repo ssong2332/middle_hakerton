@@ -124,11 +124,19 @@ const DUPLICATE_MESSAGE: Record<'term' | 'person', string> = {
 };
 
 /**
- * `owner_user_id` + `entry_type` + `source_text`(대소문자 무시, `ilike`) 스코프로 기존 엔트리를
- * 찾는다 — `unique(owner_user_id, entry_type, source_text)`(DB 제약, 대소문자 구분)만으로는
- * "SLA"와 "sla"를 다른 값으로 취급해 UX.md가 요구하는 대소문자 무시 중복 차단(AC-016)을 못
- * 만족하므로, 애플리케이션 레벨에서 먼저 확인한다. `excludeId`가 있으면(수정 시) 자기 자신은
- * 후보에서 제외한다.
+ * `owner_user_id` + `entry_type` 스코프로 후보 행을 모두 가져온 뒤, `source_text` 비교는
+ * 애플리케이션 레벨에서 `toLowerCase()` 정확 일치로 한다 — `unique(owner_user_id, entry_type,
+ * source_text)`(DB 제약, 대소문자 구분)만으로는 "SLA"와 "sla"를 다른 값으로 취급해 UX.md가
+ * 요구하는 대소문자 무시 중복 차단(AC-016)을 못 만족하므로 애플리케이션 레벨에서 먼저
+ * 확인한다. `excludeId`가 있으면(수정 시) 자기 자신은 후보에서 제외한다.
+ *
+ * 🔴 C-1(리뷰 지적) — 이전에는 raw `sourceText`를 그대로 `.ilike()`에 넘겼다. postgrest-js는
+ * 이를 그대로 Postgres `ILIKE` 패턴으로 전달하므로 `%`/`_`(및 PostgREST가 매핑하는 `*`)가
+ * 와일드카드로 해석돼, 예를 들어 기존 엔트리 "100% 달성"이 있는 상태에서 서로 다른 값인
+ * "100%"를 추가하면 `ILIKE '100%'`가 "100"으로 시작하는 모든 행에 매치되어 거짓 409가
+ * 발생했다(그 값은 영원히 등록 불가). 쿼리 자체는 `source_text`로 필터링하지 않고
+ * owner_user_id+entry_type로만 스코프해 후보를 가져온 뒤, 정확한 문자열 비교로 판정해
+ * 와일드카드 해석 자체를 피한다.
  */
 async function hasDuplicate(
   client: SupabaseClient,
@@ -139,14 +147,15 @@ async function hasDuplicate(
 ): Promise<boolean> {
   const { data, error } = await client
     .from('dictionary_terms')
-    .select('id')
+    .select('id, source_text')
     .eq('owner_user_id', userId)
-    .eq('entry_type', entryType)
-    .ilike('source_text', sourceText);
+    .eq('entry_type', entryType);
   if (error) throw error;
 
-  const rows = (data ?? []) as { id: string }[];
-  return excludeId ? rows.some((row) => row.id !== excludeId) : rows.length > 0;
+  const normalized = sourceText.toLowerCase();
+  const rows = (data ?? []) as { id: string; source_text: string }[];
+  const matches = rows.filter((row) => row.source_text.toLowerCase() === normalized);
+  return excludeId ? matches.some((row) => row.id !== excludeId) : matches.length > 0;
 }
 
 /**
