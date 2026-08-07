@@ -1,10 +1,19 @@
 /**
  * T22 — C5 용어사전 조회 (`dictionary_terms`). Supabase는 실제로 호출하지 않고 최소 체이닝만
  * 흉내내는 페이크로 검증한다(`apps/web/lib/messages/pattern-learning.test.ts`와 같은 모킹 정책).
+ *
+ * T23(UX-010 화면) 추가분은 아래 "T23 —" 표시 구획부터다: 화면용 상세 조회(id·note 포함)와
+ * CRUD(create/update/delete), 그중 create/update의 대소문자 무시 중복 차단(AC-016)이 핵심이다.
  */
 import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fetchDictionaryEntries } from './storage';
+import {
+  createDictionaryEntry,
+  deleteDictionaryEntry,
+  fetchDictionaryEntries,
+  fetchDictionaryEntriesDetailed,
+  updateDictionaryEntry,
+} from './storage';
 
 interface FakeHandle {
   client: SupabaseClient;
@@ -132,6 +141,453 @@ describe('fetchDictionaryEntries', () => {
     const { client } = createFakeSupabase({ error: { message: 'connection failed' } });
 
     await expect(fetchDictionaryEntries(client, 'user-1')).rejects.toEqual({
+      message: 'connection failed',
+    });
+  });
+});
+
+// T23 — UX-010 화면 조회(id·note 포함, `fetchDictionaryEntries`와 다른 select). AC-016.
+describe('fetchDictionaryEntriesDetailed', () => {
+  it('owner_user_id로 스코프해 조회한다(AC-016)', async () => {
+    const { client, eqCalls } = createFakeSupabase({ rows: [] });
+
+    await fetchDictionaryEntriesDetailed(client, 'user-1');
+
+    expect(eqCalls).toEqual([['owner_user_id', 'user-1']]);
+  });
+
+  it('id·note를 포함해 카멜케이스로 변환한다(화면 전용 컬럼 — fetchDictionaryEntries는 select하지 않는다)', async () => {
+    const { client } = createFakeSupabase({
+      rows: [
+        {
+          id: 'entry-1',
+          entry_type: 'term',
+          source_text: 'SLA',
+          target_text: 'SLA',
+          ko_honorific: null,
+          en_honorific: null,
+          note: '항상 원문 유지',
+        },
+      ],
+    });
+
+    const result = await fetchDictionaryEntriesDetailed(client, 'user-1');
+
+    expect(result).toEqual([
+      {
+        id: 'entry-1',
+        entryType: 'term',
+        sourceText: 'SLA',
+        targetText: 'SLA',
+        koHonorific: null,
+        enHonorific: null,
+        note: '항상 원문 유지',
+      },
+    ]);
+  });
+
+  it('비어 있으면 []를 반환한다', async () => {
+    const { client } = createFakeSupabase({ rows: [] });
+
+    const result = await fetchDictionaryEntriesDetailed(client, 'user-1');
+
+    expect(result).toEqual([]);
+  });
+
+  it('조회 실패 시 에러를 던진다(에러 삼키기 금지)', async () => {
+    const { client } = createFakeSupabase({ error: { message: 'connection failed' } });
+
+    await expect(fetchDictionaryEntriesDetailed(client, 'user-1')).rejects.toEqual({
+      message: 'connection failed',
+    });
+  });
+});
+
+// T23 — 생성(POST /api/dictionary). AC-016, AC-047.
+interface FakeCreateHandle {
+  client: SupabaseClient;
+  duplicateEqCalls: Array<[string, unknown]>;
+  ilikeCalls: Array<[string, unknown]>;
+  insertedRows: unknown[];
+}
+
+function createFakeCreateSupabase(
+  options: {
+    duplicateRows?: unknown[];
+    duplicateError?: { message: string } | null;
+    insertedRow?: unknown;
+    insertError?: { message: string } | null;
+  } = {},
+): FakeCreateHandle {
+  const duplicateEqCalls: Array<[string, unknown]> = [];
+  const ilikeCalls: Array<[string, unknown]> = [];
+  const insertedRows: unknown[] = [];
+
+  const client = {
+    from(table: string) {
+      if (table !== 'dictionary_terms') throw new Error(`unexpected table: ${table}`);
+      return {
+        select: () => ({
+          eq: (col1: string, val1: unknown) => {
+            duplicateEqCalls.push([col1, val1]);
+            return {
+              eq: (col2: string, val2: unknown) => {
+                duplicateEqCalls.push([col2, val2]);
+                return {
+                  ilike: (col3: string, val3: unknown) => {
+                    ilikeCalls.push([col3, val3]);
+                    return Promise.resolve({
+                      data: options.duplicateError ? null : (options.duplicateRows ?? []),
+                      error: options.duplicateError ?? null,
+                    });
+                  },
+                };
+              },
+            };
+          },
+        }),
+        insert: (row: unknown) => {
+          insertedRows.push(row);
+          return {
+            select: () => ({
+              single: () =>
+                Promise.resolve({
+                  data: options.insertError ? null : (options.insertedRow ?? null),
+                  error: options.insertError ?? null,
+                }),
+            }),
+          };
+        },
+      };
+    },
+  } as unknown as SupabaseClient;
+
+  return { client, duplicateEqCalls, ilikeCalls, insertedRows };
+}
+
+describe('createDictionaryEntry — AC-016/AC-047', () => {
+  it('중복이 없으면 owner_user_id를 실어 insert하고 생성된 엔트리를 반환한다', async () => {
+    const { client, insertedRows } = createFakeCreateSupabase({
+      duplicateRows: [],
+      insertedRow: {
+        id: 'entry-1',
+        entry_type: 'term',
+        source_text: 'SLA',
+        target_text: 'Service Level Agreement',
+        ko_honorific: null,
+        en_honorific: null,
+        note: null,
+      },
+    });
+
+    const result = await createDictionaryEntry(client, 'user-1', {
+      entryType: 'term',
+      sourceText: 'SLA',
+      targetText: 'Service Level Agreement',
+    });
+
+    expect(insertedRows[0]).toMatchObject({
+      owner_user_id: 'user-1',
+      entry_type: 'term',
+      source_text: 'SLA',
+      target_text: 'Service Level Agreement',
+    });
+    expect(result).toEqual({
+      id: 'entry-1',
+      entryType: 'term',
+      sourceText: 'SLA',
+      targetText: 'Service Level Agreement',
+      koHonorific: null,
+      enHonorific: null,
+      note: null,
+    });
+  });
+
+  it('term 중복(대소문자 무시)이 있으면 DuplicateEntryError("이미 등록된 용어입니다")를 던지고 insert하지 않는다', async () => {
+    const { client, insertedRows } = createFakeCreateSupabase({
+      duplicateRows: [{ id: 'existing-1' }],
+    });
+
+    await expect(
+      createDictionaryEntry(client, 'user-1', { entryType: 'term', sourceText: 'sla' }),
+    ).rejects.toMatchObject({ code: 'CONFLICT_DUPLICATE_ENTRY', message: '이미 등록된 용어입니다' });
+    expect(insertedRows).toHaveLength(0);
+  });
+
+  it('person 중복이 있으면 DuplicateEntryError("이미 등록된 인물입니다")를 던진다', async () => {
+    const { client } = createFakeCreateSupabase({ duplicateRows: [{ id: 'existing-1' }] });
+
+    await expect(
+      createDictionaryEntry(client, 'user-1', {
+        entryType: 'person',
+        sourceText: '김수진',
+        koHonorific: '김 대리님',
+      }),
+    ).rejects.toMatchObject({ code: 'CONFLICT_DUPLICATE_ENTRY', message: '이미 등록된 인물입니다' });
+  });
+
+  it('중복 조회를 entry_type과 sourceText(ilike)로 스코프한다(대소문자 무시 비교)', async () => {
+    const { client, duplicateEqCalls, ilikeCalls } = createFakeCreateSupabase({
+      duplicateRows: [],
+      insertedRow: {
+        id: 'entry-1',
+        entry_type: 'term',
+        source_text: 'SLA',
+        target_text: null,
+        ko_honorific: null,
+        en_honorific: null,
+        note: null,
+      },
+    });
+
+    await createDictionaryEntry(client, 'user-1', { entryType: 'term', sourceText: 'SLA' });
+
+    expect(duplicateEqCalls).toEqual([
+      ['owner_user_id', 'user-1'],
+      ['entry_type', 'term'],
+    ]);
+    expect(ilikeCalls).toEqual([['source_text', 'SLA']]);
+  });
+
+  it('중복 조회 실패 시 에러를 던진다(에러 삼키기 금지)', async () => {
+    const { client } = createFakeCreateSupabase({
+      duplicateError: { message: 'connection failed' },
+    });
+
+    await expect(
+      createDictionaryEntry(client, 'user-1', { entryType: 'term', sourceText: 'SLA' }),
+    ).rejects.toEqual({ message: 'connection failed' });
+  });
+
+  it('insert 실패 시 에러를 던진다(에러 삼키기 금지)', async () => {
+    const { client } = createFakeCreateSupabase({
+      duplicateRows: [],
+      insertError: { message: 'connection failed' },
+    });
+
+    await expect(
+      createDictionaryEntry(client, 'user-1', { entryType: 'term', sourceText: 'SLA' }),
+    ).rejects.toEqual({ message: 'connection failed' });
+  });
+});
+
+// T23 — 수정(PUT /api/dictionary/{id}). AC-016, AC-047.
+interface FakeUpdateHandle {
+  client: SupabaseClient;
+  duplicateEqCalls: Array<[string, unknown]>;
+  updateEqCalls: Array<[string, unknown]>;
+  updatedPayloads: unknown[];
+}
+
+function createFakeUpdateSupabase(
+  options: {
+    duplicateRows?: unknown[];
+    duplicateError?: { message: string } | null;
+    updatedRows?: unknown[];
+    updateError?: { message: string } | null;
+  } = {},
+): FakeUpdateHandle {
+  const duplicateEqCalls: Array<[string, unknown]> = [];
+  const updateEqCalls: Array<[string, unknown]> = [];
+  const updatedPayloads: unknown[] = [];
+
+  const client = {
+    from(table: string) {
+      if (table !== 'dictionary_terms') throw new Error(`unexpected table: ${table}`);
+      return {
+        select: () => ({
+          eq: (col1: string, val1: unknown) => {
+            duplicateEqCalls.push([col1, val1]);
+            return {
+              eq: (col2: string, val2: unknown) => {
+                duplicateEqCalls.push([col2, val2]);
+                return {
+                  ilike: (col3: string, val3: unknown) => {
+                    duplicateEqCalls.push([col3, val3]);
+                    return Promise.resolve({
+                      data: options.duplicateError ? null : (options.duplicateRows ?? []),
+                      error: options.duplicateError ?? null,
+                    });
+                  },
+                };
+              },
+            };
+          },
+        }),
+        update: (row: unknown) => {
+          updatedPayloads.push(row);
+          return {
+            eq: (col1: string, val1: unknown) => {
+              updateEqCalls.push([col1, val1]);
+              return {
+                eq: (col2: string, val2: unknown) => {
+                  updateEqCalls.push([col2, val2]);
+                  return {
+                    select: () =>
+                      Promise.resolve({
+                        data: options.updateError ? null : (options.updatedRows ?? []),
+                        error: options.updateError ?? null,
+                      }),
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  } as unknown as SupabaseClient;
+
+  return { client, duplicateEqCalls, updateEqCalls, updatedPayloads };
+}
+
+describe('updateDictionaryEntry — AC-016/AC-047', () => {
+  it('중복이 없으면 id·owner_user_id로 스코프해 update하고 갱신된 엔트리를 반환한다', async () => {
+    const { client, updateEqCalls, updatedPayloads } = createFakeUpdateSupabase({
+      duplicateRows: [],
+      updatedRows: [
+        {
+          id: 'entry-1',
+          entry_type: 'term',
+          source_text: 'SLA',
+          target_text: '변경됨',
+          ko_honorific: null,
+          en_honorific: null,
+          note: null,
+        },
+      ],
+    });
+
+    const result = await updateDictionaryEntry(client, 'user-1', 'entry-1', {
+      entryType: 'term',
+      sourceText: 'SLA',
+      targetText: '변경됨',
+    });
+
+    expect(updateEqCalls).toEqual([
+      ['id', 'entry-1'],
+      ['owner_user_id', 'user-1'],
+    ]);
+    expect(updatedPayloads[0]).toMatchObject({ source_text: 'SLA', target_text: '변경됨' });
+    expect(result.targetText).toBe('변경됨');
+  });
+
+  it('자기 자신을 제외하고 같은 sourceText와 중복되면(자기 자신은 예외) DuplicateEntryError를 던지지 않는다', async () => {
+    const { client } = createFakeUpdateSupabase({
+      duplicateRows: [{ id: 'entry-1' }], // 조회된 중복 후보가 자기 자신뿐
+      updatedRows: [
+        {
+          id: 'entry-1',
+          entry_type: 'term',
+          source_text: 'SLA',
+          target_text: null,
+          ko_honorific: null,
+          en_honorific: null,
+          note: null,
+        },
+      ],
+    });
+
+    await expect(
+      updateDictionaryEntry(client, 'user-1', 'entry-1', { entryType: 'term', sourceText: 'SLA' }),
+    ).resolves.toMatchObject({ id: 'entry-1' });
+  });
+
+  it('다른 엔트리와 중복되면 DuplicateEntryError를 던지고 update하지 않는다', async () => {
+    const { client, updatedPayloads } = createFakeUpdateSupabase({
+      duplicateRows: [{ id: 'other-entry' }],
+    });
+
+    await expect(
+      updateDictionaryEntry(client, 'user-1', 'entry-1', { entryType: 'term', sourceText: 'sla' }),
+    ).rejects.toMatchObject({ code: 'CONFLICT_DUPLICATE_ENTRY', message: '이미 등록된 용어입니다' });
+    expect(updatedPayloads).toHaveLength(0);
+  });
+
+  it('대상이 없으면(존재하지 않거나 타인 소유) NotFoundError를 던진다', async () => {
+    const { client } = createFakeUpdateSupabase({ duplicateRows: [], updatedRows: [] });
+
+    await expect(
+      updateDictionaryEntry(client, 'user-1', 'missing-id', {
+        entryType: 'term',
+        sourceText: 'SLA',
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('update 실패 시 에러를 던진다(에러 삼키기 금지)', async () => {
+    const { client } = createFakeUpdateSupabase({
+      duplicateRows: [],
+      updateError: { message: 'connection failed' },
+    });
+
+    await expect(
+      updateDictionaryEntry(client, 'user-1', 'entry-1', { entryType: 'term', sourceText: 'SLA' }),
+    ).rejects.toEqual({ message: 'connection failed' });
+  });
+});
+
+// T23 — 삭제(DELETE /api/dictionary/{id}). AC-016.
+interface FakeDeleteHandle {
+  client: SupabaseClient;
+  eqCalls: Array<[string, unknown]>;
+}
+
+function createFakeDeleteSupabase(
+  options: { deletedRows?: unknown[]; error?: { message: string } | null } = {},
+): FakeDeleteHandle {
+  const eqCalls: Array<[string, unknown]> = [];
+  const client = {
+    from(table: string) {
+      if (table !== 'dictionary_terms') throw new Error(`unexpected table: ${table}`);
+      return {
+        delete: () => ({
+          eq: (col1: string, val1: unknown) => {
+            eqCalls.push([col1, val1]);
+            return {
+              eq: (col2: string, val2: unknown) => {
+                eqCalls.push([col2, val2]);
+                return {
+                  select: () =>
+                    Promise.resolve({
+                      data: options.error ? null : (options.deletedRows ?? []),
+                      error: options.error ?? null,
+                    }),
+                };
+              },
+            };
+          },
+        }),
+      };
+    },
+  } as unknown as SupabaseClient;
+  return { client, eqCalls };
+}
+
+describe('deleteDictionaryEntry — AC-016', () => {
+  it('id와 owner_user_id 둘 다로 스코프해 삭제한다(타인 소유 방지)', async () => {
+    const { client, eqCalls } = createFakeDeleteSupabase({ deletedRows: [{ id: 'entry-1' }] });
+
+    await deleteDictionaryEntry(client, 'user-1', 'entry-1');
+
+    expect(eqCalls).toEqual([
+      ['id', 'entry-1'],
+      ['owner_user_id', 'user-1'],
+    ]);
+  });
+
+  it('삭제된 행이 0개면(존재하지 않거나 타인 소유) NotFoundError를 던진다', async () => {
+    const { client } = createFakeDeleteSupabase({ deletedRows: [] });
+
+    await expect(deleteDictionaryEntry(client, 'user-1', 'entry-1')).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+
+  it('삭제 실패 시 원본 에러를 던진다(에러 삼키기 금지)', async () => {
+    const { client } = createFakeDeleteSupabase({ error: { message: 'connection failed' } });
+
+    await expect(deleteDictionaryEntry(client, 'user-1', 'entry-1')).rejects.toEqual({
       message: 'connection failed',
     });
   });
