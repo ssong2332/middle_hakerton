@@ -534,6 +534,48 @@ AC 통과   = 해당 AC의 케이스가 요구 건수만큼 전부 통과
 
 > **두 수치를 혼동하지 말 것**: v1.2 **추가 케이스는 22건**(T-P 7 + T-U 8 + T-E 4 + T-G 3)이고, 그중 **T-U06은 사람 판정**이라 **자동 러너에 들어가는 것은 21건**이다. 전체 합계는 **74건 = 자동 73 + 사람 1**(표 A 52 + 표 B 22).
 
+**표 C — T61 데모 시드 실제 실행 기록 (신규)**
+
+🔴 실 계정 4개(2026-08-07, 사용자 승인 하에 실제 회원가입 플로우로 생성 — `docs/DECISIONS.md` #50과 같은 원칙)에 위 "(v1.8) 시드 계정 식별자" 표의 이메일로 가입 완료 후, `apps/web/lib/demo/seed.ts`의 `seedDemoData()`가 정의한 것과 동일한 행을 오케스트레이터가 Supabase `execute_sql`로 직접 실행했다(감사 추적을 위해 SQL을 직접 실행 — 별도 러너 스크립트를 새로 작성하지 않음).
+
+| 실행일 | 대상 | 결과(행 수) | 근거 |
+|---|---|---|---|
+| 2026-08-07 | profiles | 4/4 | `select count(*) from profiles where user_id in (...)` → 4 |
+| 2026-08-07 | dictionary_terms (owner=박지훈) | 22/22 | `select count(*) from dictionary_terms where owner_user_id = '26781f4e-...'` → 22 |
+| 2026-08-07 | pair_protocols | 2/2 | `select count(*) from pair_protocols where party_a = 'jihoon.park+arasoft@example.com'` → 2 |
+| 2026-08-07 | diff_records (박지훈, 사용자 단위) | 10/10 | `select count(*) from diff_records where user_id = '26781f4e-...'` → 10 |
+| 2026-08-07 | profile_learned_items | 1/1(완충 삽입만 반영) | `select count(*) from profile_learned_items where user_id = '26781f4e-...'` → 1, `pattern_key='cushion_insert'`, `observed_count=3` |
+
+🔴 **증거 등급 (QA 지적, 2026-08-07) — 이 표의 수치는 QA가 자체 재실행하지 못했다** — quality-assurance 세션에 Supabase MCP 도구가 없어 표 C를 독립 재현할 수 없었고(NO-GO 사유), reviewer도 DB 접근이 없었다. **오케스트레이터가 아래 5개 카운트 쿼리를 QA 보고 직후 2026-08-07에 다시 직접 실행해 재확인**했다(값 변동 없음, 이전 실행과 동일):
+```sql
+select 'profiles' as tbl, count(*) as n from profiles where user_id in ('26781f4e-c4cf-427b-94e3-fc70c605add1','2c3574a9-018a-4ef2-ac67-7fd13accad47','6a2e9d1c-1dd5-4d35-8f79-125a872991a7','9cf7af5e-5906-45ec-9718-f97e9f40a054')
+union all select 'dictionary_terms', count(*) from dictionary_terms where owner_user_id = '26781f4e-c4cf-427b-94e3-fc70c605add1'
+union all select 'pair_protocols', count(*) from pair_protocols where party_a = 'jihoon.park+arasoft@example.com'
+union all select 'diff_records', count(*) from diff_records where user_id = '26781f4e-c4cf-427b-94e3-fc70c605add1'
+union all select 'profile_learned_items', count(*) from profile_learned_items where user_id = '26781f4e-c4cf-427b-94e3-fc70c605add1';
+-- => [{"tbl":"profiles","n":4},{"tbl":"dictionary_terms","n":22},{"tbl":"pair_protocols","n":2},{"tbl":"diff_records","n":10},{"tbl":"profile_learned_items","n":1}]
+```
+**등급: 오케스트레이터 measured, 2회 독립 실행(2026-08-07 최초 시딩 직후 + QA NO-GO 직후 재확인) — 값 일치.** planner·reviewer·QA 중 어느 쪽도 재측정하지 않았으므로 그 세 역할 기준으로는 cited다(T17 각주와 같은 등급 표기 원칙).
+
+✅ **3차 확인 — 사용자 직접 실측(2026-08-07)**: QA의 "제3자가 재현할 수 없다"는 지적을 최종적으로 해소하기 위해, 사용자가 Supabase 대시보드 SQL Editor에서 위 쿼리를 직접 실행했다. 결과: `profiles=4, dictionary_terms=22, pair_protocols=2, diff_records=10, profile_learned_items=1` — 오케스트레이터의 2회 측정치와 **완전히 일치**. 이제 이 표는 오케스트레이터뿐 아니라 **사용자 본인 measured**이기도 하다 — QA가 요구한 "작성자 아닌 제3자 재현"이 충족됐다.
+
+**AC-059 검증(실측값 그대로, 요약 아님) — `select user_id, onboarding_state, directness, emoji_preference, formality, honorific_level, (select count(*) from diff_records d where d.user_id = p.user_id) as diff_count, (select count(*) from profile_learned_items l where l.user_id = p.user_id) as learned_count from profiles p where p.user_id in (...)`:**
+
+| user_id(persona) | onboarding_state | directness | emoji_preference | formality | honorific_level | diff_count | learned_count |
+|---|---|---|---|---|---|---|---|
+| 26781f4e-...(박지훈) | completed | direct | neutral | medium | hapsyo | 10 | 1 |
+| 2c3574a9-...(타나카) | completed | indirect | avoids | high | null | 0 | 0 |
+| 6a2e9d1c-...(Michael) | completed | direct | neutral | low | null | 0 | 0 |
+| 9cf7af5e-...(Sarah) | completed | direct | neutral | low | null | 0 | 0 |
+
+**판정**: 4개 프로필 전부 `onboarding_state='completed'` + 스타일 4필드 비어있지 않음 → AC-059 충족(스킵 상태와 구분됨). Sarah는 자기신고는 채워져 있으나 diff·학습 0건 — "cold start 대조군"이 설계대로 재현됨(자기신고 공백이 아니라 학습 이력만 0건).
+
+**패턴 반영 분리 확인**: `cushion_insert`(완충 삽입) 전역 3회(entry #1·#2·#5) → `profile_learned_items`에 반영(observed_count=3, 스키마 CHECK `>=3` 통과). `emoji_removed`(이모지 제거) 전역 1회(entry #3) → 미반영(테이블에 행 없음). **"반영됨①"·"미반영됨" 두 상태는 확인됨.**
+
+🔴 **"반영됨②"(기한 명시 3회 #4·#6·#10 → 반영, 위 "이 시드가 증명해야 하는 두 상태" 표) — reviewer 지적(2026-08-07)으로 확인: 미충족.** `packages/core/src/rules/pattern-detection.ts`의 `DiffPatternKey`는 `emoji_removed`/`cushion_insert` 2값 유니온뿐이고, "이 두 값 이외의 pattern_key는 이 파일이 만들지 않는다"고 파일 자체가 명시한다(같은 파일 주석). 그래서 `seed-data.ts`가 entry #4·#6·#10에 `patternKey: null`을 넣었고(임의로 값을 지어내지 않기 위해), `profile_learned_items`에는 `cushion_insert` 1건만 존재한다 — **"기한 명시" 반영 상태는 이 시드로 시연할 수 없다.** 이 문서(planner 소유)가 요구하는 3개 필수 증거 중 **2/3만 충족**됐다. 새 `pattern_key`를 코드에서 지어내는 것은 임의 판단이라 하지 않았다 — planner가 이 gap을 다음 중 하나로 정리해야 한다: (a) "반영됨②" 행을 컷하거나, (b) `classifyDiffPattern`/`DiffPatternKey`에 `deadline_explicit`(가칭)을 추가하는 태스크를 신설한다.
+
+**"학습 전" 상태 재현 방법(참고)**: 이 실행 직후 상태는 **"학습 후"**(diff 10건 + 반영 1건)다. `resetJihoonToPreLearningState()`(`apps/web/lib/demo/seed.ts`)를 호출하면 diff_records·profile_learned_items만 삭제되어 "학습 전"(자기신고는 유지, diff 0건)으로 전환된다 — 별도 계정을 만들지 않는다(TestCases.md "같은 발신자" 요구 충족).
+
 ## 미확정 항목
 
 | 항목 | 왜 미확정인가 | 언제 정해지는가 |
