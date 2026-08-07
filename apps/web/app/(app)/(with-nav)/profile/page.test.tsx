@@ -1,6 +1,10 @@
 /**
  * UX-009 Profile Management Screen — `docs/UX.md` Screen Catalog (Screen ID: UX-009).
  * AC-014, AC-012/AC-013(뒷단이지만 이 화면이 노출), AC-046, AC-059. `docs/Tasks.md` T21.
+ *
+ * Reviewer Major 수정(M-1~M-4, 리뷰 후속): 스킵/미시작 사용자의 학습 항목 열람·삭제(M-1),
+ * 학습 항목을 차원별 1행으로 병합해 원시 patternKey 노출 제거(M-2), 자기신고 4항목을 모두
+ * 삭제한 경우의 개인화-꺼짐 표시(M-3), not_started 전용 문구(M-4) — 아래 "M-N —" 표시 테스트.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
@@ -24,8 +28,26 @@ const COMPLETED_PROFILE = {
   updatedAt: '2026-08-07T00:00:00Z',
 };
 
+const COMPLETED_ALL_NULL_PROFILE = {
+  onboardingState: 'completed',
+  directness: null,
+  emojiPreference: null,
+  formality: null,
+  honorificLevel: null,
+  updatedAt: '2026-08-07T00:00:00Z',
+};
+
 const SKIPPED_PROFILE = {
   onboardingState: 'skipped',
+  directness: null,
+  emojiPreference: null,
+  formality: null,
+  honorificLevel: null,
+  updatedAt: null,
+};
+
+const NOT_STARTED_PROFILE = {
+  onboardingState: 'not_started',
   directness: null,
   emojiPreference: null,
   formality: null,
@@ -97,7 +119,19 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
         screen.getByText('온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다'),
       ).toBeTruthy();
     });
-    expect(screen.queryByText('직설/완곡')).toBeNull();
+  });
+
+  it('M-4 — not_started 프로필은 스킵 문구가 아닌 전용 문구를 보여준다(같은 "온보딩 완료하기" 액션)', async () => {
+    mockLoadSuccess(NOT_STARTED_PROFILE, []);
+    render(<ProfilePage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('온보딩이 아직 완료되지 않았습니다 — 개인화가 꺼져 있습니다'),
+      ).toBeTruthy();
+    });
+    expect(screen.queryByText('온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다')).toBeNull();
+    expect(screen.getByRole('button', { name: '온보딩 완료하기' })).toBeTruthy();
   });
 
   it('AC-059④ — "온보딩 완료하기" 클릭 시 /onboarding으로 이동한다', async () => {
@@ -110,6 +144,42 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
     expect(mockPush).toHaveBeenCalledWith('/onboarding');
   });
 
+  it('M-3 — 자기신고 4항목을 모두 삭제한 completed 프로필도 개인화-꺼짐 표시를 보여준다', async () => {
+    mockLoadSuccess(COMPLETED_ALL_NULL_PROFILE, []);
+    render(<ProfilePage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다'),
+      ).toBeTruthy();
+    });
+  });
+
+  it('M-1 — 스킵된 사용자도 학습된 항목을 보고 삭제할 수 있다', async () => {
+    mockLoadSuccess(SKIPPED_PROFILE, [
+      { id: 'item-1', patternKey: 'emoji_removed', value: 'avoids' },
+    ]);
+    render(<ProfilePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다')).toBeTruthy();
+    });
+    // 학습된 항목(이모지 선호 차원)이 스킵 상태에서도 보여야 한다.
+    const emojiRow = screen.getByText('이모지 선호').closest('li') as HTMLElement;
+    expect(within(emojiRow).getByText('학습됨')).toBeTruthy();
+
+    fireEvent.click(within(emojiRow).getByRole('button', { name: '삭제' }));
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'item-1' }) });
+    const confirmBox = within(emojiRow).getByRole('alert');
+    fireEvent.click(within(confirmBox).getByRole('button', { name: '삭제' }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith('/api/profile/learned/item-1', {
+        method: 'DELETE',
+      });
+    });
+  });
+
   it('Empty — 완료된 프로필인데 학습 항목이 없으면 자기신고 항목은 보이고 "아직 학습된 항목이 없습니다"를 보여준다', async () => {
     mockLoadSuccess(COMPLETED_PROFILE, []);
     render(<ProfilePage />);
@@ -120,7 +190,7 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
     expect(screen.getByText('아직 학습된 항목이 없습니다')).toBeTruthy();
   });
 
-  it('Success — 자기신고 4항목(자기신고 태그) + 학습된 항목(학습됨 태그)을 모두 보여준다(AC-046②)', async () => {
+  it('M-2 — 학습된 항목은 해당 차원 행에 병합되어 표시되고, 원시 patternKey/enum 값은 노출되지 않는다(AC-046②)', async () => {
     mockLoadSuccess(COMPLETED_PROFILE, [
       { id: 'item-1', patternKey: 'emoji_removed', value: 'avoids' },
     ]);
@@ -129,9 +199,19 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
     await waitFor(() => {
       expect(screen.getByText('존댓말 레벨')).toBeTruthy();
     });
-    expect(screen.getAllByText('자기신고').length).toBe(4);
-    expect(screen.getByText('emoji_removed')).toBeTruthy();
+    // 이모지 선호 차원 하나만 학습됨으로 바뀌고, 나머지 3개는 자기신고로 남는다 — 별도의
+    // 원시 리스트(raw patternKey/enum)는 더 이상 존재하지 않는다.
+    expect(screen.getAllByText('자기신고').length).toBe(3);
     expect(screen.getByText('학습됨')).toBeTruthy();
+    expect(screen.queryByText('emoji_removed')).toBeNull();
+    expect(screen.queryByText('avoids')).toBeNull();
+
+    const emojiRow = screen.getByText('이모지 선호').closest('li') as HTMLElement;
+    expect(within(emojiRow).getByText('학습됨')).toBeTruthy();
+    expect(within(emojiRow).getByText('거의 안 써요')).toBeTruthy();
+    // 학습된 행은 수정 불가(View + Delete만) — 기존 리뷰 승인 사항(항목 1) 유지.
+    expect(within(emojiRow).queryByRole('button', { name: '수정' })).toBeNull();
+    expect(within(emojiRow).getByRole('button', { name: '삭제' })).toBeTruthy();
   });
 
   it('자기신고 4항목이 정확히 렌더된다(직설/완곡·이모지 선호·격식도·존댓말 레벨)', async () => {
@@ -237,9 +317,9 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
       { id: 'item-1', patternKey: 'emoji_removed', value: 'avoids' },
     ]);
     render(<ProfilePage />);
-    await waitFor(() => screen.getByText('emoji_removed'));
+    await waitFor(() => screen.getByText('이모지 선호'));
 
-    const learnedRow = screen.getByText('emoji_removed').closest('li') as HTMLElement;
+    const learnedRow = screen.getByText('이모지 선호').closest('li') as HTMLElement;
     fireEvent.click(within(learnedRow).getByRole('button', { name: '삭제' }));
 
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'item-1' }) });
@@ -252,7 +332,27 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
       });
     });
     await waitFor(() => {
-      expect(screen.queryByText('emoji_removed')).toBeNull();
+      expect(within(learnedRow).queryByText('학습됨')).toBeNull();
     });
+  });
+
+  it('실패 — 학습된 항목 삭제가 실패하면 인라인 에러를 보여주고 항목은 남는다(UX-009 Failure)', async () => {
+    mockLoadSuccess(COMPLETED_PROFILE, [
+      { id: 'item-1', patternKey: 'emoji_removed', value: 'avoids' },
+    ]);
+    render(<ProfilePage />);
+    await waitFor(() => screen.getByText('이모지 선호'));
+
+    const learnedRow = screen.getByText('이모지 선호').closest('li') as HTMLElement;
+    fireEvent.click(within(learnedRow).getByRole('button', { name: '삭제' }));
+
+    mockFetch.mockResolvedValueOnce({ ok: false, json: async () => ({}) });
+    const confirmBox = within(learnedRow).getByRole('alert');
+    fireEvent.click(within(confirmBox).getByRole('button', { name: '삭제' }));
+
+    await waitFor(() => {
+      expect(within(learnedRow).getByText('삭제하지 못했습니다, 다시 시도해주세요')).toBeTruthy();
+    });
+    expect(within(learnedRow).getByText('학습됨')).toBeTruthy();
   });
 });
