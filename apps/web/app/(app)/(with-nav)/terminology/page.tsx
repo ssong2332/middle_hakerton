@@ -96,6 +96,24 @@ function validationError(
   return null;
 }
 
+/**
+ * M-5(리뷰 지적) — `addError`/`rowErrors`는 M-2 fix로 모든 keystroke에서 지워지므로, 그 상태에
+ * 의존해 중복 메시지를 보여주면 타이핑 중에는 항상 사라진 채로 보인다("버튼만 비활성화되고
+ * 메시지는 안 보임"). `validationError(...)`의 렌더타임 결과를 직접 파생해 라이브로 보여준다
+ * — 서버 409 에러 경로(`addError`/`rowErrors`)는 그대로 유지하고, 이 값은 그 옆에 추가로 렌더링
+ * 한다. `validationError`가 정확히 중복 메시지를 반환할 때만(=필수 필드도 채워져 있고, 그 위에서
+ * 중복까지 걸릴 때만) 표시한다 — 저장/추가 버튼의 비활성화 조건과 동일 기준을 공유한다.
+ */
+function duplicateMessage(
+  entryType: EntryType,
+  fields: EntryFormFields,
+  entries: DictionaryEntryDetail[],
+  excludeId?: string,
+): string | null {
+  const error = validationError(entryType, fields, entries, excludeId);
+  return error === DUPLICATE_MESSAGE[entryType] ? error : null;
+}
+
 function buildRequestBody(entryType: EntryType, fields: EntryFormFields, note: string | null) {
   return {
     entryType,
@@ -309,6 +327,7 @@ export default function TerminologyPage() {
   }
 
   const addDisabled = adding || validationError(newEntryType, newFields, entries) !== null;
+  const newDuplicateMessage = duplicateMessage(newEntryType, newFields, entries);
 
   return (
     <main className={styles.page}>
@@ -352,6 +371,11 @@ export default function TerminologyPage() {
               setAddError(null);
             }}
           />
+          {newDuplicateMessage && (
+            <p role="alert" className={styles.errorText}>
+              {newDuplicateMessage}
+            </p>
+          )}
         </div>
 
         {newEntryType === 'term' && (
@@ -418,6 +442,9 @@ export default function TerminologyPage() {
             const isEditing = editingId === entry.id;
             const isDeleteTarget = deleteTargetId === entry.id;
             const rowError = rowErrors[entry.id];
+            const editDuplicateMsg = isEditing
+              ? duplicateMessage(editEntryType, editFields, entries, editingId ?? undefined)
+              : null;
 
             return (
               <li key={entry.id} className={styles.item}>
@@ -474,6 +501,11 @@ export default function TerminologyPage() {
                           setRowErrors((previous) => ({ ...previous, [entry.id]: '' }));
                         }}
                       />
+                      {editDuplicateMsg && (
+                        <p role="alert" className={styles.errorText}>
+                          {editDuplicateMsg}
+                        </p>
+                      )}
                     </div>
 
                     {editEntryType === 'term' && (
