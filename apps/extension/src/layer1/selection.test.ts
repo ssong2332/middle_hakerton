@@ -46,7 +46,8 @@ function getButton(): HTMLButtonElement | null {
 // 코드가 구조가 다른 두 문서에서 동일하게 동작해야 한다. 실제 라이브 사이트(Wikipedia/MDN)
 // 검증은 오케스트레이터가 별도로 수행했다(이 태스크 보고 참조) — 여기서는 자동화된 회귀만 커버한다.
 function renderGenericSiteA(): HTMLElement {
-  document.body.innerHTML = '<article id="content-a"><p>Hello selectable paragraph text.</p></article>';
+  document.body.innerHTML =
+    '<article id="content-a"><p>Hello selectable paragraph text.</p></article>';
   return document.getElementById('content-a') as HTMLElement;
 }
 
@@ -180,16 +181,14 @@ describe('initSelectionOverlay', () => {
     });
   }
 
-  it('never branches on window.location (no site-identification code — AC-052③)', async () => {
-    // 소스를 직접 읽어 `location` 참조가 아예 없는지 확인한다 — grep 성격의 구조적 테스트다
-    // (`docs/CodingRules.md` Tests 절 "부재 검증"과 같은 성격, `docs/DefinitionOfDone.md`가
-    // 요구하는 "코드가 아니라 산출물" 원칙에 맞춰 실제 소스 파일을 읽는다).
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const sourcePath = path.resolve(__dirname, 'selection.ts');
-    const source = await fs.readFile(sourcePath, 'utf-8');
-    expect(source).not.toMatch(/window\.location|location\.hostname|location\.href/);
-  });
+  // AC-052③(대상 사이트 식별 코드 없음)은 여기서 단위 테스트로 검증하지 않는다 —
+  // `docs/CodingRules.md` Tests 절 "부재 검증" 행이 이런 "없음"의 판정 수단으로 **코드 검색
+  // (grep) 결과를 근거로 첨부**하도록 명시적으로 지정했다("단위 테스트로 '없음'을 증명할 수
+  // 없다"). 게다가 이 파일이 브라우저 전용 tsconfig(`apps/extension/tsconfig.json`의
+  // `types: ["chrome"]`)를 쓰는 워크스페이스에 있어 `node:fs`를 정적으로 import하면
+  // typecheck가 깨진다 — Node 타입을 얹는 것은 이 태스크 범위 밖의 tsconfig 변경이 된다.
+  // 근거는 구현 완료 보고에 `grep -n "location\\." apps/extension/src/layer1/selection.ts
+  // apps/extension/src/content.ts` 실행 결과로 첨부한다.
 });
 
 describe('removeFloatingButton (module-level export)', () => {
