@@ -22,10 +22,12 @@
  * `resolveSession()`이 이미 담당한다(쿠키 또는 Bearer, `docs/API.md` Conventions "인증").
  *
  * 🔴 온보딩(UX-003) 강제 리다이렉트(`docs/UX.md` "Direct URL access" v2.7/AC-059)는 **이 파일의
- * 범위가 아니다** — 프로필 완료 여부를 판정하려면 `profiles` 테이블이 필요한데 그 스키마는
- * T18(Supabase 스키마 구축, 아직 `todo`)이 만든다. 지금은 로그인/가입 성공 후 항상 기본 랜딩
- * (`/mediate`, UX-004)으로 보낸다 — T18/T19 완료 후 온보딩 미완료 사용자를 `/onboarding`으로
- * 보내는 분기를 추가해야 한다(이 gap을 보고에 남긴다).
+ * 범위가 아니다.** 이 함수는 쿠키만 보는 낙관적 확인(Optimistic check)이고, 온보딩 완료 여부
+ * 판정에는 `profiles` 테이블 DB 조회가 필요하다 — 아래 "낙관적 확인만 한다" 주석이 인용하는 규칙
+ * 때문에 여기서 DB를 조회하지 않는다. 실제 구현은 `apps/web/lib/onboarding-guard.ts`의
+ * `enforceOnboardingRedirect()`(T73④)가 담당하며, `apps/web/app/(app)/(with-nav)/layout.tsx`
+ * (async Server Component)에서만 호출된다 — 프록시의 낙관적 확인과 Server Component의 실제 DB
+ * 기반 인가 확인을 분리하는 layer 설계다.
  */
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
