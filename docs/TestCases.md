@@ -557,7 +557,9 @@ AC 통과   = 해당 AC의 케이스가 요구 건수만큼 전부 통과
 
 **판정**: 4개 프로필 전부 `onboarding_state='completed'` + 스타일 4필드 비어있지 않음 → AC-059 충족(스킵 상태와 구분됨). Sarah는 자기신고는 채워져 있으나 diff·학습 0건 — "cold start 대조군"이 설계대로 재현됨(자기신고 공백이 아니라 학습 이력만 0건).
 
-**패턴 반영 분리 확인**: `cushion_insert`(완충 삽입) 전역 3회(entry #1·#2·#5) → `profile_learned_items`에 반영(observed_count=3, 스키마 CHECK `>=3` 통과). `emoji_removed`(이모지 제거) 전역 1회(entry #3) → 미반영(테이블에 행 없음) — TestCases.md가 요구하는 "반영됨/미반영됨" 두 상태가 실제 DB에서 동시에 확인 가능한 상태로 시드됨.
+**패턴 반영 분리 확인**: `cushion_insert`(완충 삽입) 전역 3회(entry #1·#2·#5) → `profile_learned_items`에 반영(observed_count=3, 스키마 CHECK `>=3` 통과). `emoji_removed`(이모지 제거) 전역 1회(entry #3) → 미반영(테이블에 행 없음). **"반영됨①"·"미반영됨" 두 상태는 확인됨.**
+
+🔴 **"반영됨②"(기한 명시 3회 #4·#6·#10 → 반영, 위 "이 시드가 증명해야 하는 두 상태" 표) — reviewer 지적(2026-08-07)으로 확인: 미충족.** `packages/core/src/rules/pattern-detection.ts`의 `DiffPatternKey`는 `emoji_removed`/`cushion_insert` 2값 유니온뿐이고, "이 두 값 이외의 pattern_key는 이 파일이 만들지 않는다"고 파일 자체가 명시한다(같은 파일 주석). 그래서 `seed-data.ts`가 entry #4·#6·#10에 `patternKey: null`을 넣었고(임의로 값을 지어내지 않기 위해), `profile_learned_items`에는 `cushion_insert` 1건만 존재한다 — **"기한 명시" 반영 상태는 이 시드로 시연할 수 없다.** 이 문서(planner 소유)가 요구하는 3개 필수 증거 중 **2/3만 충족**됐다. 새 `pattern_key`를 코드에서 지어내는 것은 임의 판단이라 하지 않았다 — planner가 이 gap을 다음 중 하나로 정리해야 한다: (a) "반영됨②" 행을 컷하거나, (b) `classifyDiffPattern`/`DiffPatternKey`에 `deadline_explicit`(가칭)을 추가하는 태스크를 신설한다.
 
 **"학습 전" 상태 재현 방법(참고)**: 이 실행 직후 상태는 **"학습 후"**(diff 10건 + 반영 1건)다. `resetJihoonToPreLearningState()`(`apps/web/lib/demo/seed.ts`)를 호출하면 diff_records·profile_learned_items만 삭제되어 "학습 전"(자기신고는 유지, diff 0건)으로 전환된다 — 별도 계정을 만들지 않는다(TestCases.md "같은 발신자" 요구 충족).
 
