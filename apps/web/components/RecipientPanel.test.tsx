@@ -273,4 +273,47 @@ describe('RecipientPanel', () => {
 
     expect(screen.queryByText('최종 발송문을 입력해야 승인할 수 있습니다.')).toBeNull();
   });
+
+  // T25/AC-058② — 감정 신호가 낮아 옵션이 제시되지 않으면(ticketOffered=false) "Convert to Task
+  // Ticket" 링크는 비활성/회색이 아니라 DOM에서 완전히 사라져야 한다(Absent-not-disabled controls).
+  it('T25/AC-058② — ticketOffered가 false면 Convert to Task Ticket 링크가 렌더되지 않는다', () => {
+    render(
+      <RecipientPanel
+        hasResult={true}
+        isStale={false}
+        ticketOffered={false}
+        finalText="Please confirm by tomorrow."
+        onFinalTextChange={vi.fn()}
+        onApprove={vi.fn()}
+        approveStatus="idle"
+        sentAt={null}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /Convert to Task Ticket/ })).toBeNull();
+  });
+
+  // T25/AC-058① — 감정 신호가 있어 옵션이 제시되면(ticketOffered=true) 링크가 나타나고, 클릭하면
+  // onConvertToTicket이 호출된다(UX-007로의 유일한 진입 경로, `docs/UX.md` UX-007 Entry).
+  it('T25/AC-058① — ticketOffered가 true면 링크가 렌더되고 클릭하면 onConvertToTicket이 호출된다', () => {
+    const onConvertToTicket = vi.fn();
+    render(
+      <RecipientPanel
+        hasResult={true}
+        isStale={false}
+        ticketOffered={true}
+        onConvertToTicket={onConvertToTicket}
+        finalText="Please confirm by tomorrow."
+        onFinalTextChange={vi.fn()}
+        onApprove={vi.fn()}
+        approveStatus="idle"
+        sentAt={null}
+      />,
+    );
+
+    const link = screen.getByRole('button', { name: /Convert to Task Ticket/ });
+    expect(onConvertToTicket).not.toHaveBeenCalled();
+    fireEvent.click(link);
+    expect(onConvertToTicket).toHaveBeenCalledTimes(1);
+  });
 });

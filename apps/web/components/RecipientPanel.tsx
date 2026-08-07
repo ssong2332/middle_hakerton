@@ -33,6 +33,18 @@ export interface RecipientPanelProps {
   approveStatus: 'idle' | 'sending' | 'sent' | 'error';
   /** 승인 성공 후 서버가 반환한 발송 시각(`POST /api/messages` 응답의 `sentAt`). */
   sentAt: string | null;
+  /**
+   * 🔴 T25/AC-058 — 이 결과에 대해 C6 티켓 변환 옵션이 제시되었는가(`ticketOption.offered`,
+   * `docs/UX.md` UX-007 Entry). `false`면 "Convert to Task Ticket" 링크를 **완전히 렌더하지
+   * 않는다** — 비활성·회색 링크 금지(AC-058②, "Absent-not-disabled controls" 패턴,
+   * `PrimaryNav.tsx`의 `implemented` 필터와 같은 원칙). 기본값 `false` — 기존 호출부를 깨지 않기
+   * 위한 선택적 prop이다(`isRunning`과 같은 패턴).
+   */
+  ticketOffered?: boolean;
+  /** 🔴 링크 클릭 시 호출된다 — 원문을 세션에 저장하고 `/ticket`으로 이동하는 것은 부모
+   * (`MediationWorkspace`, `apps/web/lib/ticket-draft.ts`)의 책임이다. `ticketOffered=true`일
+   * 때만 실제로 렌더·호출된다. */
+  onConvertToTicket?: () => void;
 }
 
 /**
@@ -57,6 +69,8 @@ export function RecipientPanel({
   onApprove,
   approveStatus,
   sentAt,
+  ticketOffered = false,
+  onConvertToTicket,
 }: RecipientPanelProps) {
   const isDelivered = approveStatus === 'sent';
   // MJ-3(사용자 지시 유지보수 라운드) — 최종 발송문이 비어 있으면(공백만 있는 경우 포함) 승인
@@ -90,6 +104,17 @@ export function RecipientPanel({
               onChange={(event) => onFinalTextChange(event.target.value)}
             />
           </div>
+          {/* T25/AC-058① — UX-007로의 유일한 진입 경로(`docs/UX.md` UX-007 Entry, UX-004 Steps
+              7). `ticketOffered`가 false면 이 블록 자체가 렌더되지 않는다(위 AC-058②). */}
+          {!isDelivered && ticketOffered && (
+            <button
+              type="button"
+              className={styles.ticketLink}
+              onClick={() => onConvertToTicket?.()}
+            >
+              Convert to Task Ticket
+            </button>
+          )}
           {approveStatus === 'error' && (
             <p role="alert" className={styles.errorText}>
               승인 처리에 실패했습니다. 다시 시도해 주세요.
