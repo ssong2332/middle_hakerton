@@ -34,6 +34,7 @@ type HonorificLevel = 'hapsyo' | 'haeyo';
 
 type Status = 'idle' | 'submitting' | 'success';
 type LastAction = 'complete' | 'skip' | null;
+type QuestionKey = 'directness' | 'emojiPreference' | 'formality' | 'honorificLevel';
 
 interface CompleteBody {
   onboardingState: 'completed';
@@ -56,6 +57,28 @@ export default function OnboardingPage() {
   const [status, setStatus] = useState<Status>('idle');
   const [showErrorBanner, setShowErrorBanner] = useState(false);
   const [lastAction, setLastAction] = useState<LastAction>(null);
+  // M-3(reviewer) — `docs/UX.md` Interaction Patterns → Validation: "Inline, appears next to the
+  // offending field at first blur or first submit attempt" — not on pristine/first load. Per
+  // 문항(라디오 그룹) touched 상태를 signup 화면의 `emailTouched` 관례를 따라 추적한다.
+  const [touched, setTouched] = useState<Record<QuestionKey, boolean>>({
+    directness: false,
+    emojiPreference: false,
+    formality: false,
+    honorificLevel: false,
+  });
+
+  function markTouched(key: QuestionKey) {
+    setTouched((previous) => (previous[key] ? previous : { ...previous, [key]: true }));
+  }
+
+  function markAllTouched() {
+    setTouched({
+      directness: true,
+      emojiPreference: true,
+      formality: true,
+      honorificLevel: true,
+    });
+  }
 
   const allAnswered =
     directness !== null &&
@@ -95,6 +118,7 @@ export default function OnboardingPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    markAllTouched();
     if (!canSubmit) return;
     const body = completeBody();
     if (!body) return;
@@ -149,6 +173,7 @@ export default function OnboardingPage() {
               name="directness"
               checked={directness === 'direct'}
               onChange={() => setDirectness('direct')}
+              onBlur={() => markTouched('directness')}
             />
             직설적으로 표현하는 편이에요
           </label>
@@ -158,10 +183,13 @@ export default function OnboardingPage() {
               name="directness"
               checked={directness === 'indirect'}
               onChange={() => setDirectness('indirect')}
+              onBlur={() => markTouched('directness')}
             />
             완곡하게 표현하는 편이에요
           </label>
-          {directness === null && <p className={styles.unanswered}>선택해주세요</p>}
+          {directness === null && touched.directness && (
+            <p className={styles.unanswered}>선택해주세요</p>
+          )}
         </fieldset>
 
         <fieldset className={styles.fieldset}>
@@ -172,6 +200,7 @@ export default function OnboardingPage() {
               name="emojiPreference"
               checked={emojiPreference === 'likes'}
               onChange={() => setEmojiPreference('likes')}
+              onBlur={() => markTouched('emojiPreference')}
             />
             자주 써요
           </label>
@@ -181,6 +210,7 @@ export default function OnboardingPage() {
               name="emojiPreference"
               checked={emojiPreference === 'neutral'}
               onChange={() => setEmojiPreference('neutral')}
+              onBlur={() => markTouched('emojiPreference')}
             />
             가끔 써요
           </label>
@@ -190,10 +220,13 @@ export default function OnboardingPage() {
               name="emojiPreference"
               checked={emojiPreference === 'avoids'}
               onChange={() => setEmojiPreference('avoids')}
+              onBlur={() => markTouched('emojiPreference')}
             />
             거의 안 써요
           </label>
-          {emojiPreference === null && <p className={styles.unanswered}>선택해주세요</p>}
+          {emojiPreference === null && touched.emojiPreference && (
+            <p className={styles.unanswered}>선택해주세요</p>
+          )}
         </fieldset>
 
         <fieldset className={styles.fieldset}>
@@ -204,6 +237,7 @@ export default function OnboardingPage() {
               name="formality"
               checked={formality === 'high'}
               onChange={() => setFormality('high')}
+              onBlur={() => markTouched('formality')}
             />
             격식 있게
           </label>
@@ -213,6 +247,7 @@ export default function OnboardingPage() {
               name="formality"
               checked={formality === 'medium'}
               onChange={() => setFormality('medium')}
+              onBlur={() => markTouched('formality')}
             />
             보통
           </label>
@@ -222,10 +257,13 @@ export default function OnboardingPage() {
               name="formality"
               checked={formality === 'low'}
               onChange={() => setFormality('low')}
+              onBlur={() => markTouched('formality')}
             />
             편하게
           </label>
-          {formality === null && <p className={styles.unanswered}>선택해주세요</p>}
+          {formality === null && touched.formality && (
+            <p className={styles.unanswered}>선택해주세요</p>
+          )}
         </fieldset>
 
         <fieldset className={styles.fieldset}>
@@ -236,6 +274,7 @@ export default function OnboardingPage() {
               name="honorificLevel"
               checked={honorificLevel === 'hapsyo'}
               onChange={() => setHonorificLevel('hapsyo')}
+              onBlur={() => markTouched('honorificLevel')}
             />
             합쇼체 (합니다/입니다)
           </label>
@@ -245,10 +284,13 @@ export default function OnboardingPage() {
               name="honorificLevel"
               checked={honorificLevel === 'haeyo'}
               onChange={() => setHonorificLevel('haeyo')}
+              onBlur={() => markTouched('honorificLevel')}
             />
             해요체 (해요/이에요)
           </label>
-          {honorificLevel === null && <p className={styles.unanswered}>선택해주세요</p>}
+          {honorificLevel === null && touched.honorificLevel && (
+            <p className={styles.unanswered}>선택해주세요</p>
+          )}
         </fieldset>
 
         <div className={styles.actions}>

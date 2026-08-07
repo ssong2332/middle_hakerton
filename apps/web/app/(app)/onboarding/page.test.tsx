@@ -40,9 +40,9 @@ describe('OnboardingPage (UX-003) — AC-011/AC-046②/AC-059', () => {
     expect(screen.getByLabelText('해요체 (해요/이에요)')).toBeTruthy();
   });
 
-  it('문항 수는 5개를 넘지 않는다(fieldset 4개)', () => {
+  it('문항 수는 정확히 4개다(직설/완곡·이모지·격식도·존댓말 레벨, 5개 상한 이내)', () => {
     const { container } = render(<OnboardingPage />);
-    expect(container.querySelectorAll('fieldset').length).toBeLessThanOrEqual(5);
+    expect(container.querySelectorAll('fieldset').length).toBe(4);
   });
 
   // 🔴 이 파일은 `@testing-library/jest-dom`을 설치하지 않는다(`apps/web/vitest.setup.ts` 헤더
@@ -61,6 +61,19 @@ describe('OnboardingPage (UX-003) — AC-011/AC-046②/AC-059', () => {
     expect((screen.getByRole('button', { name: '완료' }) as HTMLButtonElement).disabled).toBe(
       false,
     );
+  });
+
+  // M-3(reviewer) — `docs/UX.md` Interaction Patterns → Validation: hint는 첫 blur 또는 첫 제출
+  // 시도에만 나타난다. 첫 페인트에서 4문항 전부 미응답이어도 힌트가 없어야 한다.
+  it('M-3 — 첫 렌더에서는 미응답 힌트("선택해주세요")를 보여주지 않는다', () => {
+    render(<OnboardingPage />);
+    expect(screen.queryByText('선택해주세요')).toBeNull();
+  });
+
+  it('M-3 — 라디오에서 blur하면 그 문항에만 미응답 힌트를 보여준다', () => {
+    render(<OnboardingPage />);
+    fireEvent.blur(screen.getByLabelText('직설적으로 표현하는 편이에요'));
+    expect(screen.getAllByText('선택해주세요').length).toBe(1);
   });
 
   it('AC-059① — 건너뛰기 버튼은 아무것도 답하지 않아도 항상 활성화되어 있다', () => {
