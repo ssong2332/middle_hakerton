@@ -43,6 +43,19 @@
   margin-bottom: 10px;
 }
 
+.ticketLink {
+  display: inline-flex;
+  width: fit-content;
+  padding: 0;
+  margin-bottom: 10px;
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font: 700 12px var(--font-sans);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .approveButton {
   display: flex;
   align-items: center;

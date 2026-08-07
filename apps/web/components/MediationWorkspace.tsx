@@ -1,7 +1,9 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { MediationResult, UrgencyLevel } from '@cross-border/core';
+import { TICKET_DRAFT_SESSION_KEY } from '../lib/ticket-draft';
 import { RecipientPanel } from './RecipientPanel';
 import { SenderPanel } from './SenderPanel';
 import styles from './MediationWorkspace.module.css';
@@ -92,6 +94,7 @@ const srOnlyStyle = {
  * 서버가 실제 단계별 진행을 노출하게 되면(향후 범위 밖) 그때 실제 값 기반으로 교체한다.
  */
 export function MediationWorkspace() {
+  const router = useRouter();
   const [text, setText] = useState('');
   const [recipient, setRecipient] = useState('');
   const [status, setStatus] = useState<MediationStatus>('idle');
@@ -121,6 +124,26 @@ export function MediationWorkspace() {
   // 최종문 편집처럼 실제로 다른 내용이 되면 새 키를 발급하며, 전송 성공(`approveStatus==='sent'`)
   // 후에는 다음 승인 시도를 위해 초기화한다.
   const idempotencyKeyRef = useRef<{ identity: string; key: string } | null>(null);
+
+  // T25 — `/ticket`(UX-007)에서 돌아왔을 때 작성창을 복원한다(`apps/web/lib/ticket-draft.ts`
+  // 헤더 주석 참조). "Back to message"면 원문이, "Use this ticket"이면 티켓 조립문이 이 키에
+  // 들어 있다 — 어느 쪽이든 그대로 작성창에 채운다. 읽는 즉시 세션에서 지워, 이후 이 컴포넌트가
+  // 다시 마운트되는 관계없는 방문(예: `/mediate`를 새로고침)에서 같은 값이 다시 나타나지 않게
+  // 한다(스테일 재노출 방지, T21/T23 리뷰 교훈).
+  // 🔴 `react-hooks/set-state-in-effect` — `apps/web/app/(app)/(with-nav)/profile/page.tsx`의
+  // fetch-on-mount 이펙트가 이미 세운 선례를 그대로 따른다: 이 규칙은 이펙트 콜백의 호출
+  // 그래프에서 setState 호출이 "도달 가능"하기만 하면 경고하고, 실제로 렌더 중 동기 실행되는지는
+  // 구분하지 않는다. 이 이펙트는 마운트 시 1회 외부 저장소(`sessionStorage`)를 읽어 초기 상태를
+  // 채우는 정당한 용례이며, 규칙 전체가 아니라 이 한 줄만 억제한다.
+  /* eslint-disable react-hooks/set-state-in-effect -- mount 시 sessionStorage 읽기, 위 근거 참조 */
+  useEffect(() => {
+    const draft = sessionStorage.getItem(TICKET_DRAFT_SESSION_KEY);
+    if (draft !== null) {
+      setText(draft);
+      sessionStorage.removeItem(TICKET_DRAFT_SESSION_KEY);
+    }
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const displayedUrgency = urgencyOverride ?? result?.urgency ?? null;
   const isOverridden =
@@ -323,6 +346,16 @@ export function MediationWorkspace() {
     }
   }
 
+  // 🔴 T25/AC-058① — `RecipientPanel`의 "Convert to Task Ticket" 클릭 핸들러. 승인 대상
+  // 스냅샷 시점의 원문(`approvalSnapshot.text` — `SenderPanel`의 `originalTextSnapshot`과 같은
+  // 이유: 이 원문이 실제로 `ticketOption.offered`를 판정한 그 텍스트다)을 세션에 저장하고
+  // `/ticket`으로 이동한다. 스냅샷이 없으면(이 버튼은 `hasResult`가 true일 때만 렌더되므로
+  // 실무에서는 항상 존재하지만) 방어적으로 라이브 `text`로 degrade한다.
+  function handleConvertToTicket() {
+    sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, approvalSnapshot?.text ?? text);
+    router.push('/ticket');
+  }
+
   return (
     <div>
       {/* Major 6① — 시각적으로는 숨기고 스크린리더에만 노출한다(중복 시각 텍스트를 만들지
@@ -363,6 +396,8 @@ export function MediationWorkspace() {
               onApprove={handleApprove}
               approveStatus={approveStatus}
               sentAt={sentAt}
+              ticketOffered={hasResult && result?.ticketOption.offered === true}
+              onConvertToTicket={handleConvertToTicket}
             />
           </div>
         </div>
