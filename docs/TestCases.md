@@ -3,7 +3,7 @@
 | Item | Value |
 |---|---|
 | 기준 PRD | **docs/PRD.md v2.8** (2026-08-04) |
-| Document Version | **1.7** (v1.6 + 🔴 **T61 시드 gap 3건 해소** — "데모 시드 데이터셋"에 ① **자기신고 프로필 4인 스키마 값 확정표**(박지훈·Sarah 신규 확정, Michael `neutral` 매핑 확인) ② **시드 계정 이메일 형식 확정**(`.example` 예약 TLD, Planning Decision #11) 추가. **케이스 정의·건수는 변경 0건**(74건 불변). 근거: implementer T61 보고 — 시드 4인 중 2인의 자기신고 값과 식별자 형식이 문서에 없어 코드가 값을 지어내야 하는 상태였다) <br>v1.6 내용: (v1.5 + 🔴 **AC-045 사람 판정 기록 형식 확정** — "실행 기록"에 **표 A-1** 신설(케이스당 1행 + 루브릭 H1~H3 + **자동 × 사람 합산 판정표**), "판정 방법"에 예외 2건 명시, "미확정 항목"의 해당 행 해소. **케이스 정의·건수는 변경 0건**(74건 불변, 추가·삭제·`제외` 0건). 근거: reviewer T10/T11 발견 — AC-045 10/10건이 문자열 매칭만으로 판정 불가라 자동 러너로는 `10/10 pass`에 도달할 절차가 없었다) <br>v1.5 내용: (v1.4 + **KEY 2 재정의 반영 — PRD v2.8** — 폐기 문구("우리는 추론하지 않는다") 제거, COMPARE-01의 Sarah 대조군 역할 변경, #34 3단계 케이스 미작성 상태 등재. v1.4 내용: 온보딩 스킵에 따른 **시드 계정 조건**, C6 빈 섹션 "없음" 기대값, 공휴일 미노출 판정. **기존 74건의 케이스 정의·건수는 두 번 모두 변경 없음**) |
+| Document Version | **1.8** (v1.7 + 🔴 **시드 계정 이메일 형식 교체** — `{이름}.{성}@{회사}.example` → **`{이름}.{성}+{회사}@example.com`**(RFC 2606 예약 도메인 + `+회사` 서브주소). 사유: Supabase Auth 회원가입 엔드포인트가 `.example` TLD를 **거부**한다(`400: Email address "jihoon.park@arasoft.example" is invalid`, 2026-08-07 라이브 auth 로그 확인 — 프로젝트 `aranhwommpaphkxdfjuf`, **cited**: 사용자 조회 결과이며 planner 재측정 아님. 반복 재시도 시 `429 over_email_send_rate_limit` 동반). **v1.7이 미리 명시해 둔 대체안을 그대로 발동한 것**이며 임의 도메인 변경이 아니다. **케이스 정의·건수는 변경 0건**(74건 불변). ⚠️ 코드 미정합 잔여: `apps/web/lib/demo/seed-data.ts`의 `DEMO_IDENTIFIERS`는 아직 v1.7 값 — implementer 작업) <br>v1.7 내용: (v1.6 + 🔴 **T61 시드 gap 3건 해소** — "데모 시드 데이터셋"에 ① **자기신고 프로필 4인 스키마 값 확정표**(박지훈·Sarah 신규 확정, Michael `neutral` 매핑 확인) ② **시드 계정 이메일 형식 확정**(`.example` 예약 TLD, Planning Decision #11) 추가. **케이스 정의·건수는 변경 0건**(74건 불변). 근거: implementer T61 보고 — 시드 4인 중 2인의 자기신고 값과 식별자 형식이 문서에 없어 코드가 값을 지어내야 하는 상태였다) <br>v1.6 내용: (v1.5 + 🔴 **AC-045 사람 판정 기록 형식 확정** — "실행 기록"에 **표 A-1** 신설(케이스당 1행 + 루브릭 H1~H3 + **자동 × 사람 합산 판정표**), "판정 방법"에 예외 2건 명시, "미확정 항목"의 해당 행 해소. **케이스 정의·건수는 변경 0건**(74건 불변, 추가·삭제·`제외` 0건). 근거: reviewer T10/T11 발견 — AC-045 10/10건이 문자열 매칭만으로 판정 불가라 자동 러너로는 `10/10 pass`에 도달할 절차가 없었다) <br>v1.5 내용: (v1.4 + **KEY 2 재정의 반영 — PRD v2.8** — 폐기 문구("우리는 추론하지 않는다") 제거, COMPARE-01의 Sarah 대조군 역할 변경, #34 3단계 케이스 미작성 상태 등재. v1.4 내용: 온보딩 스킵에 따른 **시드 계정 조건**, C6 빈 섹션 "없음" 기대값, 공휴일 미노출 판정. **기존 74건의 케이스 정의·건수는 두 번 모두 변경 없음**) |
 | Last Updated | 2026-08-07 |
 | Owner | **planner** — 사용자 지시로 2026-08-04에 planner가 인수했다(docs/PRD.md Planning Decision #69). ✅ **AGENTS.md 문서 소유표 등재 완료**(2026-08-04, 커밋 `88125f1` — 오케스트레이터가 사용자 지시로 AGENTS.md를 직접 수정. Agent Contract 표의 planner 행 Input/Output/May modify 3열도 함께 갱신됐다) |
 | 쓰기 권한 예외 | **케이스 정의는 planner 전용**이나, **implementer·quality-assurance는 아래 "실행 기록" 표에 행을 추가할 수 있다.** 케이스 자체의 추가·수정·삭제는 불가하며, 부적절한 케이스는 **삭제하지 말고 사유를 적어 `제외` 표시만** 한다. ⚠️ **이 예외 조항은 오케스트레이터의 판단으로 들어간 것이며 사용자가 명시적으로 지시한 내용은 아니다** |
@@ -232,21 +232,24 @@ AC 통과   = 해당 AC의 케이스가 요구 건수만큼 전부 통과
 | Michael `emoji_preference = neutral` | ✅ **implementer 판단 확인·확정.** CHECK 어휘는 `likes`/`neutral`/`avoids` 3값뿐이고 원문 표기는 **"가끔"** 이다. "가끔"은 선호(`likes`)도 회피(`avoids`)도 아니므로 중간값이 정확하다 — 어느 한쪽으로 밀면 없는 강도를 지어내는 것이 된다. 그의 **규약** `이모지 = 가끔 허용`(`emoji_policy = ok`)이 AC-056 ② 경고 억제를 이미 담당하므로, 프로필을 `likes`로 강하게 잡을 실익도 없다 |
 | Sarah = Michael과 3축 동일(`direct`/`neutral`/`low`) | 🔴 **COMPARE-01의 "Michael ↔ Sarah 차이의 근거는 #24 규약뿐"이라는 반박 대비 논지**(아래 표 ①②③)를 데이터로도 성립시키기 위해서다. 두 사람의 자기신고가 다르면 발표에서 "프로필이 달라서 아닌가요?"가 나온다. **수신자 프로필은 애초에 중재 입력이 아니지만**(contract.ts `RecipientContext`에 profile 필드가 없다 — 규약·국가·타임존뿐), 화면에 나란히 놓이는 값이므로 **변수를 규약 하나로 줄여 둔다.** Sarah가 cold start인 것은 **diff 0건 + 규약 미합의**이지 자기신고 공백이 아니다 |
 
-### (v1.7) 시드 계정 식별자(이메일) — **형식 확정**
+### (v1.8) 시드 계정 식별자(이메일) — **형식 확정 (v1.7 `.example` → `example.com` 서브주소로 교체)**
 
 > implementer가 T61에서 임시로 고른 형식을 **문서 값으로 승격**한다(이후 이 표가 단일 출처이며 코드가 아니다). `sent_messages.recipient_identifier` · `pair_protocols.party_a/party_b`가 전부 자유 텍스트 이메일이라 값이 반드시 있어야 시드가 성립한다.
 
-**규칙**: `{이름}.{성}@{회사}.example` — 전부 **소문자 ASCII**, 도메인은 **RFC 2606 예약 TLD `.example`** 를 쓴다(실제로 라우팅되지 않음을 형식만 보고 알 수 있다). **PRD Planning Decision #11(합성 데이터만, 실제 인물·기업 반입 금지)** 의 요구를 형식 차원에서 만족시킨다 — 실재 도메인(`.com`/`.co.kr` 등)은 쓰지 않는다.
+🔴 **(v1.8) v1.7의 `{이름}.{성}@{회사}.example` 형식은 폐기됐다.** Supabase Auth 회원가입 엔드포인트가 이 형식을 거부한다 — `400: Email address "jihoon.park@arasoft.example" is invalid` (**cited**: 사용자가 2026-08-07 Supabase 프로젝트 `aranhwommpaphkxdfjuf`의 라이브 auth 로그를 직접 조회해 확인. planner가 재측정한 값이 아니다). 반복 재시도 시 `429 over_email_send_rate_limit`도 함께 발생했다. **v1.7이 미리 적어 둔 대체안(예약 도메인 `example.com` 서브주소)을 그대로 발동한다.**
 
-| 인물 | 식별자 |
-|---|---|
-| 박지훈 | `jihoon.park@arasoft.example` |
-| 타나카 유키 | `yuki.tanaka@sakuradigital.example` |
-| Michael Chen | `michael.chen@vertexlabs.example` |
-| Sarah Willis | `sarah.willis@vertexlabs.example` |
+**규칙(v1.8)**: `{이름}.{성}+{회사}@example.com` — 전부 **소문자 ASCII**, 베이스 도메인은 **RFC 2606 예약 도메인 `example.com`**(실제로 라우팅되지 않는 예약 도메인이며, Supabase 검증기가 수용하는 형식이다). 회사 구분은 도메인 대신 **`+회사` 서브주소**로 유지한다 — 4개 주소가 눈으로 구별되고 소속 회사로 추적 가능해야 한다는 v1.7의 의도를 그대로 보존한다. **PRD Planning Decision #11(합성 데이터만, 실제 인물·기업 반입 금지)** 은 그대로 충족된다 — 실재 도메인(`.co.kr`, 실제 회사 도메인 등)은 쓰지 않는다.
 
-> ⚠️ **잔여 확인 1건(T61 완료 판정에 포함)**: 실제 회원가입 플로우(T46)가 `.example` TLD를 거부하면 이 형식을 쓸 수 없다. **거부될 경우 임의로 실재 도메인으로 바꾸지 말고** planner에 되돌린다 — 대체안은 RFC 2606의 `example.com` 서브주소(`jihoon.park+arasoft@example.com` 등)이며, 어느 쪽이든 **문서를 먼저 고치고 코드를 맞춘다.**
-> ⚠️ 계정 생성 자체는 **사용자 승인 사항**이다(T74/AC-039와 같은 취급 — `auth.users` 직접 조작 금지).
+| 인물 | 식별자 (v1.8) | (폐기) v1.7 값 |
+|---|---|---|
+| 박지훈 | `jihoon.park+arasoft@example.com` | ~~`jihoon.park@arasoft.example`~~ |
+| 타나카 유키 | `yuki.tanaka+sakuradigital@example.com` | ~~`yuki.tanaka@sakuradigital.example`~~ |
+| Michael Chen | `michael.chen+vertexlabs@example.com` | ~~`michael.chen@vertexlabs.example`~~ |
+| Sarah Willis | `sarah.willis+vertexlabs@example.com` | ~~`sarah.willis@vertexlabs.example`~~ |
+
+> ⚠️ **v1.7의 "잔여 확인 1건"은 해소됐다 — 거부가 확인됐고, 문서가 먼저 고쳐졌다.** 남은 것은 **코드 정합**이다: `apps/web/lib/demo/seed-data.ts`의 `DEMO_IDENTIFIERS`(seed-data.ts:38–43)와 `seed-data.test.ts`가 아직 v1.7 값을 들고 있다. **planner는 소스 코드를 수정하지 않는다**(AGENTS.md 소유표) — implementer가 위 표에 맞춰야 T61이 종결된다.
+> ⚠️ **`+` 서브주소 취급 확인 1건(implementer 확인 대상, planner 미검증)**: 이 값은 `recipient_identifier`·`pair_protocols.party_a/party_b`·`pair_key` 생성에 문자열 그대로 쓰인다. **어디에서도 `+`를 공백으로 URL 디코딩하거나 정규화로 제거하지 말 것** — 하면 4개 주소가 전부 `...@example.com` 한 값으로 붕괴한다. 4개 값의 구별 가능성이 깨지면 planner로 되돌린다.
+> ⚠️ 계정 생성 자체는 **사용자 승인 사항**이다(T74/AC-039와 같은 취급 — `auth.users` 직접 조작 금지). 위 429(`over_email_send_rate_limit`)는 재시도 전 대기가 필요함을 뜻한다.
 
 ### diff 학습 히스토리 10건 — **사용자 단위로 시드한다**
 
