@@ -106,7 +106,7 @@ export default function SignupPage() {
 
   return (
     <main className={styles.page}>
-      <h1 className={styles.title}>UX-002 회원가입</h1>
+      <h1 className={styles.title}>회원가입</h1>
       {banner === 'duplicate-email' && (
         <p role="alert" className={styles.banner}>
           이미 가입된 이메일입니다 <a href="/login">로그인</a>
