@@ -6,6 +6,14 @@
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { TICKET_DRAFT_SESSION_KEY } from '../lib/ticket-draft';
+
+// T25 — `MediationWorkspace`가 "Convert to Task Ticket" 클릭 시 `/ticket`으로 이동한다
+// (`apps/web/lib/ticket-draft.ts` 참조, next/navigation의 실제 라우터 컨텍스트가 jsdom 테스트에
+// 없으므로 이 리포의 다른 라우팅 테스트(`LogoutButton.test.tsx` 등)와 같은 패턴으로 목한다).
+const mockPush = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }));
+
 import { MediationWorkspace } from './MediationWorkspace';
 import styles from './MediationWorkspace.module.css';
 
@@ -48,6 +56,8 @@ function fillAndRun() {
 describe('MediationWorkspace', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    mockPush.mockClear();
+    window.sessionStorage.clear();
   });
 
   it('AC-009 — 발신자 패널과 수신자 패널이 한 화면에 동시에 표시된다', () => {
@@ -1403,5 +1413,68 @@ describe('MediationWorkspace', () => {
     } finally {
       vi.stubGlobal('crypto', originalCrypto);
     }
+  });
+
+  // T25/AC-058① — `ticketOption.offered:true`면 RecipientPanel에 링크가 나타나고, 클릭하면
+  // 승인 대상 원문(스냅샷)을 세션에 저장한 뒤 `/ticket`으로 이동한다(`apps/web/lib/ticket-draft.ts`).
+  it('T25 — Convert to Task Ticket 클릭 시 원문을 세션에 저장하고 /ticket으로 이동한다', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        mediateSuccessResponse({ ticketOption: { offered: true, basis: 'signal_present' } }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    const ticketLink = within(recipientPanel).getByRole('button', {
+      name: /Convert to Task Ticket/,
+    });
+    fireEvent.click(ticketLink);
+
+    expect(window.sessionStorage.getItem(TICKET_DRAFT_SESSION_KEY)).toBe(
+      '내일까지 확인 부탁드립니다.',
+    );
+    expect(mockPush).toHaveBeenCalledWith('/ticket');
+  });
+
+  // T25/AC-058② — 감정 신호가 낮아 `ticketOption.offered:false`이면 링크 자체가 없다.
+  it('T25 — ticketOption.offered가 false면 Convert to Task Ticket 링크가 없다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mediateSuccessResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    expect(
+      within(recipientPanel).queryByRole('button', { name: /Convert to Task Ticket/ }),
+    ).toBeNull();
+  });
+
+  // T25 — `/ticket`에서 "Use this ticket"/"Back to message"로 돌아왔을 때, 세션에 남아 있는
+  // 초안(`TICKET_DRAFT_SESSION_KEY`)을 마운트 시 작성창에 복원하고 즉시 소비(삭제)한다 — 이후
+  // 관계없는 방문에서 같은 값이 다시 나타나지 않게 한다(스테일 재노출 방지).
+  it('T25 — 마운트 시 세션에 티켓 초안이 있으면 작성창에 복원하고 세션에서 지운다', () => {
+    window.sessionStorage.setItem(
+      TICKET_DRAFT_SESSION_KEY,
+      '[문제 정의]\n편집된 문제\n\n[영향·리스크]\n없음\n\n[요청 사항]\n요청\n\n[우려 수준]\n높음',
+    );
+
+    render(<MediationWorkspace />);
+
+    const messageField = screen.getByLabelText('메시지') as HTMLTextAreaElement;
+    expect(messageField.value).toContain('편집된 문제');
+    expect(window.sessionStorage.getItem(TICKET_DRAFT_SESSION_KEY)).toBeNull();
   });
 });
