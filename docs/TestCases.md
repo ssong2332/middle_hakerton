@@ -557,6 +557,8 @@ union all select 'profile_learned_items', count(*) from profile_learned_items wh
 ```
 **등급: 오케스트레이터 measured, 2회 독립 실행(2026-08-07 최초 시딩 직후 + QA NO-GO 직후 재확인) — 값 일치.** planner·reviewer·QA 중 어느 쪽도 재측정하지 않았으므로 그 세 역할 기준으로는 cited다(T17 각주와 같은 등급 표기 원칙).
 
+✅ **3차 확인 — 사용자 직접 실측(2026-08-07)**: QA의 "제3자가 재현할 수 없다"는 지적을 최종적으로 해소하기 위해, 사용자가 Supabase 대시보드 SQL Editor에서 위 쿼리를 직접 실행했다. 결과: `profiles=4, dictionary_terms=22, pair_protocols=2, diff_records=10, profile_learned_items=1` — 오케스트레이터의 2회 측정치와 **완전히 일치**. 이제 이 표는 오케스트레이터뿐 아니라 **사용자 본인 measured**이기도 하다 — QA가 요구한 "작성자 아닌 제3자 재현"이 충족됐다.
+
 **AC-059 검증(실측값 그대로, 요약 아님) — `select user_id, onboarding_state, directness, emoji_preference, formality, honorific_level, (select count(*) from diff_records d where d.user_id = p.user_id) as diff_count, (select count(*) from profile_learned_items l where l.user_id = p.user_id) as learned_count from profiles p where p.user_id in (...)`:**
 
 | user_id(persona) | onboarding_state | directness | emoji_preference | formality | honorific_level | diff_count | learned_count |
