@@ -393,6 +393,18 @@ export default function ProfilePage() {
             const onRequestDelete = learnedRow
               ? () => requestDeleteLearned(learnedRow.id)
               : () => requestDeleteField(key);
+            // MJ-1(리뷰) — 스킵/미시작 사용자는 자기신고 4필드가 항상 null이다
+            // (`saveOnboardingProfile`이 `onboardingState !== 'completed'`이면 항상 null로
+            // 저장한다, `apps/web/lib/profile/storage.ts:77-80`). 그런데 이 값이 null이어도
+            // 수정/삭제 버튼은 계속 렌더됐고, `deleteField`/`saveEdit`는 `onboardingState:
+            // 'completed'`를 하드코딩해 보낸다 — "지울 것도 없는" 미설정 행에서 삭제를 누르면
+            // 아무것도 안 지워졌는데 온보딩 상태만 completed로 뒤바뀐다(AC-059③⑤가 요구하는
+            // skipped/completed 구분이 깨짐). 자기신고 행이면서 값이 없고 아직 completed가
+            // 아닌 경우에만 컨트롤을 감춘다 — completed인데 4항목을 전부 지운 M-3 케이스는
+            // 그대로 수정/삭제 가능해야 하므로 건드리지 않는다. 값을 채우려면 "온보딩
+            // 완료하기" 배너 액션을 쓴다(위 배너 렌더 부분 참고).
+            const canManageSelfReport =
+              profile.onboardingState === 'completed' || profile[key] !== null;
 
             return (
               <li key={key} className={styles.item}>
@@ -404,22 +416,24 @@ export default function ProfilePage() {
                 {editingField !== key && (
                   <>
                     <span className={styles.itemValue}>{displayValue}</span>
-                    <div className={styles.itemActions}>
-                      {/* 학습된 값이 표시 중인 행은 View + Delete만 지원한다(수정 없음) —
-                          파일 헤더 주석 참고. */}
-                      {!isLearned && (
-                        <button
-                          type="button"
-                          className={styles.editButton}
-                          onClick={() => startEdit(key)}
-                        >
-                          수정
+                    {(isLearned || canManageSelfReport) && (
+                      <div className={styles.itemActions}>
+                        {/* 학습된 값이 표시 중인 행은 View + Delete만 지원한다(수정 없음) —
+                            파일 헤더 주석 참고. */}
+                        {!isLearned && canManageSelfReport && (
+                          <button
+                            type="button"
+                            className={styles.editButton}
+                            onClick={() => startEdit(key)}
+                          >
+                            수정
+                          </button>
+                        )}
+                        <button type="button" className={styles.deleteButton} onClick={onRequestDelete}>
+                          삭제
                         </button>
-                      )}
-                      <button type="button" className={styles.deleteButton} onClick={onRequestDelete}>
-                        삭제
-                      </button>
-                    </div>
+                      </div>
+                    )}
                   </>
                 )}
 
