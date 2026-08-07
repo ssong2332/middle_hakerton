@@ -5,29 +5,37 @@
  * (Screen ID: UX-009)". AC-014 (screen), AC-012/AC-013 (backend behaviors surfaced here),
  * AC-046 (honorific-level item), AC-059 (skipped/empty profile + resume path). `docs/Tasks.md` T21.
  *
- * States(`docs/UX.md` UX-009 States): Loading(skeleton) / SkippedProfile(온보딩 건너뜀 —
- * "온보딩 완료하기" 액션) / Empty(학습된 항목 0건, 자기신고 항목은 계속 보임) / Error(재시도) /
- * Success(자기신고 4항목 + 학습된 항목 목록). Empty와 Success는 같은 "본문" 렌더 트리 안에서
- * 학습 항목 섹션만 달라진다 — 자기신고 4항목은 `onboardingState==='completed'`면 항상 보인다
- * (UX.md Empty 설명 "self-report exists but no diff pattern has reached 3 repeats yet" — 자기신고
- * 자체가 사라지는 상태가 아니다).
+ * States(`docs/UX.md` UX-009 States): Loading(skeleton) / SkippedProfile 계열(개인화-꺼짐
+ * 배너 — "온보딩 완료하기" 액션) / Empty(학습된 항목 0건) / Error(재시도) / Success(차원별 1행,
+ * `docs/UX.md:577` "full list shown ..., each item tagged 자기신고 or 학습됨" — 자기신고 목록과
+ * 학습된 항목 목록이 분리된 두 리스트가 아니라, 4개 차원(직설/완곡·이모지 선호·격식도·존댓말
+ * 레벨) 각각 한 행이며 그 차원에 학습된 값이 있으면 그 행이 "학습됨"으로 대체된다(리뷰 M-2)).
  *
- * 🔴 `(with-nav)` 레이아웃의 `enforceOnboardingRedirect()`가 `onboardingState==='not_started'`
- * 계정은 이미 `/onboarding`으로 돌려보낸다 — 이 화면에 도달했는데 프로필이 비어 있다면 사실상
- * `skipped`뿐이다. 그래도 이 화면 안에서 "삭제"로 되돌린 직후(서버 재내비게이션 없이)는 클라이언트
- * 상태가 `not_started`가 될 수 있으므로, SkippedProfile 분기는 `onboardingState !== 'completed'`
- * 전체를 포괄한다(스킵과 미시작을 화면에서 다른 문구로 나누지 않는다 — 둘 다 "비어 있고 온보딩으로
- * 돌아가야 함"이라는 같은 처방이다).
+ * 🔴 (리뷰 M-1) 패턴 학습(`applyPatternLearningSafe`,
+ * `apps/web/app/api/messages/route.ts`)은 `onboardingState`와 무관하게 항상 실행된다
+ * (`apps/web/lib/messages/pattern-learning.ts` — 임계값만 확인, 온보딩 상태는 보지 않는다).
+ * 그래서 스킵/미시작 사용자도 `profile_learned_items` 행을 가질 수 있다 — 이 화면은 그 행을
+ * `onboardingState`로 가리지 않는다. 아래 차원 목록(위 Success 문단)은 항상 렌더되고,
+ * `isSkippedOrEmpty`는 오직 "개인화가 꺼져 있습니다" 배너의 노출 여부만 제어한다(M-3 참고,
+ * 자기신고 값이 비어 있어도 학습된 값은 여전히 보이고 지울 수 있어야 한다).
  *
- * 🔴 Edit/Delete가 있는 항목은 **자기신고 4항목뿐**이다 — `PUT /api/profile`만으로 표현 가능하다
- * (편집: 그 필드만 바꿔 전체를 다시 보낸다. 삭제: 그 필드를 생략해 `null`로 되돌리고 나머지는
- * 그대로 다시 보낸다 — `saveOnboardingProfile`이 "보내지 않은 필드는 null"로 취급하므로, 편집·
- * 삭제 모두 현재 값 전체를 함께 실어 보내야 다른 필드가 같이 지워지지 않는다). 학습된 항목은
- * `docs/API.md`에 PUT 엔드포인트가 없다 — View + Delete만 지원한다(`DELETE
- * /api/profile/learned/{id}`).
+ * 🔴 (리뷰 M-4) `not_started`가 이 화면에 도달하는 이유는 이 화면 자신이 `DELETE /api/profile`을
+ * 호출해서가 아니다(그런 라우트를 이 화면은 호출하지 않는다 — 아래 참고). 진짜 이유는
+ * `apps/web/lib/onboarding-guard.ts`의 `enforceOnboardingRedirect()`가 DB/config 오류에
+ * **fail-open**이기 때문이다(`onboarding-guard.ts:22-32`) — 그 실패 시 리다이렉트 없이 통과하므로
+ * 실제로 온보딩을 한 번도 완료하지 않은 사용자가 이 화면에 도달할 수 있다. `not_started`는
+ * "건너뛰었다"가 아니라 "아직 완료하지 않았다"이므로 `skipped`와 다른 문구를 쓴다.
+ *
+ * 🔴 Edit/Delete가 있는 항목은 **자기신고 값을 보여주는 행뿐**이다 — `PUT /api/profile`만으로
+ * 표현 가능하다(편집: 그 필드만 바꿔 전체를 다시 보낸다. 삭제: 그 필드를 생략해 `null`로 되돌리고
+ * 나머지는 그대로 다시 보낸다 — `saveOnboardingProfile`이 "보내지 않은 필드는 null"로 취급하므로,
+ * 편집·삭제 모두 현재 값 전체를 함께 실어 보내야 다른 필드가 같이 지워지지 않는다). 학습된 값이
+ * 표시 중인 행은 `docs/API.md`에 PUT 엔드포인트가 없어 View + Delete만 지원한다(`DELETE
+ * /api/profile/learned/{id}`) — 이 화면은 그 행에서 "수정" 버튼을 아예 렌더하지 않는다.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { profileValueForPattern } from '@cross-border/core';
 import styles from './profile.module.css';
 
 const ONBOARDING_ROUTE = '/onboarding';
@@ -36,6 +44,11 @@ const FIELD_SAVE_FAILED_MESSAGE = '저장하지 못했습니다, 다시 시도�
 const FIELD_DELETE_FAILED_MESSAGE = '삭제하지 못했습니다, 다시 시도해주세요';
 const EMPTY_VALUE_ERROR = '값을 선택해주세요';
 const CONFIRM_DELETE_MESSAGE = '삭제하시겠습니까?';
+// M-4 — `not_started`는 "건너뛰었다"가 아니라 "아직 완료하지 않았다"이므로 별도 문구를 쓴다.
+// `skipped`와 "completed인데 자기신고 4항목이 모두 null"(M-3)은 같은 문구를 공유한다 — 두 경우
+// 모두 "자기신고로 채워질 값이 없다"는 같은 사실이며, 이 이상의 세분화는 이번 수정 범위 밖이다.
+const SKIPPED_MESSAGE = '온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다';
+const NOT_STARTED_MESSAGE = '온보딩이 아직 완료되지 않았습니다 — 개인화가 꺼져 있습니다';
 
 type Directness = 'direct' | 'indirect';
 type EmojiPreference = 'likes' | 'neutral' | 'avoids';
@@ -93,6 +106,29 @@ const FIELD_OPTIONS: Record<FieldKey, { value: string; label: string }[]> = {
 function fieldValueLabel(key: FieldKey, value: string | null): string {
   if (value === null) return '미설정';
   return FIELD_OPTIONS[key].find((option) => option.value === value)?.label ?? value;
+}
+
+// M-2 — `packages/core/src/rules/pattern-detection.ts`가 만드는 `pattern_key`가 어느 자기신고
+// 차원에 대응하는지의 어휘. `formality`/`honorificLevel`은 diff로 학습되는 필드가 아니므로
+// (core의 `profileValueForPattern`이 두 값만 만든다) 이 표에 없다 — 항상 "자기신고"로 남는다.
+const PATTERN_TO_FIELD: Record<string, FieldKey> = {
+  emoji_removed: 'emojiPreference',
+  cushion_insert: 'directness',
+};
+
+/** `key` 차원에 대응하는 학습 항목(있다면 하나) — 원시 patternKey를 화면에 그대로 노출하지 않고,
+ * 이 항목을 찾아 그 차원의 자기신고 행을 대체하는 데만 쓴다(M-2). */
+function learnedItemForField(key: FieldKey, items: LearnedItem[]): LearnedItem | undefined {
+  return items.find((item) => PATTERN_TO_FIELD[item.patternKey] === key);
+}
+
+/** 학습 항목의 `patternKey`가 가리키는 `profiles` 어휘 값 — `profileValueForPattern`(core)이
+ * 유일한 통로다. 분류 불가(core가 만들지 않는 값)면 `null`(지어내지 않는다). */
+function learnedDisplayValue(item: LearnedItem): string | null {
+  if (item.patternKey === 'emoji_removed' || item.patternKey === 'cushion_insert') {
+    return profileValueForPattern(item.patternKey);
+  }
+  return null;
 }
 
 type DeleteTarget = { type: 'field'; key: FieldKey } | { type: 'learned'; id: string };
@@ -302,7 +338,14 @@ export default function ProfilePage() {
 
   if (!profile) return null;
 
-  const isSkippedOrEmpty = profile.onboardingState !== 'completed';
+  // M-3 — `onboardingState`만으로 판정하면 "completed이지만 자기신고 4항목을 전부 삭제한" 상태를
+  // 놓친다(`deleteField`가 필드별로 null로 되돌릴 뿐 `onboardingState`는 그대로 두므로 이 상태에
+  // 도달할 수 있다). `docs/UX.md:926` Personalization-off indicator는 "개인화 입력이 없을 때는
+  // 언제나"이므로, 상태값과 별개로 실제 4개 필드가 모두 null인지도 함께 본다.
+  const allStyleFieldsNull = FIELD_ORDER.every((key) => profile[key] === null);
+  const isSkippedOrEmpty = profile.onboardingState !== 'completed' || allStyleFieldsNull;
+  const bannerMessage =
+    profile.onboardingState === 'not_started' ? NOT_STARTED_MESSAGE : SKIPPED_MESSAGE;
 
   return (
     <main className={styles.page}>
@@ -311,9 +354,7 @@ export default function ProfilePage() {
 
       {isSkippedOrEmpty && (
         <div className={styles.skippedBox}>
-          <p className={styles.skippedMessage}>
-            온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다
-          </p>
+          <p className={styles.skippedMessage}>{bannerMessage}</p>
           <button
             type="button"
             className={styles.completeOnboardingButton}
@@ -324,35 +365,58 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {!isSkippedOrEmpty && (
-        <section className={styles.section} aria-label="자기신고 항목">
-          <h2 className={styles.sectionTitle}>자기신고 항목</h2>
-          <ul className={styles.list}>
-            {FIELD_ORDER.map((key) => (
+      {/* M-1 — 이 섹션은 `isSkippedOrEmpty`로 가리지 않는다. 패턴 학습은 온보딩 상태와 무관하게
+          실행되므로, 스킵/미시작 사용자도 학습된 값을 보고 지울 수 있어야 한다(파일 헤더 주석
+          참고). 위 배너는 "자기신고 입력이 비어 있다"는 사실만 알릴 뿐, 학습된 값의 열람·삭제를
+          막을 이유가 되지 않는다. */}
+      <section className={styles.section} aria-label="프로필 항목">
+        <h2 className={styles.sectionTitle}>프로필 항목</h2>
+        {learnedItems.length === 0 && (
+          <p className={styles.emptyMessage}>아직 학습된 항목이 없습니다</p>
+        )}
+        <ul className={styles.list}>
+          {FIELD_ORDER.map((key) => {
+            const learned = learnedItemForField(key, learnedItems);
+            // M-2 — 학습 항목이 있으면 그 차원 행은 학습된 값으로 대체되어 "학습됨" 태그를 달고,
+            // 없으면 기존처럼 자기신고 값을 "자기신고" 태그로 보여준다. 한 차원에 두 값이 동시에
+            // 보이는 일은 없다(원본 버그의 핵심 — 원시 patternKey/enum을 별도로 또 보여주던 것).
+            const learnedValue = learned ? learnedDisplayValue(learned) : null;
+            const learnedRow = learned && learnedValue !== null ? { id: learned.id, learnedValue } : null;
+            const isLearned = learnedRow !== null;
+            const displayValue = learnedRow
+              ? fieldValueLabel(key, learnedRow.learnedValue)
+              : fieldValueLabel(key, profile[key]);
+            const rowError = learnedRow ? learnedErrors[learnedRow.id] : fieldErrors[key];
+            const isThisDeleteTarget = learnedRow
+              ? deleteTarget?.type === 'learned' && deleteTarget.id === learnedRow.id
+              : deleteTarget?.type === 'field' && deleteTarget.key === key;
+            const onRequestDelete = learnedRow
+              ? () => requestDeleteLearned(learnedRow.id)
+              : () => requestDeleteField(key);
+
+            return (
               <li key={key} className={styles.item}>
                 <div className={styles.itemHeader}>
                   <span className={styles.itemLabel}>{FIELD_LABELS[key]}</span>
-                  <span className={styles.tag}>자기신고</span>
+                  <span className={styles.tag}>{isLearned ? '학습됨' : '자기신고'}</span>
                 </div>
 
                 {editingField !== key && (
                   <>
-                    <span className={styles.itemValue}>
-                      {fieldValueLabel(key, profile[key])}
-                    </span>
+                    <span className={styles.itemValue}>{displayValue}</span>
                     <div className={styles.itemActions}>
-                      <button
-                        type="button"
-                        className={styles.editButton}
-                        onClick={() => startEdit(key)}
-                      >
-                        수정
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.deleteButton}
-                        onClick={() => requestDeleteField(key)}
-                      >
+                      {/* 학습된 값이 표시 중인 행은 View + Delete만 지원한다(수정 없음) —
+                          파일 헤더 주석 참고. */}
+                      {!isLearned && (
+                        <button
+                          type="button"
+                          className={styles.editButton}
+                          onClick={() => startEdit(key)}
+                        >
+                          수정
+                        </button>
+                      )}
+                      <button type="button" className={styles.deleteButton} onClick={onRequestDelete}>
                         삭제
                       </button>
                     </div>
@@ -388,13 +452,13 @@ export default function ProfilePage() {
                   </div>
                 )}
 
-                {fieldErrors[key] && (
+                {rowError && (
                   <p role="alert" className={styles.errorText}>
-                    {fieldErrors[key]}
+                    {rowError}
                   </p>
                 )}
 
-                {deleteTarget?.type === 'field' && deleteTarget.key === key && (
+                {isThisDeleteTarget && (
                   <div role="alert" className={styles.confirmBox}>
                     <p>{CONFIRM_DELETE_MESSAGE}</p>
                     <div className={styles.confirmActions}>
@@ -406,81 +470,17 @@ export default function ProfilePage() {
                       >
                         삭제
                       </button>
-                      <button
-                        type="button"
-                        className={styles.cancelButton}
-                        onClick={cancelDelete}
-                      >
+                      <button type="button" className={styles.cancelButton} onClick={cancelDelete}>
                         취소
                       </button>
                     </div>
                   </div>
                 )}
               </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {!isSkippedOrEmpty && (
-        <section className={styles.section} aria-label="학습된 항목">
-          <h2 className={styles.sectionTitle}>학습된 항목</h2>
-          {learnedItems.length === 0 && (
-            <p className={styles.emptyMessage}>아직 학습된 항목이 없습니다</p>
-          )}
-          {learnedItems.length > 0 && (
-            <ul className={styles.list}>
-              {learnedItems.map((item) => (
-                <li key={item.id} className={styles.item}>
-                  <div className={styles.itemHeader}>
-                    <span className={styles.itemLabel}>{item.patternKey}</span>
-                    <span className={styles.tag}>학습됨</span>
-                  </div>
-                  <span className={styles.itemValue}>{item.value}</span>
-                  <div className={styles.itemActions}>
-                    <button
-                      type="button"
-                      className={styles.deleteButton}
-                      onClick={() => requestDeleteLearned(item.id)}
-                    >
-                      삭제
-                    </button>
-                  </div>
-
-                  {learnedErrors[item.id] && (
-                    <p role="alert" className={styles.errorText}>
-                      {learnedErrors[item.id]}
-                    </p>
-                  )}
-
-                  {deleteTarget?.type === 'learned' && deleteTarget.id === item.id && (
-                    <div role="alert" className={styles.confirmBox}>
-                      <p>{CONFIRM_DELETE_MESSAGE}</p>
-                      <div className={styles.confirmActions}>
-                        <button
-                          type="button"
-                          className={styles.confirmDeleteButton}
-                          disabled={deleting}
-                          onClick={() => void confirmDelete()}
-                        >
-                          삭제
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.cancelButton}
-                          onClick={cancelDelete}
-                        >
-                          취소
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
+            );
+          })}
+        </ul>
+      </section>
     </main>
   );
 }
