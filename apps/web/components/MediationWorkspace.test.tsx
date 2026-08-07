@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { TICKET_DRAFT_SESSION_KEY } from '../lib/ticket-draft';
+import { TICKET_DRAFT_SESSION_KEY, TICKET_RESTORE_SESSION_KEY } from '../lib/ticket-draft';
 
 // T25 — `MediationWorkspace`가 "Convert to Task Ticket" 클릭 시 `/ticket`으로 이동한다
 // (`apps/web/lib/ticket-draft.ts` 참조, next/navigation의 실제 라우터 컨텍스트가 jsdom 테스트에
@@ -1496,11 +1496,11 @@ describe('MediationWorkspace', () => {
   });
 
   // T25 — `/ticket`에서 "Use this ticket"/"Back to message"로 돌아왔을 때, 세션에 남아 있는
-  // 초안(`TICKET_DRAFT_SESSION_KEY`)을 마운트 시 작성창에 복원하고 즉시 소비(삭제)한다 — 이후
-  // 관계없는 방문에서 같은 값이 다시 나타나지 않게 한다(스테일 재노출 방지).
-  it('T25 — 마운트 시 세션에 티켓 초안이 있으면 작성창에 복원하고 세션에서 지운다', () => {
+  // 복원값(`TICKET_RESTORE_SESSION_KEY`)을 마운트 시 작성창에 복원하고 즉시 소비(삭제)한다 —
+  // 이후 관계없는 방문에서 같은 값이 다시 나타나지 않게 한다(스테일 재노출 방지).
+  it('T25 — 마운트 시 세션에 복원값이 있으면 작성창에 복원하고 세션에서 지운다', () => {
     window.sessionStorage.setItem(
-      TICKET_DRAFT_SESSION_KEY,
+      TICKET_RESTORE_SESSION_KEY,
       '[문제 정의]\n편집된 문제\n\n[영향·리스크]\n없음\n\n[요청 사항]\n요청\n\n[우려 수준]\n높음',
     );
 
@@ -1508,6 +1508,52 @@ describe('MediationWorkspace', () => {
 
     const messageField = screen.getByLabelText('메시지') as HTMLTextAreaElement;
     expect(messageField.value).toContain('편집된 문제');
-    expect(window.sessionStorage.getItem(TICKET_DRAFT_SESSION_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(TICKET_RESTORE_SESSION_KEY)).toBeNull();
+  });
+
+  // Major-1(QA GO, follow-up → 수정) — 회귀 테스트: 중재 실행(스냅샷 "A") 후 사용자가 작성창을
+  // 더 편집("A + more", 이 시점부터 `isStale`)하고 나서 "Convert to Task Ticket"을 누르면,
+  // `/api/ticket`에는 여전히 스냅샷("A")이 전달돼야 하지만(ticketOption이 그 텍스트로 판정됐으므로,
+  // 이 동작 자체는 바꾸지 않는다), "Back to message"로 돌아왔을 때 작성창은 편집분("A + more")을
+  // 보존해야 한다 — 스냅샷으로 조용히 되돌려지면 안 된다.
+  it('Major-1 — 스냅샷 이후 편집한 텍스트로 티켓 전환해도 Back to message는 편집분을 보존한다', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        mediateSuccessResponse({ ticketOption: { offered: true, basis: 'signal_present' } }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { unmount } = render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    // 성공 스냅샷은 '내일까지 확인 부탁드립니다.' — 이제 작성창을 추가로 편집한다(isStale이 됨).
+    const messageField = screen.getByLabelText('메시지') as HTMLTextAreaElement;
+    fireEvent.change(messageField, {
+      target: { value: '내일까지 확인 부탁드립니다. 그리고 추가 내용도 있습니다.' },
+    });
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    fireEvent.click(
+      within(recipientPanel).getByRole('button', { name: /Convert to Task Ticket/ }),
+    );
+
+    // API에 보낼 원문(TICKET_DRAFT_SESSION_KEY)은 여전히 스냅샷이어야 한다 — 바뀌면 안 된다.
+    expect(window.sessionStorage.getItem(TICKET_DRAFT_SESSION_KEY)).toBe(
+      '내일까지 확인 부탁드립니다.',
+    );
+
+    // `/ticket`으로 이동하면서 이 컴포넌트가 언마운트된다(별개 라우트) — "Back to message"는
+    // 세션 값을 건드리지 않으므로, 재마운트로 그 결과를 시뮬레이션한다.
+    unmount();
+    render(<MediationWorkspace />);
+
+    expect((screen.getByLabelText('메시지') as HTMLTextAreaElement).value).toBe(
+      '내일까지 확인 부탁드립니다. 그리고 추가 내용도 있습니다.',
+    );
   });
 });

@@ -6,7 +6,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { TICKET_DRAFT_SESSION_KEY } from '../lib/ticket-draft';
+import { TICKET_DRAFT_SESSION_KEY, TICKET_RESTORE_SESSION_KEY } from '../lib/ticket-draft';
 
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }));
@@ -186,7 +186,7 @@ describe('TicketWorkspace', () => {
     expect(screen.queryByText('폴백 응답 사용 중')).toBeNull();
   });
 
-  it('"Use this ticket" — 편집된 4섹션을 조립해 세션에 저장하고 /mediate로 이동한다', async () => {
+  it('"Use this ticket" — 편집된 4섹션을 조립해 복원용 세션 키에 저장하고 /mediate로 이동한다', async () => {
     window.sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, '원문');
     const fetchMock = vi.fn().mockResolvedValue(ticketResponse());
     vi.stubGlobal('fetch', fetchMock);
@@ -201,13 +201,17 @@ describe('TicketWorkspace', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /Use this ticket/ }));
 
-    const stored = window.sessionStorage.getItem(TICKET_DRAFT_SESSION_KEY);
+    // Major-1 — API 소스 키(`TICKET_DRAFT_SESSION_KEY`)는 그대로 두고, 복원 전용 키
+    // (`TICKET_RESTORE_SESSION_KEY`)에 조립문을 쓴다.
+    const stored = window.sessionStorage.getItem(TICKET_RESTORE_SESSION_KEY);
     expect(stored).toContain('편집된 문제');
+    expect(window.sessionStorage.getItem(TICKET_DRAFT_SESSION_KEY)).toBe('원문');
     expect(mockPush).toHaveBeenCalledWith('/mediate');
   });
 
-  it('"Back to message" — 세션의 원문을 건드리지 않고 /mediate로 돌아간다(원문 보존)', async () => {
+  it('"Back to message" — 세션의 원문/복원값을 건드리지 않고 /mediate로 돌아간다(원문 보존)', async () => {
     window.sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, '원문');
+    window.sessionStorage.setItem(TICKET_RESTORE_SESSION_KEY, '편집 중이던 원문');
     const fetchMock = vi.fn().mockResolvedValue(ticketResponse());
     vi.stubGlobal('fetch', fetchMock);
 
@@ -219,6 +223,7 @@ describe('TicketWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: /Back to message/ }));
 
     expect(window.sessionStorage.getItem(TICKET_DRAFT_SESSION_KEY)).toBe('원문');
+    expect(window.sessionStorage.getItem(TICKET_RESTORE_SESSION_KEY)).toBe('편집 중이던 원문');
     expect(mockPush).toHaveBeenCalledWith('/mediate');
   });
 });
