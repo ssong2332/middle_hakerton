@@ -180,6 +180,38 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
     });
   });
 
+  it('MJ-1 — 스킵된 사용자의 미설정(자기신고) 행은 수정/삭제 버튼을 렌더하지 않는다(삭제로 onboardingState가 completed로 바뀌면 안 됨)', async () => {
+    mockLoadSuccess(SKIPPED_PROFILE, []);
+    render(<ProfilePage />);
+    await waitFor(() => {
+      expect(screen.getByText('온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다')).toBeTruthy();
+    });
+
+    const directnessRow = screen.getByText('직설/완곡').closest('li') as HTMLElement;
+    expect(within(directnessRow).queryByRole('button', { name: '수정' })).toBeNull();
+    expect(within(directnessRow).queryByRole('button', { name: '삭제' })).toBeNull();
+
+    // PUT은 전혀 호출되지 않는다 — 특히 onboardingState: 'completed'로 바뀌는 호출은 없어야 한다.
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      '/api/profile',
+      expect.objectContaining({ method: 'PUT' }),
+    );
+  });
+
+  it('MJ-1 — not_started 사용자의 미설정 행도 수정/삭제 버튼을 렌더하지 않는다', async () => {
+    mockLoadSuccess(NOT_STARTED_PROFILE, []);
+    render(<ProfilePage />);
+    await waitFor(() => {
+      expect(
+        screen.getByText('온보딩이 아직 완료되지 않았습니다 — 개인화가 꺼져 있습니다'),
+      ).toBeTruthy();
+    });
+
+    const formalityRow = screen.getByText('격식도').closest('li') as HTMLElement;
+    expect(within(formalityRow).queryByRole('button', { name: '수정' })).toBeNull();
+    expect(within(formalityRow).queryByRole('button', { name: '삭제' })).toBeNull();
+  });
+
   it('Empty — 완료된 프로필인데 학습 항목이 없으면 자기신고 항목은 보이고 "아직 학습된 항목이 없습니다"를 보여준다', async () => {
     mockLoadSuccess(COMPLETED_PROFILE, []);
     render(<ProfilePage />);
