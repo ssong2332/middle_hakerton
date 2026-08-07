@@ -302,4 +302,124 @@ describe('TerminologyPage (UX-010) — AC-016/AC-047', () => {
       expect(screen.queryByText('SLA')).toBeNull();
     });
   });
+
+  it('M-1 — 저장(PUT)이 진행 중인 동안 같은 행의 삭제 버튼이 비활성화된다(저장 중 삭제 경합 방지)', async () => {
+    mockLoadSuccess([TERM_ENTRY]);
+    render(<TerminologyPage />);
+    await waitFor(() => screen.getByText('SLA'));
+
+    const row = screen.getByText('SLA').closest('li') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: '수정' }));
+
+    const targetInput = within(row).getByLabelText('번역/대응어') as HTMLInputElement;
+    fireEvent.change(targetInput, { target: { value: '변경됨' } });
+
+    let resolveSave: (value: unknown) => void = () => {};
+    const savePromise = new Promise((resolve) => {
+      resolveSave = resolve;
+    });
+    mockFetch.mockImplementationOnce(() => savePromise);
+    fireEvent.click(within(row).getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      const deleteButton = within(row).getByRole('button', { name: '삭제' }) as HTMLButtonElement;
+      expect(deleteButton.disabled).toBe(true);
+    });
+
+    resolveSave(jsonOk({ ...TERM_ENTRY, targetText: '변경됨' }));
+    await waitFor(() => {
+      expect(screen.getByText('변경됨')).toBeTruthy();
+    });
+  });
+
+  it('M-2 — 추가 폼에서 중복 에러가 뜬 뒤 입력값을 바꾸면(재제출 없이) 에러 메시지가 사라진다', async () => {
+    mockLoadSuccess([]);
+    render(<TerminologyPage />);
+    await waitFor(() => screen.getByText('등록된 용어가 없습니다. 첫 용어를 추가하세요'));
+
+    fireEvent.change(screen.getByLabelText('용어'), { target: { value: 'SLA' } });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => ({
+        error: { code: 'CONFLICT_DUPLICATE_ENTRY', message: '이미 등록된 용어입니다', retryable: false },
+      }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: '추가' }));
+    await waitFor(() => {
+      expect(screen.getByText('이미 등록된 용어입니다')).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText('용어'), { target: { value: 'SLA2' } });
+
+    expect(screen.queryByText('이미 등록된 용어입니다')).toBeNull();
+  });
+
+  it('M-2 — 수정 폼에서 인라인 에러가 뜬 뒤 입력값을 바꾸면(재제출 없이) 에러 메시지가 사라진다', async () => {
+    mockLoadSuccess([TERM_ENTRY]);
+    render(<TerminologyPage />);
+    await waitFor(() => screen.getByText('SLA'));
+
+    const row = screen.getByText('SLA').closest('li') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: '수정' }));
+
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => ({
+        error: { code: 'CONFLICT_DUPLICATE_ENTRY', message: '이미 등록된 용어입니다', retryable: false },
+      }),
+    });
+    fireEvent.click(within(row).getByRole('button', { name: '저장' }));
+    await waitFor(() => {
+      expect(within(row).getByText('이미 등록된 용어입니다')).toBeTruthy();
+    });
+
+    fireEvent.change(within(row).getByLabelText('번역/대응어'), { target: { value: '바뀐값' } });
+
+    expect(within(row).queryByText('이미 등록된 용어입니다')).toBeNull();
+  });
+
+  it('M-3 — 추가 폼에 이미 등록된 용어(대소문자 무시)를 입력하면 추가 버튼이 비활성화된다(클라이언트 선제 검사)', async () => {
+    mockLoadSuccess([TERM_ENTRY]);
+    render(<TerminologyPage />);
+    await waitFor(() => screen.getByText('SLA'));
+
+    fireEvent.change(screen.getByLabelText('용어'), { target: { value: 'sla' } });
+
+    const addButton = screen.getByRole('button', { name: '추가' }) as HTMLButtonElement;
+    expect(addButton.disabled).toBe(true);
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      '/api/dictionary',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('M-3 — 수정 폼에서 다른 항목과 중복되는 값으로 바꾸면 저장 버튼이 비활성화된다(자기 자신은 제외)', async () => {
+    const OTHER_ENTRY = {
+      id: 'entry-9',
+      entryType: 'term',
+      sourceText: 'KPI',
+      targetText: null,
+      koHonorific: null,
+      enHonorific: null,
+      note: null,
+    };
+    mockLoadSuccess([TERM_ENTRY, OTHER_ENTRY]);
+    render(<TerminologyPage />);
+    await waitFor(() => screen.getByText('SLA'));
+
+    const row = screen.getByText('SLA').closest('li') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: '수정' }));
+
+    // 값을 바꾸지 않은 채(자기 자신)로는 저장이 막히지 않는다.
+    expect((within(row).getByRole('button', { name: '저장' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+
+    fireEvent.change(within(row).getByLabelText('용어'), { target: { value: 'kpi' } });
+
+    const saveButton = within(row).getByRole('button', { name: '저장' }) as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(true);
+  });
 });

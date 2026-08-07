@@ -61,16 +61,37 @@ const TYPE_LABEL: Record<EntryType, string> = { term: '용어', person: '사람�
 const SOURCE_TEXT_LABEL: Record<EntryType, string> = { term: '용어', person: '실명' };
 
 /**
- * `entryType`·`fields`가 서버에 보낼 만큼 유효한지(=Add/Save 활성화 조건, UX-010 Validation).
- * 대소문자 무시 중복 여부는 여기서 확인하지 않는다(DB 조회가 필요해 서버가 최종 권한 — 태스크
- * 지시 "client-side pre-check is fine, but server is the final authority").
+ * `entryType`·`fields`가 서버에 보낼 만큼 유효한지(=Add/Save 활성화 조건, UX-010 Validation
+ * "Add/Save enabled only when the active entry type's required fields are valid **and
+ * non-duplicate**").
+ *
+ * M-3(리뷰 지적) — `entries`(이미 로드된 목록)를 기준으로 같은 entryType·대소문자 무시
+ * sourceText 중복을 클라이언트에서 선제 차단한다. `excludeId`가 있으면(수정 시) 자기 자신은
+ * 후보에서 제외한다. 서버(`hasDuplicate`, `apps/web/lib/dictionary/storage.ts`)가 여전히
+ * 최종 권한이다 — 이 프리체크는 Add/Save 버튼을 선제적으로 막는 용도일 뿐, 서버 측 검증을
+ * 대체하지 않는다(로드된 목록이 최신이 아닐 수 있음).
  */
-function validationError(entryType: EntryType, fields: EntryFormFields): string | null {
+function validationError(
+  entryType: EntryType,
+  fields: EntryFormFields,
+  entries: DictionaryEntryDetail[],
+  excludeId?: string,
+): string | null {
   if (!fields.sourceText.trim()) {
     return entryType === 'term' ? '용어를 입력해주세요' : '실명을 입력해주세요';
   }
   if (entryType === 'person' && !fields.koHonorific.trim() && !fields.enHonorific.trim()) {
     return HONORIFIC_REQUIRED_MESSAGE;
+  }
+  const normalized = fields.sourceText.trim().toLowerCase();
+  const isDuplicate = entries.some(
+    (entry) =>
+      entry.id !== excludeId &&
+      entry.entryType === entryType &&
+      entry.sourceText.toLowerCase() === normalized,
+  );
+  if (isDuplicate) {
+    return DUPLICATE_MESSAGE[entryType];
   }
   return null;
 }
@@ -142,7 +163,7 @@ export default function TerminologyPage() {
   }
 
   async function handleAdd() {
-    const error = validationError(newEntryType, newFields);
+    const error = validationError(newEntryType, newFields, entries);
     if (error) {
       setAddError(error);
       return;
@@ -197,7 +218,7 @@ export default function TerminologyPage() {
   async function saveEdit() {
     if (!editingId) return;
     const id = editingId;
-    const error = validationError(editEntryType, editFields);
+    const error = validationError(editEntryType, editFields, entries, id);
     if (error) {
       setRowErrors((previous) => ({ ...previous, [id]: error }));
       return;
@@ -287,7 +308,7 @@ export default function TerminologyPage() {
     );
   }
 
-  const addDisabled = adding || validationError(newEntryType, newFields) !== null;
+  const addDisabled = adding || validationError(newEntryType, newFields, entries) !== null;
 
   return (
     <main className={styles.page}>
@@ -325,9 +346,11 @@ export default function TerminologyPage() {
             id="new-source-text"
             type="text"
             value={newFields.sourceText}
-            onChange={(event) =>
-              setNewFields((previous) => ({ ...previous, sourceText: event.target.value }))
-            }
+            onChange={(event) => {
+              const value = event.target.value;
+              setNewFields((previous) => ({ ...previous, sourceText: value }));
+              setAddError(null);
+            }}
           />
         </div>
 
@@ -338,9 +361,11 @@ export default function TerminologyPage() {
               id="new-target-text"
               type="text"
               value={newFields.targetText}
-              onChange={(event) =>
-                setNewFields((previous) => ({ ...previous, targetText: event.target.value }))
-              }
+              onChange={(event) => {
+                const value = event.target.value;
+                setNewFields((previous) => ({ ...previous, targetText: value }));
+                setAddError(null);
+              }}
             />
           </div>
         )}
@@ -353,9 +378,11 @@ export default function TerminologyPage() {
                 id="new-ko-honorific"
                 type="text"
                 value={newFields.koHonorific}
-                onChange={(event) =>
-                  setNewFields((previous) => ({ ...previous, koHonorific: event.target.value }))
-                }
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setNewFields((previous) => ({ ...previous, koHonorific: value }));
+                  setAddError(null);
+                }}
               />
             </div>
             <div className={styles.field}>
@@ -364,9 +391,11 @@ export default function TerminologyPage() {
                 id="new-en-honorific"
                 type="text"
                 value={newFields.enHonorific}
-                onChange={(event) =>
-                  setNewFields((previous) => ({ ...previous, enHonorific: event.target.value }))
-                }
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setNewFields((previous) => ({ ...previous, enHonorific: value }));
+                  setAddError(null);
+                }}
               />
             </div>
           </>
@@ -418,6 +447,9 @@ export default function TerminologyPage() {
                       <button
                         type="button"
                         className={styles.deleteButton}
+                        // M-1 — 이 행의 편집 저장(editSaving)이 진행 중인 동안에는 삭제도
+                        // 막는다(반대 방향 F-1 재발 방지: PUT in-flight 중 DELETE 경합 방지).
+                        disabled={deleting || editSaving}
                         onClick={() => requestDelete(entry.id)}
                       >
                         삭제
@@ -436,9 +468,11 @@ export default function TerminologyPage() {
                         id={`edit-source-text-${entry.id}`}
                         type="text"
                         value={editFields.sourceText}
-                        onChange={(event) =>
-                          setEditFields((previous) => ({ ...previous, sourceText: event.target.value }))
-                        }
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setEditFields((previous) => ({ ...previous, sourceText: value }));
+                          setRowErrors((previous) => ({ ...previous, [entry.id]: '' }));
+                        }}
                       />
                     </div>
 
@@ -449,9 +483,11 @@ export default function TerminologyPage() {
                           id={`edit-target-text-${entry.id}`}
                           type="text"
                           value={editFields.targetText}
-                          onChange={(event) =>
-                            setEditFields((previous) => ({ ...previous, targetText: event.target.value }))
-                          }
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setEditFields((previous) => ({ ...previous, targetText: value }));
+                            setRowErrors((previous) => ({ ...previous, [entry.id]: '' }));
+                          }}
                         />
                       </div>
                     )}
@@ -464,12 +500,11 @@ export default function TerminologyPage() {
                             id={`edit-ko-honorific-${entry.id}`}
                             type="text"
                             value={editFields.koHonorific}
-                            onChange={(event) =>
-                              setEditFields((previous) => ({
-                                ...previous,
-                                koHonorific: event.target.value,
-                              }))
-                            }
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setEditFields((previous) => ({ ...previous, koHonorific: value }));
+                              setRowErrors((previous) => ({ ...previous, [entry.id]: '' }));
+                            }}
                           />
                         </div>
                         <div className={styles.field}>
@@ -478,12 +513,11 @@ export default function TerminologyPage() {
                             id={`edit-en-honorific-${entry.id}`}
                             type="text"
                             value={editFields.enHonorific}
-                            onChange={(event) =>
-                              setEditFields((previous) => ({
-                                ...previous,
-                                enHonorific: event.target.value,
-                              }))
-                            }
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setEditFields((previous) => ({ ...previous, enHonorific: value }));
+                              setRowErrors((previous) => ({ ...previous, [entry.id]: '' }));
+                            }}
                           />
                         </div>
                       </>
@@ -493,7 +527,13 @@ export default function TerminologyPage() {
                       <button
                         type="button"
                         className={styles.saveButton}
-                        disabled={editSaving}
+                        // M-3 — Add와 동일 기준: 클라이언트 선제 중복/검증 체크가 걸리면
+                        // 저장 버튼을 미리 비활성화한다(서버 왕복 없이).
+                        disabled={
+                          editSaving ||
+                          validationError(editEntryType, editFields, entries, editingId ?? undefined) !==
+                            null
+                        }
                         onClick={() => void saveEdit()}
                       >
                         저장
@@ -506,6 +546,8 @@ export default function TerminologyPage() {
                       <button
                         type="button"
                         className={styles.deleteButton}
+                        // M-1 — 이 행의 저장(editSaving)이 진행 중인 동안에는 삭제도 막는다.
+                        disabled={deleting || editSaving}
                         onClick={() => requestDelete(entry.id)}
                       >
                         삭제
@@ -527,7 +569,8 @@ export default function TerminologyPage() {
                       <button
                         type="button"
                         className={styles.confirmDeleteButton}
-                        disabled={deleting}
+                        // M-1 — 편집 저장(editSaving)이 진행 중인 동안에는 확인 클릭도 막는다.
+                        disabled={deleting || editSaving}
                         onClick={() => void confirmDelete()}
                       >
                         삭제
