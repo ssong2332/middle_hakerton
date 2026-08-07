@@ -180,14 +180,16 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
     });
   });
 
-  it('값 선택 없이 저장하면 차단되고 안내 문구를 보여준다', async () => {
-    mockLoadSuccess(COMPLETED_PROFILE, []);
+  it('값 선택 없이 저장하면 차단되고 안내 문구를 보여준다(필드가 이미 비어 있는 경우)', async () => {
+    // 자기신고 항목은 편집을 열면 현재 값이 미리 선택되므로(onboarding 라디오와 같은 관례),
+    // "선택 없음"은 이미 null인 필드(이전에 삭제된 필드)를 다시 편집할 때만 재현된다.
+    mockLoadSuccess({ ...COMPLETED_PROFILE, directness: null }, []);
     render(<ProfilePage />);
     await waitFor(() => screen.getByText('직설/완곡'));
 
     const directnessRow = screen.getByText('직설/완곡').closest('li') as HTMLElement;
     fireEvent.click(within(directnessRow).getByRole('button', { name: '수정' }));
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    fireEvent.click(within(directnessRow).getByRole('button', { name: '저장' }));
 
     expect(screen.getByText('값을 선택해주세요')).toBeTruthy();
     expect(mockFetch).not.toHaveBeenCalledWith(
@@ -211,7 +213,8 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
     );
 
     mockFetch.mockResolvedValueOnce(jsonOk({ ...COMPLETED_PROFILE, directness: null }));
-    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    const confirmBox = within(directnessRow).getByRole('alert');
+    fireEvent.click(within(confirmBox).getByRole('button', { name: '삭제' }));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
@@ -240,7 +243,8 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
     fireEvent.click(within(learnedRow).getByRole('button', { name: '삭제' }));
 
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'item-1' }) });
-    fireEvent.click(screen.getAllByRole('button', { name: '삭제' }).slice(-1)[0]);
+    const confirmBox = within(learnedRow).getByRole('alert');
+    fireEvent.click(within(confirmBox).getByRole('button', { name: '삭제' }));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith('/api/profile/learned/item-1', {
