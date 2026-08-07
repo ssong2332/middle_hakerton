@@ -45,20 +45,29 @@ describe('OnboardingPage (UX-003) — AC-011/AC-046②/AC-059', () => {
     expect(container.querySelectorAll('fieldset').length).toBeLessThanOrEqual(5);
   });
 
+  // 🔴 이 파일은 `@testing-library/jest-dom`을 설치하지 않는다(`apps/web/vitest.setup.ts` 헤더
+  // 참조) — `toBeDisabled()` 대신 vitest 기본 매처로 `.disabled` 프로퍼티를 직접 읽는다
+  // (`apps/web/app/(auth)/signup/page.test.tsx`와 같은 관례).
   it('아무것도 답하지 않으면 완료 버튼이 비활성화된다(전부 응답 또는 전부 스킵만 허용)', () => {
     render(<OnboardingPage />);
-    expect(screen.getByRole('button', { name: '완료' })).toBeDisabled();
+    expect((screen.getByRole('button', { name: '완료' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
   });
 
   it('4문항을 모두 답하면 완료 버튼이 활성화된다', () => {
     render(<OnboardingPage />);
     answerAllQuestions();
-    expect(screen.getByRole('button', { name: '완료' })).not.toBeDisabled();
+    expect((screen.getByRole('button', { name: '완료' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
   });
 
   it('AC-059① — 건너뛰기 버튼은 아무것도 답하지 않아도 항상 활성화되어 있다', () => {
     render(<OnboardingPage />);
-    expect(screen.getByRole('button', { name: '건너뛰기' })).not.toBeDisabled();
+    expect(
+      (screen.getByRole('button', { name: '건너뛰기' }) as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 
   it('AC-059①② — 건너뛰기를 누르면 스타일 필드 없이 skipped 상태로 저장하고 /mediate로 이동한다', async () => {
