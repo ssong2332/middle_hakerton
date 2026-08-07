@@ -15,6 +15,7 @@ const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }));
 
 import { MediationWorkspace } from './MediationWorkspace';
+import { TicketWorkspace } from './TicketWorkspace';
 import styles from './MediationWorkspace.module.css';
 
 function mediateSuccessResponse(overrides: Record<string, unknown> = {}) {
@@ -1554,6 +1555,57 @@ describe('MediationWorkspace', () => {
 
     expect((screen.getByLabelText('메시지') as HTMLTextAreaElement).value).toBe(
       '내일까지 확인 부탁드립니다. 그리고 추가 내용도 있습니다.',
+    );
+  });
+
+  // M-A(reviewer 발견 → 수정) — Major-1 수정이 `removeItem`을 `TICKET_RESTORE_SESSION_KEY`로만
+  // 재조준하면서 `TICKET_DRAFT_SESSION_KEY`(API 소스 스냅샷)가 탭 세션 내내 영구히 지워지지 않는
+  // 회귀가 생겼다. 회귀 시나리오: (1) mediate → 티켓 전환(두 키 모두 기록) → "Back to message"로
+  // `/mediate` 재마운트(마운트 이펙트가 두 키를 모두 지워야 정상) → (2) 이후 AC-058 게이트를 거치지
+  // 않은 두 번째 `/ticket` 진입(브라우저 뒤로/앞으로가기 등)을 시뮬레이션 — `TICKET_DRAFT_SESSION_KEY`가
+  // 남아 있으면 `TicketWorkspace`가 그 스테일 원문으로 `POST /api/ticket`을 다시 호출해버린다.
+  // 정상 동작은 `no-source` 상태("원본 메시지를 찾을 수 없습니다")를 보여주고 API를 호출하지 않는 것.
+  it('M-A — 티켓 전환 후 mediate로 복귀하면 두 세션 키가 모두 지워져, 게이트 없는 재진입은 no-source가 된다', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        mediateSuccessResponse({ ticketOption: { offered: true, basis: 'signal_present' } }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { unmount } = render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    fireEvent.click(
+      within(recipientPanel).getByRole('button', { name: /Convert to Task Ticket/ }),
+    );
+
+    expect(window.sessionStorage.getItem(TICKET_DRAFT_SESSION_KEY)).not.toBeNull();
+    expect(window.sessionStorage.getItem(TICKET_RESTORE_SESSION_KEY)).not.toBeNull();
+
+    // `/ticket`으로 이동(언마운트) 후 "Back to message"로 `/mediate`에 재마운트한다.
+    unmount();
+    const { unmount: unmountMediate2 } = render(<MediationWorkspace />);
+
+    expect(window.sessionStorage.getItem(TICKET_RESTORE_SESSION_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(TICKET_DRAFT_SESSION_KEY)).toBeNull();
+
+    unmountMediate2();
+    fetchMock.mockClear();
+
+    // 게이트(AC-058, "Convert to Task Ticket" 클릭)를 거치지 않고 다시 `/ticket`에 진입한다
+    // (브라우저 Back/Forward, 북마크, 직접 URL 등을 시뮬레이션).
+    render(<TicketWorkspace />);
+
+    expect(screen.getByText(/원본 메시지를 찾을 수 없습니다/)).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      '/api/ticket',
+      expect.anything(),
     );
   });
 });
