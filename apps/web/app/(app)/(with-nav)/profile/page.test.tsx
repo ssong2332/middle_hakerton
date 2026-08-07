@@ -144,15 +144,22 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
     expect(mockPush).toHaveBeenCalledWith('/onboarding');
   });
 
-  it('M-3 — 자기신고 4항목을 모두 삭제한 completed 프로필도 개인화-꺼짐 표시를 보여준다', async () => {
+  it('F-3(구 M-3) — 자기신고 4항목을 모두 삭제한 completed 프로필은 스킵 문구가 아닌 전용 문구를 보여준다', async () => {
     mockLoadSuccess(COMPLETED_ALL_NULL_PROFILE, []);
     render(<ProfilePage />);
 
     await waitFor(() => {
       expect(
-        screen.getByText('온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다'),
+        screen.getByText(
+          '입력한 프로필 항목이 모두 삭제되어 개인화가 꺼져 있습니다 — 항목을 다시 입력하면 켜집니다',
+        ),
       ).toBeTruthy();
     });
+    expect(screen.queryByText('온보딩을 건너뛰었습니다 — 개인화가 꺼져 있습니다')).toBeNull();
+    expect(
+      screen.queryByText('온보딩이 아직 완료되지 않았습니다 — 개인화가 꺼져 있습니다'),
+    ).toBeNull();
+    expect(screen.getByRole('button', { name: '온보딩 완료하기' })).toBeTruthy();
   });
 
   it('M-1 — 스킵된 사용자도 학습된 항목을 보고 삭제할 수 있다', async () => {
@@ -342,6 +349,65 @@ describe('ProfilePage (UX-009) — AC-014/AC-046/AC-059', () => {
         }),
       );
     });
+  });
+
+  it('F-1 — 삭제 확인 중 같은 행의 수정을 누르면 확인 상자가 닫히고 편집 폼만 열린다(공존 방지)', async () => {
+    mockLoadSuccess(COMPLETED_PROFILE, []);
+    render(<ProfilePage />);
+    await waitFor(() => screen.getByText('직설/완곡'));
+
+    const directnessRow = screen.getByText('직설/완곡').closest('li') as HTMLElement;
+    fireEvent.click(within(directnessRow).getByRole('button', { name: '삭제' }));
+    expect(within(directnessRow).getByText('삭제하시겠습니까?')).toBeTruthy();
+
+    fireEvent.click(within(directnessRow).getByRole('button', { name: '수정' }));
+
+    // 삭제 확인 상자는 닫혀 있어야 하고, 편집 폼만 열려 있어야 한다 — 둘이 동시에 열려
+    // 있으면(원 버그) 확인 후 저장 시 삭제된 값이 되살아난다.
+    expect(within(directnessRow).queryByText('삭제하시겠습니까?')).toBeNull();
+    expect(
+      within(directnessRow).getByRole('radio', { name: '직설적으로 표현하는 편이에요' }),
+    ).toBeTruthy();
+  });
+
+  it('F-4 — 방어적 가드: onboardingState가 completed가 아닌데(불변식 위반) 삭제를 시도하면 PUT을 보내지 않고 인라인 에러를 보여준다', async () => {
+    // 정상 UI 경로에서는 도달하지 않아야 하는 상태를 재현한다 — skipped인데 필드값이 남아있는
+    // 불변식 위반(현재는 canManageSelfReport가 profile[key] !== null이면 컨트롤을 렌더한다).
+    mockLoadSuccess({ ...SKIPPED_PROFILE, directness: 'direct' }, []);
+    render(<ProfilePage />);
+    await waitFor(() => screen.getByText('직설/완곡'));
+
+    const directnessRow = screen.getByText('직설/완곡').closest('li') as HTMLElement;
+    fireEvent.click(within(directnessRow).getByRole('button', { name: '삭제' }));
+    const confirmBox = within(directnessRow).getByRole('alert');
+    fireEvent.click(within(confirmBox).getByRole('button', { name: '삭제' }));
+
+    await waitFor(() => {
+      expect(within(directnessRow).getByText('삭제하지 못했습니다, 다시 시도해주세요')).toBeTruthy();
+    });
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      '/api/profile',
+      expect.objectContaining({ method: 'PUT' }),
+    );
+  });
+
+  it('F-4 — 방어적 가드: onboardingState가 completed가 아닌데(불변식 위반) 수정 저장을 시도하면 PUT을 보내지 않고 인라인 에러를 보여준다', async () => {
+    mockLoadSuccess({ ...SKIPPED_PROFILE, directness: 'direct' }, []);
+    render(<ProfilePage />);
+    await waitFor(() => screen.getByText('직설/완곡'));
+
+    const directnessRow = screen.getByText('직설/완곡').closest('li') as HTMLElement;
+    fireEvent.click(within(directnessRow).getByRole('button', { name: '수정' }));
+    fireEvent.click(screen.getByLabelText('완곡하게 표현하는 편이에요'));
+    fireEvent.click(within(directnessRow).getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      expect(within(directnessRow).getByText('저장하지 못했습니다, 다시 시도해주세요')).toBeTruthy();
+    });
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      '/api/profile',
+      expect.objectContaining({ method: 'PUT' }),
+    );
   });
 
   it('학습된 항목 삭제 — 확인 후 DELETE /api/profile/learned/{id}를 호출하고 목록에서 제거한다', async () => {
