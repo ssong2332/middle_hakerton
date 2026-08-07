@@ -546,7 +546,18 @@ AC 통과   = 해당 AC의 케이스가 요구 건수만큼 전부 통과
 | 2026-08-07 | diff_records (박지훈, 사용자 단위) | 10/10 | `select count(*) from diff_records where user_id = '26781f4e-...'` → 10 |
 | 2026-08-07 | profile_learned_items | 1/1(완충 삽입만 반영) | `select count(*) from profile_learned_items where user_id = '26781f4e-...'` → 1, `pattern_key='cushion_insert'`, `observed_count=3` |
 
-**AC-059 검증(실측값 그대로, 요약 아님) — `select user_id, onboarding_state, directness, emoji_preference, formality, honorific_level, diff_count, learned_count from profiles ... `:**
+🔴 **증거 등급 (QA 지적, 2026-08-07) — 이 표의 수치는 QA가 자체 재실행하지 못했다** — quality-assurance 세션에 Supabase MCP 도구가 없어 표 C를 독립 재현할 수 없었고(NO-GO 사유), reviewer도 DB 접근이 없었다. **오케스트레이터가 아래 5개 카운트 쿼리를 QA 보고 직후 2026-08-07에 다시 직접 실행해 재확인**했다(값 변동 없음, 이전 실행과 동일):
+```sql
+select 'profiles' as tbl, count(*) as n from profiles where user_id in ('26781f4e-c4cf-427b-94e3-fc70c605add1','2c3574a9-018a-4ef2-ac67-7fd13accad47','6a2e9d1c-1dd5-4d35-8f79-125a872991a7','9cf7af5e-5906-45ec-9718-f97e9f40a054')
+union all select 'dictionary_terms', count(*) from dictionary_terms where owner_user_id = '26781f4e-c4cf-427b-94e3-fc70c605add1'
+union all select 'pair_protocols', count(*) from pair_protocols where party_a = 'jihoon.park+arasoft@example.com'
+union all select 'diff_records', count(*) from diff_records where user_id = '26781f4e-c4cf-427b-94e3-fc70c605add1'
+union all select 'profile_learned_items', count(*) from profile_learned_items where user_id = '26781f4e-c4cf-427b-94e3-fc70c605add1';
+-- => [{"tbl":"profiles","n":4},{"tbl":"dictionary_terms","n":22},{"tbl":"pair_protocols","n":2},{"tbl":"diff_records","n":10},{"tbl":"profile_learned_items","n":1}]
+```
+**등급: 오케스트레이터 measured, 2회 독립 실행(2026-08-07 최초 시딩 직후 + QA NO-GO 직후 재확인) — 값 일치.** planner·reviewer·QA 중 어느 쪽도 재측정하지 않았으므로 그 세 역할 기준으로는 cited다(T17 각주와 같은 등급 표기 원칙).
+
+**AC-059 검증(실측값 그대로, 요약 아님) — `select user_id, onboarding_state, directness, emoji_preference, formality, honorific_level, (select count(*) from diff_records d where d.user_id = p.user_id) as diff_count, (select count(*) from profile_learned_items l where l.user_id = p.user_id) as learned_count from profiles p where p.user_id in (...)`:**
 
 | user_id(persona) | onboarding_state | directness | emoji_preference | formality | honorific_level | diff_count | learned_count |
 |---|---|---|---|---|---|---|---|
