@@ -98,15 +98,35 @@ describe('TicketWorkspace', () => {
     render(<TicketWorkspace />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('문제 정의')).toBeTruthy();
+      expect(screen.getByRole('textbox', { name: '문제 정의' })).toBeTruthy();
     });
     // 근거 없는 섹션도 생략되지 않고 "없음"이 그대로 편집 가능한 값으로 보인다(AC-062).
-    const problemField = screen.getByLabelText('문제 정의') as HTMLTextAreaElement;
+    const problemField = screen.getByRole('textbox', { name: '문제 정의' }) as HTMLTextAreaElement;
     expect(problemField.value).toBe('없음');
-    expect((screen.getByLabelText('영향·리스크') as HTMLTextAreaElement).value).toBe('없음');
+    expect((screen.getByRole('textbox', { name: '영향·리스크' }) as HTMLTextAreaElement).value).toBe(
+      '없음',
+    );
 
     fireEvent.change(problemField, { target: { value: '수정된 문제 정의' } });
     expect(problemField.value).toBe('수정된 문제 정의');
+  });
+
+  // MAJ-2(reviewer follow-up) — 각 섹션은 이름 있는 landmark(region)로 노출돼야 스크린리더의
+  // 랜드마크 탐색에서 발견된다. `role="region"`에 접근 가능한 이름이 없으면 랜드마크로 노출되지
+  // 않는다(unnamed region은 ARIA 스펙상 landmark 트리에서 제외된다).
+  it('MAJ-2 — 4개 섹션이 이름 있는 region 랜드마크로 노출된다', async () => {
+    window.sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, '원문');
+    const fetchMock = vi.fn().mockResolvedValue(ticketResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<TicketWorkspace />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: '문제 정의' })).toBeTruthy();
+    });
+    expect(screen.getByRole('region', { name: '영향·리스크' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '요청 사항' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: '우려 수준' })).toBeTruthy();
   });
 
   it('AC-064 — 결정 권한 상태와 근거 문장을 읽기 전용으로 보여준다', async () => {
@@ -138,6 +158,34 @@ describe('TicketWorkspace', () => {
     });
   });
 
+  // MAJ-1(reviewer follow-up, AC-041 / docs/UX.md:920) — `SenderPanel`의 폴백 배지 관례와 동일하게,
+  // `POST /api/ticket`이 `source: 'fallback'`을 반환하면 화면에 "폴백 응답 사용 중" 라벨이 보여야
+  // 한다.
+  it('MAJ-1 — source가 fallback이면 "폴백 응답 사용 중" 라벨을 표시한다', async () => {
+    window.sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, '원문');
+    const fetchMock = vi.fn().mockResolvedValue(ticketResponse({ source: 'fallback' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<TicketWorkspace />);
+
+    await waitFor(() => {
+      expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
+    });
+  });
+
+  it('MAJ-1 — source가 live면 "폴백 응답 사용 중" 라벨을 표시하지 않는다', async () => {
+    window.sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, '원문');
+    const fetchMock = vi.fn().mockResolvedValue(ticketResponse({ source: 'live' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<TicketWorkspace />);
+
+    await waitFor(() => {
+      expect(screen.getByText('내부 승인 필요')).toBeTruthy();
+    });
+    expect(screen.queryByText('폴백 응답 사용 중')).toBeNull();
+  });
+
   it('"Use this ticket" — 편집된 4섹션을 조립해 세션에 저장하고 /mediate로 이동한다', async () => {
     window.sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, '원문');
     const fetchMock = vi.fn().mockResolvedValue(ticketResponse());
@@ -146,9 +194,11 @@ describe('TicketWorkspace', () => {
     render(<TicketWorkspace />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('문제 정의')).toBeTruthy();
+      expect(screen.getByRole('textbox', { name: '문제 정의' })).toBeTruthy();
     });
-    fireEvent.change(screen.getByLabelText('문제 정의'), { target: { value: '편집된 문제' } });
+    fireEvent.change(screen.getByRole('textbox', { name: '문제 정의' }), {
+      target: { value: '편집된 문제' },
+    });
     fireEvent.click(screen.getByRole('button', { name: /Use this ticket/ }));
 
     const stored = window.sessionStorage.getItem(TICKET_DRAFT_SESSION_KEY);

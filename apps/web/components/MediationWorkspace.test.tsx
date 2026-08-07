@@ -1462,6 +1462,39 @@ describe('MediationWorkspace', () => {
     ).toBeNull();
   });
 
+  // MAJ-3(reviewer follow-up) — "Back to message"/"Use this ticket"로 `/ticket`을 다녀오면
+  // `MediationWorkspace`가 통째로 재마운트되므로(별개 라우트), `recipient` state도 초기화된다.
+  // 원문(text)뿐 아니라 받는 사람 값도 세션 초안으로 함께 들고 다녀야, 돌아왔을 때 다시 입력하지
+  // 않아도 된다.
+  it('MAJ-3 — Convert to Task Ticket 후 재마운트(라우트 이동 시뮬레이션)해도 받는 사람 값이 복원된다', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        mediateSuccessResponse({ ticketOption: { offered: true, basis: 'signal_present' } }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { unmount } = render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    fireEvent.click(
+      within(recipientPanel).getByRole('button', { name: /Convert to Task Ticket/ }),
+    );
+
+    // `/ticket`으로 이동하면서 이 컴포넌트가 언마운트된다(별개 라우트) — 재마운트로 시뮬레이션한다.
+    unmount();
+    render(<MediationWorkspace />);
+
+    expect((screen.getByLabelText('받는 사람') as HTMLInputElement).value).toBe(
+      'boss@example.com',
+    );
+  });
+
   // T25 — `/ticket`에서 "Use this ticket"/"Back to message"로 돌아왔을 때, 세션에 남아 있는
   // 초안(`TICKET_DRAFT_SESSION_KEY`)을 마운트 시 작성창에 복원하고 즉시 소비(삭제)한다 — 이후
   // 관계없는 방문에서 같은 값이 다시 나타나지 않게 한다(스테일 재노출 방지).
