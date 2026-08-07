@@ -534,6 +534,33 @@ AC 통과   = 해당 AC의 케이스가 요구 건수만큼 전부 통과
 
 > **두 수치를 혼동하지 말 것**: v1.2 **추가 케이스는 22건**(T-P 7 + T-U 8 + T-E 4 + T-G 3)이고, 그중 **T-U06은 사람 판정**이라 **자동 러너에 들어가는 것은 21건**이다. 전체 합계는 **74건 = 자동 73 + 사람 1**(표 A 52 + 표 B 22).
 
+**표 C — T61 데모 시드 실제 실행 기록 (신규)**
+
+🔴 실 계정 4개(2026-08-07, 사용자 승인 하에 실제 회원가입 플로우로 생성 — `docs/DECISIONS.md` #50과 같은 원칙)에 위 "(v1.8) 시드 계정 식별자" 표의 이메일로 가입 완료 후, `apps/web/lib/demo/seed.ts`의 `seedDemoData()`가 정의한 것과 동일한 행을 오케스트레이터가 Supabase `execute_sql`로 직접 실행했다(감사 추적을 위해 SQL을 직접 실행 — 별도 러너 스크립트를 새로 작성하지 않음).
+
+| 실행일 | 대상 | 결과(행 수) | 근거 |
+|---|---|---|---|
+| 2026-08-07 | profiles | 4/4 | `select count(*) from profiles where user_id in (...)` → 4 |
+| 2026-08-07 | dictionary_terms (owner=박지훈) | 22/22 | `select count(*) from dictionary_terms where owner_user_id = '26781f4e-...'` → 22 |
+| 2026-08-07 | pair_protocols | 2/2 | `select count(*) from pair_protocols where party_a = 'jihoon.park+arasoft@example.com'` → 2 |
+| 2026-08-07 | diff_records (박지훈, 사용자 단위) | 10/10 | `select count(*) from diff_records where user_id = '26781f4e-...'` → 10 |
+| 2026-08-07 | profile_learned_items | 1/1(완충 삽입만 반영) | `select count(*) from profile_learned_items where user_id = '26781f4e-...'` → 1, `pattern_key='cushion_insert'`, `observed_count=3` |
+
+**AC-059 검증(실측값 그대로, 요약 아님) — `select user_id, onboarding_state, directness, emoji_preference, formality, honorific_level, diff_count, learned_count from profiles ... `:**
+
+| user_id(persona) | onboarding_state | directness | emoji_preference | formality | honorific_level | diff_count | learned_count |
+|---|---|---|---|---|---|---|---|
+| 26781f4e-...(박지훈) | completed | direct | neutral | medium | hapsyo | 10 | 1 |
+| 2c3574a9-...(타나카) | completed | indirect | avoids | high | null | 0 | 0 |
+| 6a2e9d1c-...(Michael) | completed | direct | neutral | low | null | 0 | 0 |
+| 9cf7af5e-...(Sarah) | completed | direct | neutral | low | null | 0 | 0 |
+
+**판정**: 4개 프로필 전부 `onboarding_state='completed'` + 스타일 4필드 비어있지 않음 → AC-059 충족(스킵 상태와 구분됨). Sarah는 자기신고는 채워져 있으나 diff·학습 0건 — "cold start 대조군"이 설계대로 재현됨(자기신고 공백이 아니라 학습 이력만 0건).
+
+**패턴 반영 분리 확인**: `cushion_insert`(완충 삽입) 전역 3회(entry #1·#2·#5) → `profile_learned_items`에 반영(observed_count=3, 스키마 CHECK `>=3` 통과). `emoji_removed`(이모지 제거) 전역 1회(entry #3) → 미반영(테이블에 행 없음) — TestCases.md가 요구하는 "반영됨/미반영됨" 두 상태가 실제 DB에서 동시에 확인 가능한 상태로 시드됨.
+
+**"학습 전" 상태 재현 방법(참고)**: 이 실행 직후 상태는 **"학습 후"**(diff 10건 + 반영 1건)다. `resetJihoonToPreLearningState()`(`apps/web/lib/demo/seed.ts`)를 호출하면 diff_records·profile_learned_items만 삭제되어 "학습 전"(자기신고는 유지, diff 0건)으로 전환된다 — 별도 계정을 만들지 않는다(TestCases.md "같은 발신자" 요구 충족).
+
 ## 미확정 항목
 
 | 항목 | 왜 미확정인가 | 언제 정해지는가 |
