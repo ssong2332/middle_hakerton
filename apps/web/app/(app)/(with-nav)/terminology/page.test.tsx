@@ -422,4 +422,52 @@ describe('TerminologyPage (UX-010) — AC-016/AC-047', () => {
     const saveButton = within(row).getByRole('button', { name: '저장' }) as HTMLButtonElement;
     expect(saveButton.disabled).toBe(true);
   });
+
+  it('M-5 — 추가 폼에 중복 값을 입력하면 버튼 비활성화뿐 아니라 인라인 중복 메시지가 실시간으로 보이고, 값을 바꾸면 사라진다', async () => {
+    mockLoadSuccess([TERM_ENTRY]);
+    render(<TerminologyPage />);
+    await waitFor(() => screen.getByText('SLA'));
+
+    fireEvent.change(screen.getByLabelText('용어'), { target: { value: 'sla' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('이미 등록된 용어입니다')).toBeTruthy();
+    });
+    expect((screen.getByRole('button', { name: '추가' }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText('용어'), { target: { value: 'KPI' } });
+
+    expect(screen.queryByText('이미 등록된 용어입니다')).toBeNull();
+  });
+
+  it('M-5 — 수정 폼에서 다른 항목과 중복되는 값을 입력하면 버튼 비활성화뿐 아니라 인라인 중복 메시지가 실시간으로 보이고, 값을 바꾸면 사라진다', async () => {
+    const OTHER_ENTRY = {
+      id: 'entry-9',
+      entryType: 'term',
+      sourceText: 'KPI',
+      targetText: null,
+      koHonorific: null,
+      enHonorific: null,
+      note: null,
+    };
+    mockLoadSuccess([TERM_ENTRY, OTHER_ENTRY]);
+    render(<TerminologyPage />);
+    await waitFor(() => screen.getByText('SLA'));
+
+    const row = screen.getByText('SLA').closest('li') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: '수정' }));
+
+    fireEvent.change(within(row).getByLabelText('용어'), { target: { value: 'kpi' } });
+
+    await waitFor(() => {
+      expect(within(row).getByText('이미 등록된 용어입니다')).toBeTruthy();
+    });
+    expect((within(row).getByRole('button', { name: '저장' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+
+    fireEvent.change(within(row).getByLabelText('용어'), { target: { value: 'KPI2' } });
+
+    expect(within(row).queryByText('이미 등록된 용어입니다')).toBeNull();
+  });
 });
