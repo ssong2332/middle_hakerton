@@ -3,7 +3,7 @@
 // (`docs/CodingRules.md` Tests 절 semantic vs structural 구분) — 그래서 픽셀 값이 아니라
 // "코드가 selection의 rect를 실제로 읽어 버튼 위치 계산에 썼는지"를 구조적으로 검증한다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { initSelectionOverlay, removeFloatingButton } from './selection';
+import { computeClampedPosition, initSelectionOverlay, removeFloatingButton } from './selection';
 
 const BUTTON_ID = 'cbm-layer1-selection-button';
 
@@ -189,6 +189,270 @@ describe('initSelectionOverlay', () => {
   // typecheck가 깨진다 — Node 타입을 얹는 것은 이 태스크 범위 밖의 tsconfig 변경이 된다.
   // 근거는 구현 완료 보고에 `grep -n "location\\." apps/extension/src/layer1/selection.ts
   // apps/extension/src/content.ts` 실행 결과로 첨부한다.
+});
+
+// C-1 (reviewer, Critical) — 뷰포트 클램핑. jsdom엔 실제 레이아웃 엔진이 없어 버튼 크기가
+// 항상 0으로 측정된다(DOM 통합 테스트만으로는 clamp 산술 자체를 신뢰성 있게 검증할 수 없음).
+// 그래서 클램핑 계산을 순수 함수(`computeClampedPosition`)로 분리해 여기서 직접 단위 테스트한다.
+describe('computeClampedPosition (C-1 viewport clamping — pure function)', () => {
+  const viewport = { width: 1000, height: 800 };
+  const buttonSize = { width: 120, height: 32 };
+
+  it('positions below-right of the selection when it fits within the viewport', () => {
+    const rect = { top: 100, bottom: 120, left: 50, right: 150 };
+    expect(computeClampedPosition(rect, buttonSize, viewport)).toEqual({ top: 124, left: 50 });
+  });
+
+  it('flips to above the selection when placing it below would overflow the bottom edge', () => {
+    // rect.bottom(780)+gap(4)=784; 784+height(32)=816 > viewport.height(800) → overflow → flip.
+    const rect = { top: 750, bottom: 780, left: 100, right: 200 };
+    expect(computeClampedPosition(rect, buttonSize, viewport)).toEqual({
+      top: 750 - buttonSize.height - 4, // 714
+      left: 100,
+    });
+  });
+
+  it('shifts left when the default position would overflow the right edge', () => {
+    // rect.left(950)+width(120)=1070 > viewport.width(1000) → shift so left+width === viewport.width.
+    const rect = { top: 100, bottom: 120, left: 950, right: 1050 };
+    expect(computeClampedPosition(rect, buttonSize, viewport)).toEqual({
+      top: 124,
+      left: 1000 - buttonSize.width, // 880
+    });
+  });
+
+  it('clamps left to 0 when the button is wider than the viewport even after shifting', () => {
+    const narrowViewport = { width: 100, height: 800 };
+    const rect = { top: 100, bottom: 120, left: 10, right: 130 };
+    const result = computeClampedPosition(rect, buttonSize, narrowViewport);
+    expect(result.left).toBe(0);
+  });
+
+  it('clamps top to 0 when the button is taller than the viewport even after flipping', () => {
+    const shortViewport = { width: 1000, height: 100 };
+    const tallButton = { width: 120, height: 120 };
+    const rect = { top: 40, bottom: 60, left: 0, right: 0 };
+    const result = computeClampedPosition(rect, tallButton, shortViewport);
+    expect(result.top).toBe(0);
+  });
+});
+
+describe('initSelectionOverlay — viewport clamping integration (C-1)', () => {
+  let cleanup: () => void;
+  let originalRangeRect: typeof Range.prototype.getBoundingClientRect | undefined;
+  let buttonRectSpy: ReturnType<typeof vi.spyOn> | undefined;
+  let originalInnerWidth: number;
+  let originalInnerHeight: number;
+
+  beforeEach(() => {
+    originalRangeRect = Range.prototype.getBoundingClientRect;
+    originalInnerWidth = window.innerWidth;
+    originalInnerHeight = window.innerHeight;
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    if (originalRangeRect) {
+      Range.prototype.getBoundingClientRect = originalRangeRect;
+    } else {
+      delete (Range.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+    }
+    buttonRectSpy?.mockRestore();
+    Object.defineProperty(window, 'innerWidth', { value: originalInnerWidth, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: originalInnerHeight, configurable: true });
+    document.body.innerHTML = '';
+    window.getSelection()?.removeAllRanges();
+  });
+
+  it('flips the button above the selection when it would overflow the viewport bottom', () => {
+    // Selection near the bottom of a short viewport; button height forces an overflow below.
+    const nearBottomRect = {
+      x: 10,
+      y: 70,
+      width: 100,
+      height: 20,
+      top: 70,
+      left: 10,
+      right: 110,
+      bottom: 90,
+      toJSON() {
+        return this;
+      },
+    } as DOMRect;
+    Range.prototype.getBoundingClientRect = vi.fn(() => nearBottomRect);
+    buttonRectSpy = vi
+      .spyOn(HTMLButtonElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ width: 100, height: 30, top: 0, left: 0, bottom: 30, right: 100 } as DOMRect);
+    Object.defineProperty(window, 'innerHeight', { value: 100, configurable: true });
+
+    const content = renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+    selectTextIn(content);
+    fireMouseUp();
+
+    const button = getButton();
+    expect(button).not.toBeNull();
+    // below = 90+4=94; 94+30=124 > 100 → flip: top = 70-30-4 = 36.
+    expect(button!.style.top).toBe('36px');
+  });
+
+  it('shifts the button left and floors it at 0 when it would overflow the viewport right edge', () => {
+    Range.prototype.getBoundingClientRect = vi.fn(() => FAKE_RECT);
+    buttonRectSpy = vi
+      .spyOn(HTMLButtonElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ width: 100, height: 30, top: 0, left: 0, bottom: 30, right: 100 } as DOMRect);
+    Object.defineProperty(window, 'innerWidth', { value: 80, configurable: true });
+
+    const content = renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+    selectTextIn(content);
+    fireMouseUp();
+
+    const button = getButton();
+    expect(button).not.toBeNull();
+    // FAKE_RECT.left(10)+width(100)=110 > innerWidth(80) → shift to 80-100=-20 → floor at 0.
+    expect(button!.style.left).toBe('0px');
+  });
+});
+
+// M-1 (reviewer, Major) — 실브라우저에서 버튼 위 mousedown이 document selection을 collapse시켜
+// selectionchange가 버튼을 지우기 전에 클릭이 도달하지 못하는 문제. jsdom은 mousedown으로
+// selection을 collapse하지 않으므로(이 문제를 가리는 원인) 여기서는 버튼이 자기 자신의
+// mousedown에 대해 실제로 preventDefault를 호출하는지를 직접 검증한다.
+describe('initSelectionOverlay — button preserves native selection on mousedown (M-1)', () => {
+  let cleanup: () => void;
+  let originalGetBoundingClientRect: typeof Range.prototype.getBoundingClientRect | undefined;
+
+  beforeEach(() => {
+    originalGetBoundingClientRect = Range.prototype.getBoundingClientRect;
+    Range.prototype.getBoundingClientRect = vi.fn(() => FAKE_RECT);
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    if (originalGetBoundingClientRect) {
+      Range.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    } else {
+      delete (Range.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+    }
+    document.body.innerHTML = '';
+    window.getSelection()?.removeAllRanges();
+  });
+
+  it('calls preventDefault on mousedown targeting the floating button itself', () => {
+    const content = renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+
+    selectTextIn(content);
+    fireMouseUp();
+
+    const button = getButton()!;
+    const mousedownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    button.dispatchEvent(mousedownEvent);
+
+    expect(mousedownEvent.defaultPrevented).toBe(true);
+  });
+});
+
+// M-2 (reviewer, Major) — 실브라우저에서 `<textarea>`/`<input>` 안의 선택은
+// `window.getSelection().toString()`이 빈 문자열을 반환해 버튼이 뜨지 않는 문제
+// (`docs/UX.md:187` UF-005 1단계). `document.activeElement`가 폼 컨트롤이고 선택이
+// non-collapsed면 `.value.slice(selectionStart, selectionEnd)`로 읽어야 한다.
+describe('initSelectionOverlay — form control selections (M-2)', () => {
+  let cleanup: () => void;
+
+  afterEach(() => {
+    cleanup?.();
+    document.body.innerHTML = '';
+  });
+
+  function selectInFormControl(el: HTMLTextAreaElement | HTMLInputElement, start: number, end: number): void {
+    el.focus();
+    el.setSelectionRange(start, end);
+  }
+
+  it('shows the button with the correct substring for text selected in a <textarea>', () => {
+    document.body.innerHTML = '<textarea id="ta">Hello selectable body copy</textarea>';
+    const textarea = document.getElementById('ta') as HTMLTextAreaElement;
+    const onSelect = vi.fn();
+    cleanup = initSelectionOverlay({ onSelect });
+
+    selectInFormControl(textarea, 6, 16); // "selectable"
+    fireMouseUp();
+
+    const button = getButton();
+    expect(button).not.toBeNull();
+    button!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect.mock.calls[0][0].text).toBe('selectable');
+  });
+
+  it('shows the button with the correct substring for text selected in an <input>', () => {
+    document.body.innerHTML = '<input id="inp" value="Hello selectable body copy" />';
+    const input = document.getElementById('inp') as HTMLInputElement;
+    const onSelect = vi.fn();
+    cleanup = initSelectionOverlay({ onSelect });
+
+    selectInFormControl(input, 6, 16); // "selectable"
+    fireMouseUp();
+
+    const button = getButton();
+    expect(button).not.toBeNull();
+    button!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect.mock.calls[0][0].text).toBe('selectable');
+  });
+
+  it('does not show the button for an empty/collapsed textarea selection', () => {
+    document.body.innerHTML = '<textarea id="ta">Hello</textarea>';
+    const textarea = document.getElementById('ta') as HTMLTextAreaElement;
+    cleanup = initSelectionOverlay();
+
+    selectInFormControl(textarea, 3, 3);
+    fireMouseUp();
+
+    expect(getButton()).toBeNull();
+  });
+});
+
+// M-3 (reviewer, Major) — 이전 구현은 어떤 scroll 이벤트에도(중첩 스크롤 컨테이너 포함,
+// `capture:true`) 버튼을 지웠다. `docs/UX.md:928`가 명시하는 해제 트리거는 정확히 3개
+// (다른 곳 클릭 / Escape / 새 빈 선택)뿐이고 scroll은 없다 — 이 테스트는 scroll 리스너를
+// 완전히 제거한 뒤의 동작(= 이전과 반대: 더 이상 지워지지 않음)을 검증한다. 이 파일에는
+// 이전 라운드에 scroll이 버튼을 지운다는 테스트가 없었으므로 "뒤집는" 대상 테스트는 없고,
+// 이번 라운드에 신규로 추가한다(구현 완료 보고에도 동일하게 기재).
+describe('initSelectionOverlay — scroll does not dismiss the button (M-3)', () => {
+  let cleanup: () => void;
+  let originalGetBoundingClientRect: typeof Range.prototype.getBoundingClientRect | undefined;
+
+  beforeEach(() => {
+    originalGetBoundingClientRect = Range.prototype.getBoundingClientRect;
+    Range.prototype.getBoundingClientRect = vi.fn(() => FAKE_RECT);
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    if (originalGetBoundingClientRect) {
+      Range.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    } else {
+      delete (Range.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+    }
+    document.body.innerHTML = '';
+    window.getSelection()?.removeAllRanges();
+  });
+
+  it('keeps the floating button visible when the page (or a nested container) scrolls', () => {
+    const content = renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+
+    selectTextIn(content);
+    fireMouseUp();
+    expect(getButton()).not.toBeNull();
+
+    window.dispatchEvent(new Event('scroll'));
+
+    expect(getButton()).not.toBeNull();
+  });
 });
 
 describe('removeFloatingButton (module-level export)', () => {
