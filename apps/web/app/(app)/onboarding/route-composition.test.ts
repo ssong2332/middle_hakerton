@@ -27,9 +27,15 @@ describe('(app)/onboarding 라우트 합성 — 로그아웃 버튼을 끌어들
     expect(existsSync(join(here, 'page.tsx'))).toBe(true);
   });
 
-  it('LogoutButton을 렌더하는 레이아웃은 `(with-nav)` 안에만 존재한다', () => {
+  it('상시 내비게이션(PrimaryNav, 로그아웃 포함)을 렌더하는 레이아웃은 `(with-nav)` 안에만 존재한다 — T73③', () => {
     const navLayout = join(appGroupDir, '(with-nav)', 'layout.tsx');
     expect(existsSync(navLayout)).toBe(true);
-    expect(readFileSync(navLayout, 'utf-8')).toMatch(/LogoutButton/);
+    expect(readFileSync(navLayout, 'utf-8')).toMatch(/PrimaryNav/);
+  });
+
+  it('온보딩 강제 리다이렉트(enforceOnboardingRedirect)를 호출하는 레이아웃도 `(with-nav)` 안에만 존재한다 — T73④, 루프 방지(ⓒ)는 이 라우트 분리로 보장된다', () => {
+    const navLayout = join(appGroupDir, '(with-nav)', 'layout.tsx');
+    expect(readFileSync(navLayout, 'utf-8')).toMatch(/enforceOnboardingRedirect/);
+    expect(readFileSync(join(here, 'page.tsx'), 'utf-8')).not.toMatch(/enforceOnboardingRedirect/);
   });
 });
