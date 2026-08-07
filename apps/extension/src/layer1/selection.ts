@@ -200,10 +200,13 @@ export function initSelectionOverlay(options: SelectionOverlayOptions = {}): () 
   };
 
   const handleSelectionChange = (): void => {
-    // 선택이 비었거나 접혔으면(클릭으로 다른 곳을 눌러 collapse된 경우 포함) 버튼을 치운다.
-    const selection = window.getSelection();
-    const text = selection?.toString().trim() ?? '';
-    if (text === '') removeFloatingButton();
+    // M-A(QA): 생성 조건(getSelectionPayload — 문서 selection 또는 폼 컨트롤 selection)과
+    // 대칭이어야 한다. 폼 컨트롤 selection이 떠 있으면 window.getSelection()은 설계상 항상
+    // 빈 문자열을 반환하므로(M-2), 그것만 보면 폼 컨트롤 selection이 여전히 non-collapsed인데도
+    // "비었다"고 오판해 버튼을 지운다(예: textarea selection을 Shift+Arrow로 확장 — 그
+    // selectionchange는 document까지 버블된다). 문서 selection도 폼 컨트롤 selection도 둘 다
+    // 없을 때만(getSelectionPayload()가 null일 때만) 지운다.
+    if (getSelectionPayload() === null) removeFloatingButton();
   };
 
   const handleKeyDown = (event: KeyboardEvent): void => {
