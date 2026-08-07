@@ -50,7 +50,9 @@ describe('DecisionsWorkspace', () => {
     render(<DecisionsWorkspace />);
 
     expect(screen.getByRole('textbox', { name: '스레드 텍스트' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Generate summary' })).toBeDisabled();
+    expect(
+      (screen.getByRole('button', { name: 'Generate summary' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
   it('Validation — 텍스트를 입력하면 Generate summary 버튼이 활성화된다', () => {
@@ -60,7 +62,9 @@ describe('DecisionsWorkspace', () => {
       target: { value: '스레드 원문' },
     });
 
-    expect(screen.getByRole('button', { name: 'Generate summary' })).toBeEnabled();
+    expect(
+      (screen.getByRole('button', { name: 'Generate summary' }) as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 
   it('Loading — Generate summary 클릭 시 POST /api/summary를 호출하고 진행 중 상태를 보여준다', () => {
