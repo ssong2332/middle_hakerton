@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fetchLearnedItems, fetchSenderProfile } from './storage';
+import { fetchLearnedItems, fetchSenderProfile, saveOnboardingProfile } from './storage';
 
 interface FakeProfileHandle {
   client: SupabaseClient;
@@ -170,5 +170,106 @@ describe('fetchLearnedItems', () => {
     await expect(fetchLearnedItems(client, 'user-1')).rejects.toEqual({
       message: 'connection failed',
     });
+  });
+});
+
+// T19 — 온보딩 저장(쓰기 측). AC-011, AC-046②, AC-059.
+interface FakeUpsertHandle {
+  client: SupabaseClient;
+  upsertCalls: Array<[unknown, unknown]>;
+}
+
+function createFakeUpsertSupabase(
+  options: { error: { message: string } | null } = { error: null },
+): FakeUpsertHandle {
+  const upsertCalls: Array<[unknown, unknown]> = [];
+  const client = {
+    from(table: string) {
+      if (table !== 'profiles') throw new Error(`unexpected table: ${table}`);
+      return {
+        upsert: (row: unknown, opts: unknown) => {
+          upsertCalls.push([row, opts]);
+          return Promise.resolve({ data: options.error ? null : {}, error: options.error });
+        },
+      };
+    },
+  } as unknown as SupabaseClient;
+  return { client, upsertCalls };
+}
+
+describe('saveOnboardingProfile — AC-011/AC-046②/AC-059(나란히 스킵·완료 두 경로 모두 검증)', () => {
+  it('완료 경로 — 4개 스타일 필드 + onboarding_state=completed를 user_id 기준 upsert한다(AC-011/AC-046②)', async () => {
+    const { client, upsertCalls } = createFakeUpsertSupabase();
+
+    const result = await saveOnboardingProfile(client, 'user-1', {
+      onboardingState: 'completed',
+      directness: 'direct',
+      emojiPreference: 'neutral',
+      formality: 'medium',
+      honorificLevel: 'hapsyo',
+    });
+
+    expect(upsertCalls[0][0]).toMatchObject({
+      user_id: 'user-1',
+      onboarding_state: 'completed',
+      directness: 'direct',
+      emoji_preference: 'neutral',
+      formality: 'medium',
+      honorific_level: 'hapsyo',
+    });
+    expect(upsertCalls[0][1]).toEqual({ onConflict: 'user_id' });
+    expect(result.onboardingState).toBe('completed');
+    expect(result.directness).toBe('direct');
+    expect(result.honorificLevel).toBe('hapsyo');
+    expect(typeof result.updatedAt).toBe('string');
+  });
+
+  it('스킵 경로 — onboarding_state=skipped면 스타일 4필드를 전부 null로 저장한다(AC-059②, 기본값·추측값 금지)', async () => {
+    const { client, upsertCalls } = createFakeUpsertSupabase();
+
+    const result = await saveOnboardingProfile(client, 'user-2', {
+      onboardingState: 'skipped',
+    });
+
+    expect(upsertCalls[0][0]).toMatchObject({
+      user_id: 'user-2',
+      onboarding_state: 'skipped',
+      directness: null,
+      emoji_preference: null,
+      formality: null,
+      honorific_level: null,
+    });
+    expect(result.onboardingState).toBe('skipped');
+    expect(result.directness).toBeNull();
+    expect(result.emojiPreference).toBeNull();
+    expect(result.formality).toBeNull();
+    expect(result.honorificLevel).toBeNull();
+  });
+
+  it('스킵인데 호출부가 스타일 값을 실어 보내도 무시하고 null로 저장한다(AC-059② 마지막 방어선)', async () => {
+    const { client, upsertCalls } = createFakeUpsertSupabase();
+
+    await saveOnboardingProfile(client, 'user-3', {
+      onboardingState: 'skipped',
+      directness: 'direct',
+      emojiPreference: 'likes',
+      formality: 'high',
+      honorificLevel: 'haeyo',
+    });
+
+    expect(upsertCalls[0][0]).toMatchObject({
+      directness: null,
+      emoji_preference: null,
+      formality: null,
+      honorific_level: null,
+    });
+  });
+
+  it('저장 실패 시 에러를 던진다(에러 삼키기 금지)', async () => {
+    const { client } = createFakeUpsertSupabase({ error: { message: 'connection failed' } });
+
+    await expect(
+      saveOnboardingProfile(client, 'user-1', { onboardingState: 'skipped' }),
+    ).rejects.toEqual({ message: 'connection failed' });
   });
 });

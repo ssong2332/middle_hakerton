@@ -41,6 +41,60 @@ const EMPTY_PROFILE: CommunicationProfile = {
 };
 
 /**
+ * T19 — 온보딩 저장(쓰기 측). `PUT /api/profile`(`docs/API.md` "GET / PUT / DELETE /api/profile")이
+ * 이 함수를 호출한다. **완료(complete)든 스킵(skip)이든 이 함수 하나로 처리한다** — 판정 분기를
+ * 라우트가 아니라 여기서 한다: `onboardingState !== 'completed'`이면 스타일 4필드를 전부 `null`로
+ * 저장한다(AC-059②, 기본값·추측값 금지). 재실행(④)도 같은 함수다 — `profiles`는 `user_id` PK라
+ * `upsert`가 곧 "덮어쓰기"다(`apps/web/lib/demo/seed.ts` `seedProfiles`와 같은 upsert 관례).
+ */
+export interface SaveOnboardingProfileInput {
+  onboardingState: 'completed' | 'skipped';
+  directness?: 'direct' | 'indirect';
+  emojiPreference?: 'likes' | 'neutral' | 'avoids';
+  formality?: 'high' | 'medium' | 'low';
+  honorificLevel?: 'hapsyo' | 'haeyo';
+}
+
+export interface SavedProfile extends CommunicationProfile {
+  updatedAt: string;
+}
+
+/**
+ * `profiles`에 `userId` 행을 upsert한다. `onboardingState: 'skipped'`면 호출부가 스타일 필드를
+ * 실어 보내도 **무시하고 null로 저장한다** — 이 함수가 AC-059②의 마지막 방어선이다(호출부 실수로
+ * 스킵인데 값이 섞여 들어와도 여기서 걸러진다).
+ */
+export async function saveOnboardingProfile(
+  client: SupabaseClient,
+  userId: string,
+  input: SaveOnboardingProfileInput,
+): Promise<SavedProfile> {
+  const isComplete = input.onboardingState === 'completed';
+  const updatedAt = new Date().toISOString();
+  const row = {
+    user_id: userId,
+    onboarding_state: input.onboardingState,
+    directness: isComplete ? (input.directness ?? null) : null,
+    emoji_preference: isComplete ? (input.emojiPreference ?? null) : null,
+    formality: isComplete ? (input.formality ?? null) : null,
+    honorific_level: isComplete ? (input.honorificLevel ?? null) : null,
+    updated_at: updatedAt,
+  };
+
+  const { error } = await client.from('profiles').upsert(row, { onConflict: 'user_id' });
+  if (error) throw error;
+
+  return {
+    onboardingState: input.onboardingState,
+    directness: row.directness,
+    emojiPreference: row.emoji_preference,
+    formality: row.formality,
+    honorificLevel: row.honorific_level,
+    updatedAt,
+  };
+}
+
+/**
  * `profiles`에서 `userId`의 행(있으면 1개, 없으면 0개)을 읽어 core의 `CommunicationProfile`로
  * 변환한다. 행이 없으면 `EMPTY_PROFILE`을 반환한다(AC-059②③).
  */
