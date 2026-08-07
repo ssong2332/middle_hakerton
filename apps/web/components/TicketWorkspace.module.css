@@ -75,6 +75,7 @@
 }
 
 .useButton {
+  min-height: 44px;
   padding: 10px 16px;
   background: var(--color-accent);
   color: var(--color-surface);
@@ -84,6 +85,7 @@
 
 .backButton,
 .retryButton {
+  min-height: 44px;
   padding: 10px 16px;
   background: var(--color-surface);
   border: 1px solid var(--border-strong);

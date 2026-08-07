@@ -18,7 +18,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { TicketResult, TicketSections } from '@cross-border/core';
 import { NON_LIVE_NOTICE } from '../lib/non-live-notice';
-import { TICKET_DRAFT_SESSION_KEY } from '../lib/ticket-draft';
+import { TICKET_DRAFT_SESSION_KEY, TICKET_RESTORE_SESSION_KEY } from '../lib/ticket-draft';
 import styles from './TicketWorkspace.module.css';
 
 const MEDIATE_ROUTE = '/mediate';
@@ -94,17 +94,20 @@ export function TicketWorkspace() {
   }
 
   // 🔴 Exit "Use this ticket" — 편집된 4섹션을 조립해 `/mediate`가 복원할 초안으로 세션에 저장한다
-  // (`apps/web/lib/ticket-draft.ts`). `TICKET_DRAFT_SESSION_KEY`를 원문에서 티켓 조립문으로
-  // 덮어쓴다 — `MediationWorkspace`는 이 키가 "원문"인지 "티켓 조립문"인지 구분하지 않고 그대로
-  // 작성창에 복원한다(단일 채널, 방향과 무관하게 "돌아갔을 때 채울 값" 하나).
+  // (`apps/web/lib/ticket-draft.ts`). Major-1(QA GO, follow-up → 수정) 이후 복원 전용 키
+  // (`TICKET_RESTORE_SESSION_KEY`)에 쓴다 — `TICKET_DRAFT_SESSION_KEY`(API 소스, 승인 스냅샷
+  // 원문)는 건드리지 않는다. `MediationWorkspace`는 복원 키의 값이 "라이브 원문"인지 "티켓
+  // 조립문"인지 구분하지 않고 그대로 작성창에 복원한다(단일 채널, 방향과 무관하게 "돌아갔을 때
+  // 채울 값" 하나 — 두 쓰기는 같은 방문 안에서 상호 배타적이다).
   function handleUseTicket() {
     if (!sections) return;
-    sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, assembleTicketMessage(sections));
+    sessionStorage.setItem(TICKET_RESTORE_SESSION_KEY, assembleTicketMessage(sections));
     router.push(MEDIATE_ROUTE);
   }
 
-  // 🔴 Exit "Back to message" — 세션의 원문을 그대로 둔 채 돌아간다(discard, 원본 free-text
-  // 메시지가 그대로 보존되어야 한다는 Exit 스펙 그대로).
+  // 🔴 Exit "Back to message" — 세션의 원문/복원값을 그대로 둔 채 돌아간다(discard, 원본
+  // free-text 메시지가 그대로 보존되어야 한다는 Exit 스펙 그대로 — 복원값은 "Convert to Task
+  // Ticket" 클릭 시점에 이미 라이브 원문으로 채워져 있으므로 여기서 다시 쓸 필요가 없다).
   function handleBackToMessage() {
     router.push(MEDIATE_ROUTE);
   }

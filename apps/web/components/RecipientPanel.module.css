@@ -45,7 +45,10 @@
 
 .ticketLink {
   display: inline-flex;
+  align-items: center;
   width: fit-content;
+  min-height: 44px;
+  min-width: 44px;
   padding: 0;
   margin-bottom: 10px;
   background: none;
