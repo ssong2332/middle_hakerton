@@ -52,6 +52,19 @@ describe('LoginPage (UX-001)', () => {
     });
   });
 
+  it('T75 — from이 "/"(루트)이면 /mediate가 아니라 원래 요청 경로 "/"로 이동한다', async () => {
+    mockSearchParamsGet.mockReturnValue('/');
+    mockSignInWithPassword.mockResolvedValue({ data: {}, error: null });
+    render(<LoginPage />);
+
+    fillForm('user@example.com', 'password123');
+    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/');
+    });
+  });
+
   it('from이 없으면 기본 랜딩(/mediate)으로 이동한다', async () => {
     mockSearchParamsGet.mockReturnValue(null);
     mockSignInWithPassword.mockResolvedValue({ data: {}, error: null });
