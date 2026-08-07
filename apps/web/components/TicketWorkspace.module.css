@@ -9,6 +9,13 @@
   font-weight: 600;
 }
 
+.nonLiveNotice {
+  font: 600 9px var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+  margin-bottom: 12px;
+}
+
 .emptyState {
   border: 1px dashed var(--text-muted-45);
   padding: 32px 18px;

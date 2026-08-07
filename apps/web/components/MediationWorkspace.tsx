@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { MediationResult, UrgencyLevel } from '@cross-border/core';
-import { TICKET_DRAFT_SESSION_KEY } from '../lib/ticket-draft';
+import { TICKET_DRAFT_RECIPIENT_SESSION_KEY, TICKET_DRAFT_SESSION_KEY } from '../lib/ticket-draft';
 import { RecipientPanel } from './RecipientPanel';
 import { SenderPanel } from './SenderPanel';
 import styles from './MediationWorkspace.module.css';
@@ -141,6 +141,13 @@ export function MediationWorkspace() {
     if (draft !== null) {
       setText(draft);
       sessionStorage.removeItem(TICKET_DRAFT_SESSION_KEY);
+    }
+    // MAJ-3(reviewer follow-up) — 원문과 같은 원리로, 받는 사람 값도 있으면 복원하고 즉시
+    // 소비(삭제)한다(스테일 재노출 방지, 위 원문 복원과 같은 이유).
+    const recipientDraft = sessionStorage.getItem(TICKET_DRAFT_RECIPIENT_SESSION_KEY);
+    if (recipientDraft !== null) {
+      setRecipient(recipientDraft);
+      sessionStorage.removeItem(TICKET_DRAFT_RECIPIENT_SESSION_KEY);
     }
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -353,6 +360,9 @@ export function MediationWorkspace() {
   // 실무에서는 항상 존재하지만) 방어적으로 라이브 `text`로 degrade한다.
   function handleConvertToTicket() {
     sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, approvalSnapshot?.text ?? text);
+    // MAJ-3(reviewer follow-up) — 받는 사람도 함께 들고 나간다. `/ticket`은 이 값을 쓰지 않고
+    // 그대로 통과시킬 뿐이지만, 돌아왔을 때(재마운트) 복원할 수 있어야 재입력 마찰이 없다.
+    sessionStorage.setItem(TICKET_DRAFT_RECIPIENT_SESSION_KEY, recipient);
     router.push('/ticket');
   }
 

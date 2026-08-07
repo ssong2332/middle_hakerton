@@ -17,6 +17,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { TicketResult, TicketSections } from '@cross-border/core';
+import { NON_LIVE_NOTICE } from '../lib/non-live-notice';
 import { TICKET_DRAFT_SESSION_KEY } from '../lib/ticket-draft';
 import styles from './TicketWorkspace.module.css';
 
@@ -147,15 +148,33 @@ export function TicketWorkspace() {
 
   return (
     <div>
+      {/* MAJ-1(reviewer follow-up, AC-041 / docs/UX.md:920) — `SenderPanel.tsx`의 폴백 배지
+          관례를 그대로 따른다: live가 아닌 응답(cache/fallback)이면 결과 근처에 항상 이 라벨을
+          보여준다. `TicketResultBase.source`는 (`MediationResult.stepSources`와 달리) 4섹션 +
+          결정 권한 상태 전체를 아우르는 단일 값이다(`packages/core/src/contract.ts`). */}
+      {ticket.source !== 'live' && (
+        <p role="status" className={styles.nonLiveNotice}>
+          {NON_LIVE_NOTICE}
+        </p>
+      )}
+
       {SECTION_LABELS.map(({ key, label }) => (
-        // 🔴 Accessibility(UX-007) — "heading + content"로 라벨된 region(이 태스크 지시사항이
-        // 제시한 두 형식 중 `role="region"` + heading 쪽). `aria-label`/`aria-labelledby`를
-        // section에 직접 달지 않는 이유: 아래 `<textarea aria-label={label}>`와 접근 가능한 이름이
-        // 겹치면 `getByLabelText` 류 쿼리(스크린리더의 라벨 탐색과 같은 원리)가 section과
-        // textarea를 모두 매치해 "이 섹션의 입력"을 가리키는 유일한 대상을 찾지 못한다 — region의
-        // 이름은 명시적으로 연결하지 않고 heading이 시각적/구조적으로 그 역할을 한다.
-        <section key={key} role="region" className={styles.sectionBlock}>
-          <h3 className={styles.sectionHeading}>{label}</h3>
+        // MAJ-2(reviewer follow-up) — heading에 `id`를 달고 section이 `aria-labelledby`로
+        // 가리켜 이름 있는 landmark로 노출한다(unnamed `role="region"`은 랜드마크 트리에서
+        // 빠진다). 명시적 `role="region"`은 필요 없다 — 접근 가능한 이름이 있는 `<section>`은
+        // 그 자체로 이미 region landmark로 노출된다. 이전에 `aria-labelledby`를 피했던 이유
+        // (아래 `<textarea aria-label={label}>`와 접근 가능한 이름이 겹쳐 `getByLabelText` 류
+        // 쿼리가 유일한 대상을 못 찾음)는 테스트 쿼리 쪽 문제이므로, 테스트를
+        // `getByRole('textbox', { name: label })`로 바꿔 해소한다(section은 `role="region"`
+        // 쿼리로 구분된다).
+        <section
+          key={key}
+          aria-labelledby={`ticket-section-${key}-heading`}
+          className={styles.sectionBlock}
+        >
+          <h2 id={`ticket-section-${key}-heading`} className={styles.sectionHeading}>
+            {label}
+          </h2>
           {key === 'concernLevel' && (
             <p className={styles.concernBadge}>
               <span aria-hidden="true" className={styles.concernIcon}>
@@ -178,7 +197,7 @@ export function TicketWorkspace() {
           (`TicketAuthority` 판별 유니온), `불명`이면 근거가 없을 수 있다 — 그 경우 근거 문장
           영역을 아예 렌더하지 않는다(빈 문자열을 지어내 채우지 않는다, AC-020 원칙). */}
       <section aria-label="결정 권한 상태" className={styles.authorityBlock}>
-        <h3 className={styles.sectionHeading}>결정 권한 상태</h3>
+        <h2 className={styles.sectionHeading}>결정 권한 상태</h2>
         <p className={styles.authorityValue}>{ticket.decisionAuthority}</p>
         {ticket.decisionAuthorityEvidence && (
           <p className={styles.authorityEvidence}>{ticket.decisionAuthorityEvidence}</p>

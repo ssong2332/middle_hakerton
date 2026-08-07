@@ -20,5 +20,14 @@
  * - `MediationWorkspace` 마운트 시 이 키를 읽어 작성창(`text`)을 복원하고, **읽은 즉시 키를
  *   지운다** — 한 번 소비된 값이 관계없는 이후 방문에서 다시 나타나지 않게 한다(스테일 재노출
  *   방지, T21/T23 리뷰에서 반복된 교훈).
+ *
+ * MAJ-3(reviewer follow-up) — `/ticket`을 다녀오면 `MediationWorkspace`가 통째로 재마운트되므로
+ * `recipient` state도 함께 초기화된다. 원문 재입력은 없지만(위 키가 이미 복원한다) 받는 사람만
+ * 다시 입력해야 하는 것은 순수한 마찰이라, 별도 키 하나로 받는 사람 값만 같은 원리로 들고 다닌다
+ * (전체 `MediationResult`/`approvalSnapshot`은 들고 다니지 않는다 — 티켓 우회 후 C1→C2→C4를
+ * 다시 돌리는 것은 이 플로우의 설계상 허용된 동작이고, 재입력 마찰이 있는 필드는 받는 사람뿐이다).
+ * `TicketWorkspace`는 이 키를 전혀 건드리지 않는다 — "Back to message"/"Use this ticket" 두 exit
+ * 모두 그대로 통과시킨다.
  */
 export const TICKET_DRAFT_SESSION_KEY = 'mediation:ticket:draftText';
+export const TICKET_DRAFT_RECIPIENT_SESSION_KEY = 'mediation:ticket:draftRecipient';
