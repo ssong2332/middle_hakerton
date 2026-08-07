@@ -18,6 +18,46 @@ export interface SelectionOverlayOptions {
   onSelect?: (payload: SelectionPayload) => void;
 }
 
+const POSITION_GAP = 4;
+
+export interface ClampSize {
+  width: number;
+  height: number;
+}
+
+export interface ClampViewport {
+  width: number;
+  height: number;
+}
+
+/**
+ * 선택 영역 rect 기준으로 버튼 위치를 계산하되 뷰포트를 벗어나지 않게 clamp한다 —
+ * `docs/UX.md:928` "clamped to stay fully within the viewport (flips to the opposite side if it
+ * would overflow the top/bottom edge; shifts horizontally to avoid the left/right edge)".
+ * 순수 함수로 분리한 이유: jsdom에는 실제 레이아웃 엔진이 없어 버튼 크기 측정이 항상 0으로
+ * 나온다 — DOM 통합 테스트만으로는 clamp 산술을 신뢰성 있게 검증할 수 없어 여기서 직접
+ * 단위 테스트한다(`selection.test.ts`).
+ */
+export function computeClampedPosition(
+  rect: Pick<DOMRect, 'top' | 'bottom' | 'left' | 'right'>,
+  buttonSize: ClampSize,
+  viewport: ClampViewport,
+): { top: number; left: number } {
+  const below = rect.bottom + POSITION_GAP;
+  const overflowsBottom = below + buttonSize.height > viewport.height;
+  let top = overflowsBottom ? rect.top - buttonSize.height - POSITION_GAP : below;
+  // 안전망: 버튼이 뷰포트보다 커서 flip 이후에도 벗어나면 최소한 뷰포트 안에 남긴다.
+  top = Math.min(Math.max(top, 0), Math.max(viewport.height - buttonSize.height, 0));
+
+  let left = rect.left;
+  if (left + buttonSize.width > viewport.width) {
+    left = viewport.width - buttonSize.width;
+  }
+  left = Math.max(left, 0);
+
+  return { top, left };
+}
+
 function getExistingButton(): HTMLButtonElement | null {
   return document.getElementById(BUTTON_ID) as HTMLButtonElement | null;
 }
@@ -45,18 +85,22 @@ function createFloatingButton(
 ): void {
   removeFloatingButton();
 
+  // XML/SVG 등 <all_urls> 콘텐츠 스크립트가 매칭될 수 있는 비-HTML 문서는 document.body가
+  // 없을 수 있다 — 그런 문서에서는 버튼을 그릴 곳이 없으므로 조용히 아무 것도 하지 않는다.
+  if (!document.body) return;
+
   const button = document.createElement('button');
   button.id = BUTTON_ID;
   button.type = 'button';
   button.textContent = '중재하기';
 
   // position: fixed — getBoundingClientRect()가 이미 뷰포트 기준 좌표라 스크롤 오프셋 보정이
-  // 필요 없다. 스크롤 발생 시에는 재배치 대신 **제거**를 선택했다(아래 handleScroll) — 선택
-  // 영역이 뷰포트 밖으로 나갔는지 매번 재계산하는 것보다 단순하고, 사용자는 다시 선택하면 된다.
+  // 필요 없다. top/left는 DOM에 붙인 뒤 실제 버튼 크기를 측정해서 계산한다(clamp 근거는
+  // computeClampedPosition 주석 참조) — 초기값은 measure 전까지만 존재하는 placeholder다.
   Object.assign(button.style, {
     position: 'fixed',
-    top: `${payload.rect.bottom + 4}px`,
-    left: `${payload.rect.left}px`,
+    top: '0px',
+    left: '0px',
     zIndex: '2147483647',
     padding: '4px 10px',
     fontSize: '12px',
@@ -68,6 +112,15 @@ function createFloatingButton(
     cursor: 'pointer',
   });
 
+  // M-1(reviewer): 실브라우저에서 host 페이지 어디든 mousedown하면 document selection이
+  // collapse되어 selectionchange가 발동, click이 도달하기 전에 버튼이 사라진다. 이 버튼
+  // 자신의 mousedown에서만 preventDefault해 브라우저의 네이티브 selection-collapse를 막는다
+  // — AC-052⑤가 금지하는 "host 페이지 이벤트 가로채기"가 아니다(host 페이지의 다른 어떤
+  // 요소·이벤트에도 관여하지 않고, 우리가 만든 이 버튼 자체에만 적용된다).
+  button.addEventListener('mousedown', (event) => {
+    event.preventDefault();
+  });
+
   // 버튼 자체의 클릭 핸들러는 AC-052 ⑤가 금지하는 "대상 사이트 이벤트 가로채기"가 아니다 —
   // 우리가 만든 이 버튼 위에서만 동작하며 페이지의 다른 클릭·스크롤·단축키에는 관여하지 않는다.
   button.addEventListener('click', () => {
@@ -75,15 +128,55 @@ function createFloatingButton(
   });
 
   document.body.appendChild(button);
+
+  // C-1(reviewer): DOM에 붙인 뒤에야 실제 크기를 측정할 수 있다(붙기 전엔 항상 0×0).
+  const size = button.getBoundingClientRect();
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const { top, left } = computeClampedPosition(
+    payload.rect,
+    { width: size.width, height: size.height },
+    viewport,
+  );
+  button.style.top = `${top}px`;
+  button.style.left = `${left}px`;
+}
+
+/**
+ * M-2(reviewer): 실브라우저에서 `<textarea>`/`<input>` 안의 선택은 `window.getSelection()`이
+ * 빈 문자열을 반환한다(`docs/UX.md:187` UF-005 1단계 — GitHub 댓글창 등). `document.activeElement`가
+ * 텍스트 폼 컨트롤이고 selectionStart/selectionEnd가 non-collapsed면 `.value.slice(...)`로 읽는다.
+ * `HTMLTextAreaElement`/`HTMLInputElement`는 모든 사이트에 있는 범용 DOM 인터페이스이며 호스트명·
+ * 셀렉터를 읽지 않으므로 AC-052③(대상 사이트 식별 금지) 위반이 아니다.
+ * 위치 근사: Range처럼 문자 단위 rect를 낼 수 없어 컨트롤 자신의 getBoundingClientRect()를 쓴다
+ * (버튼은 기존 로직대로 이 rect의 아래쪽에 배치된다) — 문서화된 구현 선택.
+ */
+function getFormControlSelectionPayload(): SelectionPayload | null {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement)) return null;
+
+  try {
+    const { selectionStart, selectionEnd, value } = active;
+    if (selectionStart === null || selectionEnd === null || selectionStart === selectionEnd) {
+      return null;
+    }
+    const text = value.slice(selectionStart, selectionEnd).trim();
+    if (text === '') return null;
+    return { text, rect: active.getBoundingClientRect() };
+  } catch {
+    // 일부 <input type="number"|"email"|...>은 selectionStart 접근 시 예외를 던진다
+    // (그 타입은 텍스트 선택을 지원하지 않는다는 뜻) — 버튼을 띄우지 않는다.
+    return null;
+  }
 }
 
 function getSelectionPayload(): SelectionPayload | null {
   const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return null;
-  const text = selection.toString().trim();
-  if (text === '') return null;
-  const rect = selection.getRangeAt(0).getBoundingClientRect();
-  return { text, rect };
+  const text = selection?.toString().trim() ?? '';
+  if (selection && selection.rangeCount > 0 && text !== '') {
+    const rect = selection.getRangeAt(0).getBoundingClientRect();
+    return { text, rect };
+  }
+  return getFormControlSelectionPayload();
 }
 
 /**
@@ -93,8 +186,10 @@ function getSelectionPayload(): SelectionPayload | null {
 export function initSelectionOverlay(options: SelectionOverlayOptions = {}): () => void {
   const onSelect = options.onSelect ?? defaultOnSelect;
 
-  // AC-052 ⑤ 간섭 금지: 아래 리스너 중 어떤 것도 `preventDefault`/`stopPropagation`을 호출하지
-  // 않는다 — 대상 사이트의 클릭·스크롤·단축키 동작은 이 코드가 없는 것처럼 그대로 흘러간다.
+  // AC-052 ⑤ 간섭 금지: 아래 문서/윈도우 레벨 리스너 중 어떤 것도 `preventDefault`/
+  // `stopPropagation`을 호출하지 않는다 — 대상 사이트의 클릭·스크롤·단축키 동작은 이 코드가
+  // 없는 것처럼 그대로 흘러간다. (유일한 예외는 우리가 만든 버튼 **자신의** mousedown
+  // 리스너다 — `createFloatingButton`의 M-1 주석 참조. 그건 host 페이지 이벤트가 아니다.)
   const handleMouseUp = (): void => {
     const payload = getSelectionPayload();
     if (!payload) {
@@ -115,20 +210,19 @@ export function initSelectionOverlay(options: SelectionOverlayOptions = {}): () 
     if (event.key === 'Escape') removeFloatingButton();
   };
 
-  const handleScroll = (): void => {
-    removeFloatingButton();
-  };
+  // M-3(reviewer): `docs/UX.md:928`가 명시하는 해제 트리거는 정확히 3개(다른 곳 클릭 / Escape /
+  // 새 빈 선택)뿐이고 scroll은 없다 — 이전 구현은 scroll 리스너를 `capture:true`로 window에
+  // 걸어 중첩 스크롤 컨테이너(예: 자동 스크롤되는 채팅 목록)에서 버블링된 scroll에도 버튼을
+  // 지웠다. 문서에 없는 동작을 임의로 추가하지 않고 제거한다.
 
   document.addEventListener('mouseup', handleMouseUp);
   document.addEventListener('selectionchange', handleSelectionChange);
   document.addEventListener('keydown', handleKeyDown);
-  window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
 
   return () => {
     document.removeEventListener('mouseup', handleMouseUp);
     document.removeEventListener('selectionchange', handleSelectionChange);
     document.removeEventListener('keydown', handleKeyDown);
-    window.removeEventListener('scroll', handleScroll, { capture: true });
     removeFloatingButton();
   };
 }
