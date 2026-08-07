@@ -455,6 +455,68 @@ describe('initSelectionOverlay — scroll does not dismiss the button (M-3)', ()
   });
 });
 
+// M-A (QA, Major) — `handleSelectionChange`의 제거 조건이 `handleMouseUp`의 생성 조건보다 좁았다.
+// 생성은 `getSelectionPayload()`(문서 selection **또는** 폼 컨트롤 selection)를 쓰지만, 제거는
+// `window.getSelection()`만 봤다. 폼 컨트롤 selection이 있으면 `window.getSelection()`은 설계상
+// 항상 빈 문자열을 반환하므로(M-2의 전제), 폼 컨트롤 selection이 떠 있는 동안 document에 닿는
+// 아무 selectionchange나(예: Shift+Arrow로 selection 확장 — form-control selectionchange는
+// bubble된다) 버튼을 잘못 지웠다. 재현: textarea drag-select → 버튼 표시 → 키보드로 selection
+// 확장 → selectionchange 발생 → 버튼이 사라짐(문서화되지 않은 4번째 해제 트리거,
+// `docs/UX.md:928` 위반). jsdom은 `setSelectionRange()`에 대해 selectionchange를 자동 발동하지
+// 않으므로 수동으로 dispatch한다.
+describe('initSelectionOverlay — selectionchange removal is symmetric with creation (M-A)', () => {
+  let cleanup: () => void;
+  let originalGetBoundingClientRect: typeof Range.prototype.getBoundingClientRect | undefined;
+
+  beforeEach(() => {
+    originalGetBoundingClientRect = Range.prototype.getBoundingClientRect;
+    Range.prototype.getBoundingClientRect = vi.fn(() => FAKE_RECT);
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    if (originalGetBoundingClientRect) {
+      Range.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    } else {
+      delete (Range.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+    }
+    document.body.innerHTML = '';
+    window.getSelection()?.removeAllRanges();
+  });
+
+  it('keeps the floating button when a document-level selectionchange fires while a form-control selection is still active', () => {
+    document.body.innerHTML = '<textarea id="ta">Hello selectable body copy</textarea>';
+    const textarea = document.getElementById('ta') as HTMLTextAreaElement;
+    cleanup = initSelectionOverlay();
+
+    textarea.focus();
+    textarea.setSelectionRange(6, 16); // "selectable"
+    fireMouseUp();
+    expect(getButton()).not.toBeNull();
+
+    // 실브라우저에서 폼 컨트롤 selection을 키보드로 확장하면 selectionchange가 발동해
+    // document까지 버블된다(form-control selectionchange는 bubble됨) — jsdom은 이를 자동
+    // 발동하지 않으므로 수동 dispatch로 흉내낸다.
+    document.dispatchEvent(new Event('selectionchange'));
+
+    expect(getButton()).not.toBeNull();
+  });
+
+  it('removes the button on a genuine document-level selectionchange to an empty selection when no form-control selection is active either (M-2/AC-052④ still holds)', () => {
+    const content = renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+
+    selectTextIn(content);
+    fireMouseUp();
+    expect(getButton()).not.toBeNull();
+
+    collapseSelection();
+    document.dispatchEvent(new Event('selectionchange'));
+
+    expect(getButton()).toBeNull();
+  });
+});
+
 describe('removeFloatingButton (module-level export)', () => {
   afterEach(() => {
     document.body.innerHTML = '';
