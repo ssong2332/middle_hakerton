@@ -146,7 +146,7 @@ export default function OnboardingPage() {
 
   return (
     <main className={styles.page}>
-      <h1 className={styles.title}>UX-003 온보딩 설문</h1>
+      <h1 className={styles.title}>온보딩 설문</h1>
       <p className={styles.lead}>
         평소 커뮤니케이션 스타일을 알려주시면 변환에 반영합니다. 지금 건너뛰어도 나중에 프로필에서
         다시 채울 수 있습니다.

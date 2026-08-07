@@ -89,7 +89,7 @@ export function LoginForm() {
 
   return (
     <main className={styles.page}>
-      <h1 className={styles.title}>UX-001 로그인</h1>
+      <h1 className={styles.title}>로그인</h1>
       {errorKind === 'invalid-credentials' && (
         <p role="alert" className={styles.banner}>
           이메일 또는 비밀번호가 올바르지 않습니다
