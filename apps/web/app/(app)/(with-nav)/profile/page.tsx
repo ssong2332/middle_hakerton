@@ -462,6 +462,13 @@ export default function ProfilePage() {
                           <button
                             type="button"
                             className={styles.editButton}
+                            // F-1 재발 방지 — 삭제 확인 PUT이 아직 진행 중인 동안(`deleting`)
+                            // 수정 버튼을 비활성화한다. 그렇지 않으면 삭제가 완료되기 전에
+                            // 수정을 눌러 `startEdit()`이 삭제 직전(stale)의 값을
+                            // `editDraft`에 캡처할 수 있었고, 삭제가 끝난 뒤 그 stale 값으로
+                            // 저장하면 방금 지운 값이 되살아났다(confirmDeleteButton과 같은
+                            // 이유로 같은 `deleting` 플래그를 재사용한다).
+                            disabled={deleting}
                             onClick={() => startEdit(key)}
                           >
                             수정
