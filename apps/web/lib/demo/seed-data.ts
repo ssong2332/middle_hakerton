@@ -28,18 +28,24 @@ import { classifyDiffPattern } from '@cross-border/core';
 export type DemoPersona = 'jihoon' | 'tanaka' | 'michael' | 'sarah';
 
 /**
- * 🔴 판단 근거를 남긴다 — `docs/TestCases.md`는 4인의 이름·소속·타임존만 주고 로그인/발송에 쓸
- * 식별자 문자열(이메일)은 주지 않는다. `sent_messages.recipient_identifier`·`pair_protocols.
- * party_a/party_b`가 전부 "자유 텍스트 이메일"이라 **무언가 값이 있어야 시드가 성립**한다.
- * RFC 2606 예약 도메인(`.example`)을 써서 실제 라우팅 가능한 도메인이 아님을 명시했다 —
- * 이 형식 자체는 판단(구현 편의)이며 TestCases.md의 "값"이 아니다. **확인 필요**: 실제 회원가입
- * 플로우(T46)로 계정을 만들 때 이 이메일을 그대로 쓸지는 계정 생성 승인 시점에 재확인한다.
+ * 출처: `docs/TestCases.md:235-252` "(v1.8) 시드 계정 식별자(이메일)" 표. **v1.7의 `.example`
+ * 형식(`{이름}.{성}@{회사}.example`)은 폐기됐다** — Supabase Auth 회원가입이 이를 거부했다
+ * (`400: Email address "..." is invalid`, 사용자가 2026-08-07 라이브 auth 로그로 직접 확인,
+ * TestCases.md:239). 현재 값은 `{이름}.{성}+{회사}@example.com`(RFC 2606 예약 도메인
+ * `example.com` + `+회사` 서브주소)이며, **이제 TestCases.md가 단일 출처**다(implementer가
+ * 더 이상 임의로 고르는 값이 아니다).
+ *
+ * 🔴 **`+` 취급 주의(TestCases.md:251)**: 이 값은 `recipient_identifier`·`pair_protocols.
+ * party_a/party_b`·`pair_key` 생성에 문자열 그대로 쓰인다. 어디서도 `+`를 공백으로
+ * URL 디코딩하거나 정규화로 제거하면 안 된다 — 하면 4개 주소가 전부 `...@example.com`
+ * 한 값으로 붕괴한다. **확인 필요**: 실제 회원가입 플로우(T46)로 계정을 만들 때 이 이메일을
+ * 그대로 쓸지는 계정 생성 승인 시점에 재확인한다.
  */
 export const DEMO_IDENTIFIERS: Record<DemoPersona, string> = {
-  jihoon: 'jihoon.park@arasoft.example',
-  tanaka: 'yuki.tanaka@sakuradigital.example',
-  michael: 'michael.chen@vertexlabs.example',
-  sarah: 'sarah.willis@vertexlabs.example',
+  jihoon: 'jihoon.park+arasoft@example.com',
+  tanaka: 'yuki.tanaka+sakuradigital@example.com',
+  michael: 'michael.chen+vertexlabs@example.com',
+  sarah: 'sarah.willis+vertexlabs@example.com',
 };
 
 export interface DemoProfileMeta {

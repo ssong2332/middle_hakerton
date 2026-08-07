@@ -80,9 +80,18 @@ describe('buildDictionaryTerms — 22개(번역 금지 4 + 대응 고정 18), Te
 
 describe('buildPairKey', () => {
   it('두 식별자를 소문자화 후 정렬해 연결하고, 인자 순서와 무관하게 같은 값을 만든다', () => {
-    const a = buildPairKey('Jihoon@Arasoft.example', 'Tanaka@Sakura.example');
-    const b = buildPairKey('tanaka@sakura.example', 'jihoon@arasoft.example');
+    const a = buildPairKey(DEMO_IDENTIFIERS.jihoon.toUpperCase(), DEMO_IDENTIFIERS.tanaka.toUpperCase());
+    const b = buildPairKey(DEMO_IDENTIFIERS.tanaka, DEMO_IDENTIFIERS.jihoon);
     expect(a).toBe(b);
+  });
+
+  it('실제 시드 식별자(v1.8, "+" 서브어드레싱 포함)로도 정렬 순서가 흔들리지 않는다 — "+"(0x2B)가 "."(0x2E)보다 ASCII상 앞서지만, 두 이메일 로컬파트의 첫 글자(j/y, j/m)에서 이미 순서가 갈려 "+" 위치까지 비교가 내려가지 않는다', () => {
+    expect(buildPairKey(DEMO_IDENTIFIERS.jihoon, DEMO_IDENTIFIERS.tanaka)).toBe(
+      `${DEMO_IDENTIFIERS.jihoon.toLowerCase()}::${DEMO_IDENTIFIERS.tanaka.toLowerCase()}`,
+    );
+    expect(buildPairKey(DEMO_IDENTIFIERS.jihoon, DEMO_IDENTIFIERS.michael)).toBe(
+      `${DEMO_IDENTIFIERS.jihoon.toLowerCase()}::${DEMO_IDENTIFIERS.michael.toLowerCase()}`,
+    );
   });
 });
 
