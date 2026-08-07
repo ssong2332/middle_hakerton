@@ -18,6 +18,7 @@ export * from './rules/preservation';
 export * from './rules/misread-risk';
 export * from './rules/response-source';
 export * from './data/fallback-responses';
+export * from './data/emoji-risk';
 export * from './steps/c1';
 export * from './steps/c2';
 export * from './steps/c4';
