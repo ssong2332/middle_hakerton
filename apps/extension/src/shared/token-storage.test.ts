@@ -1,6 +1,6 @@
 // T56 — 확장 토큰 저장/조회 (`docs/Architecture.md` "확장 인증").
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getStoredToken, setStoredToken, TOKEN_STORAGE_KEY } from './token-storage';
+import { clearStoredToken, getStoredToken, setStoredToken, TOKEN_STORAGE_KEY } from './token-storage';
 
 function createFakeSessionStorage() {
   const store = new Map<string, unknown>();
@@ -45,6 +45,16 @@ describe('token-storage', () => {
 
   it('treats an empty string token as absent', async () => {
     await setStoredToken('');
+    expect(await getStoredToken()).toBeNull();
+  });
+
+  // M-6(reviewer) — 만료된 토큰이 401을 받으면 background가 이걸로 지운다.
+  it('clearStoredToken removes a previously stored token', async () => {
+    await setStoredToken('tok-expired');
+    expect(await getStoredToken()).toBe('tok-expired');
+
+    await clearStoredToken();
+
     expect(await getStoredToken()).toBeNull();
   });
 });

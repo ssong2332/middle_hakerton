@@ -60,4 +60,18 @@ describe('panel-mount', () => {
 
     expect(document.getElementById('cbm-layer1-panel-host')).toBeNull();
   });
+
+  // M-7(reviewer) — UX-016 Accessibility: 닫을 때 포커스가 트리거 버튼으로 돌아간다. 버튼이
+  // (여전히) DOM에 있으면 그쪽으로 포커스가 이동해야 한다 — `selection.ts`의
+  // `focusFloatingButtonIfPresent`로 위임한다는 계약을 여기서 확인한다.
+  it('returns focus to the triggering floating button on close, when it still exists', () => {
+    const triggerButton = document.createElement('button');
+    triggerButton.id = 'cbm-layer1-selection-button';
+    document.body.appendChild(triggerButton);
+
+    openMediationPanel({ text: 'selected text', rect: FAKE_RECT });
+    closeMediationPanel();
+
+    expect(document.activeElement).toBe(triggerButton);
+  });
 });

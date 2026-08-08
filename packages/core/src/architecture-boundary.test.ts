@@ -117,14 +117,28 @@ describe('T15/AC-028(절 2, 확장 쪽) — apps/extension/src의 @cross-border/
   // 빈 배열을 반환한다(87행 주석 참조). "파일 0개면 안 됨" 가드가 없으면, `apps/extension/src`가
   // 사라지거나 이름이 바뀌어도(디렉터리 자체가 없어져 스캔이 공허하게 통과) 아래 assert가 조용히
   // green이 된다. 2026-08-08(T56) measured 값은 apps/extension/src/**/*.{ts,tsx} 전수 20개 이상 —
-  // 그 절반 미만이면 대부분 삭제·이름변경된 것으로 보고 실패시킨다.
+  // 그 절반 미만이면 대부분 삭제·이름변경된 것으로 보고 실패시킨다. 이 가드는 테스트 파일을
+  // 포함한 전체 파일 수를 본다 — 디렉터리 자체의 생존을 확인하는 목적이라 테스트 파일 포함이
+  // 오히려 더 안전하다(테스트가 다 지워져도 잡아낸다).
   it('스캔 대상 파일이 존재한다(디렉터리가 사라지거나 이름이 바뀌면 위 검사가 공허하게 통과하므로 회귀 방지용으로 먼저 확인)', () => {
     const files = safeListExtensionFiles();
     expect(files.length).toBeGreaterThanOrEqual(5);
   });
 
-  it('확장 소스가 실제로 @cross-border/core를 import한다(AC-028 절 2 확장 쪽 — measured, 2026-08-08 T56)', () => {
-    const files = safeListExtensionFiles();
+  // 🔴 M-1(reviewer, 2026-08-08) — 아래 두 assert는 `.test.ts`/`.test.tsx` 파일을 제외한 목록만
+  // 본다. 제외 전에는 `MediationPanel.test.tsx`가 타입 체크용으로 `import type { MediationResult }
+  // from '@cross-border/core'`를 쓰는 것만으로 두 assert가 **RED 커밋 시점(프로덕션 구현이 아직
+  // 없을 때)에도 이미 green**이었다(reviewer가 측정: 스텁 단계에서 파일 16개, `>=5` 가드 통과,
+  // 테스트 파일의 import 하나로 두 assert 모두 만족). 그러면 이 테스트는 "프로덕션 코드가 core를
+  // 실제로 쓰는지"를 증명하지 못하고 "테스트 파일이 타입을 import했는지"만 증명한다. 프로덕션
+  // 파일만 남기면 `MediationPanel.tsx`/`shared/api.ts`가 실제로 `MediationResult`를 쓸 때만
+  // green이 된다 — 진짜 AC-028 근거가 된다.
+  function isTestFile(path: string): boolean {
+    return /\.test\.tsx?$/.test(path);
+  }
+
+  it('확장 소스가 실제로 @cross-border/core를 import한다(AC-028 절 2 확장 쪽 — measured, 2026-08-08 T56, 프로덕션 코드만)', () => {
+    const files = safeListExtensionFiles().filter((file) => !isTestFile(file));
     const importers = files.filter((file) =>
       extractImportSpecifiers(readFileSync(file, 'utf8')).some((s) => s === '@cross-border/core'),
     );
@@ -135,8 +149,8 @@ describe('T15/AC-028(절 2, 확장 쪽) — apps/extension/src의 @cross-border/
   // (`apps/web/app/api/mediate/route.ts`)이 `POST /api/mediate` 응답으로 만드는 것과 **같은**
   // `MediationResult` 계약 타입을 참조하는지 확인한다(타입 레벨 검증 — 별도 어댑터 타입을
   // 새로 만들면 이 grep이 잡지 못한 채 "같은 인터페이스"라는 주장만 남는 것을 막는다).
-  it('그 import가 웹앱과 같은 계약 타입(MediationResult)을 참조한다(AC-028)', () => {
-    const files = safeListExtensionFiles();
+  it('그 import가 웹앱과 같은 계약 타입(MediationResult)을 참조한다(AC-028, 프로덕션 코드만)', () => {
+    const files = safeListExtensionFiles().filter((file) => !isTestFile(file));
     const usesSharedContractType = files.some((file) => {
       const content = readFileSync(file, 'utf8');
       return (

@@ -172,4 +172,38 @@ describe('MediationPanel', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  // M-3(reviewer) — navigator.clipboard.writeText가 거부되면(비-보안 컨텍스트, 포커스 상실,
+  // 권한 거부 등) 조용히 죽지 않고 눈에 보이는 실패 메시지를 보여준다. "복사됨"으로 바뀌지 않는다.
+  it('shows a visible error and does not report success when clipboard write fails', async () => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    mockedCallMediationApi.mockResolvedValue({ ok: true, data: successResult() });
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error('clipboard denied')) },
+    });
+    render(<MediationPanel initialText="hello" onClose={vi.fn()} />);
+
+    await waitFor(() => screen.getByLabelText('선택한 텍스트'));
+    fireEvent.click(screen.getByRole('button', { name: '중재 실행' }));
+    await waitFor(() => screen.getByRole('button', { name: '클립보드에 복사' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '클립보드에 복사' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toMatch(/복사/);
+    });
+    expect(screen.queryByText('복사됨')).toBeNull();
+  });
+
+  // M-4(reviewer) — chrome.storage.session이 access-level race 등으로 throw해도(getStoredToken이
+  // reject해도) "확인 중…"에 무한히 머물지 않고 NotLoggedIn으로 빠진다.
+  it('falls through to NotLoggedIn when getStoredToken rejects on mount', async () => {
+    mockedGetStoredToken.mockRejectedValue(new Error('storage access error'));
+    render(<MediationPanel initialText="hello" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('로그인');
+    });
+    expect(mockedCallMediationApi).not.toHaveBeenCalled();
+  });
 });
