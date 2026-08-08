@@ -145,19 +145,29 @@ export function MediationPanel({ initialText, onClose, adapter = null }: Mediati
   // findInput()이 null이거나 insert()가 false를 반환하는 두 경우를 하나의 `catch-all`
   // (`||`/`??`)로 뭉치지 않는다 — 둘 다 결과적으로 InsertFailed로 보이지만, 각각 명시적
   // 조건문으로 구분해 "어댑터 자체가 없음"(ClipboardOnly)과 혼동하지 않는다.
+  // 🔴 M-1(reviewer) — 성공 시 `docs/UX.md:763`(States)·`:760`(Exit)·`:187`(UF-011 step 7)
+  // 세 곳이 일치해서 요구하는 대로 패널을 즉시 닫는다(`onClose`는 닫기 버튼/Escape와 같은 prop).
+  // 🔴 M-2(reviewer) — 층 2 어댑터는 서드파티 페이지 DOM을 건드리므로 `findInput`/`insert`가
+  // throw할 수 있다(호스트 페이지 구조 변경 등). throw를 삼키지 않고 InsertFailed와 동일하게
+  // 취급한다 — 그래야 "클릭했는데 아무 반응 없음"이라는 최악의 실패 모드를 피한다.
   function handleInsert() {
     if (!adapter) return;
-    const inputEl = adapter.findInput();
-    if (inputEl === null) {
+    try {
+      const inputEl = adapter.findInput();
+      if (inputEl === null) {
+        setInsertStatus('failed');
+        return;
+      }
+      const inserted = adapter.insert(inputEl, finalText);
+      if (inserted === false) {
+        setInsertStatus('failed');
+        return;
+      }
+      setInsertStatus('inserted');
+      onClose();
+    } catch {
       setInsertStatus('failed');
-      return;
     }
-    const inserted = adapter.insert(inputEl, finalText);
-    if (inserted === false) {
-      setInsertStatus('failed');
-      return;
-    }
-    setInsertStatus('inserted');
   }
 
   const c2Source = result?.stepSources?.c2 ?? result?.source;
