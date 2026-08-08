@@ -80,22 +80,18 @@ function findInput(origin: InsertionOrigin): HTMLElement | null {
  *  덮어쓰는 표준 편집 명령이라, 선택 없이 호출하면 커서 위치에 텍스트가 삽입만 되고 기존 초안이
  *  남는다.
  */
-function selectAllContents(el: HTMLElement): void {
-  const selection = window.getSelection();
-  if (selection) {
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    selection.removeAllRanges();
-    selection.addRange(range);
-  }
+function selectAllContents(): void {
   document.execCommand('selectAll', false);
 }
 
-/** 최후 폴백 — raw `textContent` 쓰기 + 프레임워크가 듣는 `input` 이벤트 수동 디스패치. */
+/** 최후 폴백 — raw `textContent` 쓰기 + 프레임워크가 듣는 `input` 이벤트 수동 디스패치.
+ *  쓰기가 실제로 반영됐는지 read-back으로 확인한다 — 에디터 내부 모델이 값을 되돌리거나
+ *  무시할 수 있어(무음 false-success) 대입 자체를 성공으로 간주하지 않는다.
+ */
 function replaceViaTextContent(el: HTMLElement, text: string): boolean {
   el.textContent = text;
   el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
-  return true;
+  return el.textContent === text;
 }
 
 /**
@@ -117,7 +113,7 @@ function insert(el: HTMLElement, text: string): boolean {
 
   let execCommandSucceeded: boolean;
   try {
-    selectAllContents(el);
+    selectAllContents();
     execCommandSucceeded = document.execCommand('insertText', false, text);
   } catch {
     execCommandSucceeded = false;

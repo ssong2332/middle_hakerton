@@ -32,8 +32,9 @@ describe('layer2/index — adapters registration', () => {
     expect(result).toBeNull();
   });
 
-  // T47 — slack adapter must be registered alongside github/gmail so the mediation panel
-  // renders an "Insert" affordance on app.slack.com (AC-042).
+  // T47 — slack adapter must be registered alongside github so the mediation panel
+  // renders an "Insert" affordance on app.slack.com (AC-042). (gmail/T49 is not yet
+  // merged into this worktree's dev line.)
   it('resolves the slack adapter for an app.slack.com URL', () => {
     const result = findAdapterForUrl(adapters, new URL('https://app.slack.com/client/T000/C000'));
 
