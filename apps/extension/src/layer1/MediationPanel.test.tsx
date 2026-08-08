@@ -14,6 +14,7 @@ vi.mock('../shared/api', () => ({
 import { getStoredToken } from '../shared/token-storage';
 import { callMediationApi } from '../shared/api';
 import { MediationPanel } from './MediationPanel';
+import type { Layer2Adapter } from './registry';
 
 const mockedGetStoredToken = vi.mocked(getStoredToken);
 const mockedCallMediationApi = vi.mocked(callMediationApi);
@@ -205,5 +206,93 @@ describe('MediationPanel', () => {
       expect(screen.getByRole('alert').textContent).toContain('로그인');
     });
     expect(mockedCallMediationApi).not.toHaveBeenCalled();
+  });
+
+  // T57 — Layer 2 어댑터가 매칭되면 "입력창에 삽입"이 실제 활성화된 버튼으로 렌더된다
+  // (AC-053② — 비활성/회색 버튼 금지). 클릭하면 findInput → insert 순으로 호출되고 성공 시
+  // 확인 메시지가 뜬다. AC-040 — insert() 호출 외에 어떤 전송/제출 코드도 실행하지 않는다.
+  describe('Insert into input field (Layer 2 adapter present)', () => {
+    async function runToSuccess(adapter: Layer2Adapter) {
+      mockedGetStoredToken.mockResolvedValue('tok');
+      mockedCallMediationApi.mockResolvedValue({ ok: true, data: successResult() });
+      render(<MediationPanel initialText="hello" onClose={vi.fn()} adapter={adapter} />);
+
+      await waitFor(() => screen.getByLabelText('선택한 텍스트'));
+      fireEvent.click(screen.getByRole('button', { name: '중재 실행' }));
+      await waitFor(() => screen.getByRole('button', { name: '클립보드에 복사' }));
+    }
+
+    it('renders Insert as a real enabled button when an adapter matches', async () => {
+      const inputEl = document.createElement('textarea');
+      const insert = vi.fn().mockReturnValue(true);
+      const adapter: Layer2Adapter = {
+        id: 'github',
+        matches: () => true,
+        findInput: () => inputEl,
+        insert,
+      };
+      await runToSuccess(adapter);
+
+      const insertButton = screen.getByRole('button', { name: '입력창에 삽입' });
+      expect(insertButton).not.toBeDisabled();
+    });
+
+    it('clicking Insert calls findInput then insert and shows a success confirmation', async () => {
+      const inputEl = document.createElement('textarea');
+      const findInput = vi.fn().mockReturnValue(inputEl);
+      const insert = vi.fn().mockReturnValue(true);
+      const adapter: Layer2Adapter = { id: 'github', matches: () => true, findInput, insert };
+      await runToSuccess(adapter);
+
+      fireEvent.click(screen.getByRole('button', { name: '입력창에 삽입' }));
+
+      expect(findInput).toHaveBeenCalledTimes(1);
+      expect(insert).toHaveBeenCalledWith(inputEl, 'transformed text');
+      await waitFor(() => {
+        expect(screen.getByText('삽입됨')).toBeTruthy();
+      });
+    });
+
+    it('shows InsertFailed and keeps Copy working when findInput() returns null', async () => {
+      const adapter: Layer2Adapter = {
+        id: 'github',
+        matches: () => true,
+        findInput: () => null,
+        insert: vi.fn().mockReturnValue(true),
+      };
+      await runToSuccess(adapter);
+
+      fireEvent.click(screen.getByRole('button', { name: '입력창에 삽입' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert').textContent).toMatch(/삽입/);
+      });
+      expect(adapter.insert).not.toHaveBeenCalled();
+
+      // Copy는 Insert 실패로 깨지지 않는다 (UX-016 InsertFailed — AC-053①).
+      fireEvent.click(screen.getByRole('button', { name: '클립보드에 복사' }));
+      await waitFor(() => {
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith('transformed text');
+        expect(screen.getByText('복사됨')).toBeTruthy();
+      });
+    });
+
+    it('shows InsertFailed when insert() returns false', async () => {
+      const inputEl = document.createElement('textarea');
+      const adapter: Layer2Adapter = {
+        id: 'github',
+        matches: () => true,
+        findInput: () => inputEl,
+        insert: vi.fn().mockReturnValue(false),
+      };
+      await runToSuccess(adapter);
+
+      fireEvent.click(screen.getByRole('button', { name: '입력창에 삽입' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert').textContent).toMatch(/삽입/);
+      });
+      expect(screen.queryByText('삽입됨')).toBeNull();
+    });
   });
 });

@@ -4,9 +4,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./MediationPanel', () => ({
-  MediationPanel: ({ initialText, onClose }: { initialText: string; onClose: () => void }) => (
+  MediationPanel: ({
+    initialText,
+    onClose,
+    adapter,
+  }: {
+    initialText: string;
+    onClose: () => void;
+    adapter?: { id: string } | null;
+  }) => (
     <div data-testid="mock-panel">
       <span>{initialText}</span>
+      <span data-testid="adapter-id">{adapter ? adapter.id : 'none'}</span>
       <button type="button" onClick={onClose}>
         close
       </button>
@@ -15,6 +24,7 @@ vi.mock('./MediationPanel', () => ({
 }));
 
 import { closeMediationPanel, openMediationPanel } from './panel-mount';
+import type { Layer2Adapter } from './registry';
 
 const FAKE_RECT = { top: 0, bottom: 0, left: 0, right: 0 } as DOMRect;
 
@@ -73,5 +83,32 @@ describe('panel-mount', () => {
     closeMediationPanel();
 
     expect(document.activeElement).toBe(triggerButton);
+  });
+
+  // T57/AC-053③ — 어댑터를 넘기지 않으면(기본값) 패널은 null을 받는다 — 층 2 없는 사이트의
+  // 일상 경로.
+  it('defaults to a null adapter when none is passed', () => {
+    openMediationPanel({ text: 'x', rect: FAKE_RECT });
+
+    const host = document.getElementById('cbm-layer1-panel-host')!;
+    expect(host.shadowRoot!.querySelector('[data-testid="adapter-id"]')!.textContent).toBe(
+      'none',
+    );
+  });
+
+  // T57/AC-053② — 매칭된 어댑터가 있으면 그대로 MediationPanel에 prop으로 전달된다.
+  it('passes the matched adapter through to MediationPanel', () => {
+    const fakeAdapter: Layer2Adapter = {
+      id: 'github',
+      matches: () => true,
+      findInput: () => null,
+      insert: () => true,
+    };
+    openMediationPanel({ text: 'x', rect: FAKE_RECT }, fakeAdapter);
+
+    const host = document.getElementById('cbm-layer1-panel-host')!;
+    expect(host.shadowRoot!.querySelector('[data-testid="adapter-id"]')!.textContent).toBe(
+      'github',
+    );
   });
 });
