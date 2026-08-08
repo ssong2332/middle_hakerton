@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { findAdapterForUrl } from '../layer1/registry';
 import { adapters } from './index';
 import { github } from './github';
+import { slack } from './slack';
 
 describe('layer2/index — adapters registration', () => {
   it('resolves the github adapter for a github.com PR URL', () => {
@@ -29,5 +30,19 @@ describe('layer2/index — adapters registration', () => {
     const result = findAdapterForUrl(adapters, new URL('https://example.com'));
 
     expect(result).toBeNull();
+  });
+
+  // T47 — slack adapter must be registered alongside github/gmail so the mediation panel
+  // renders an "Insert" affordance on app.slack.com (AC-042).
+  it('resolves the slack adapter for an app.slack.com URL', () => {
+    const result = findAdapterForUrl(adapters, new URL('https://app.slack.com/client/T000/C000'));
+
+    expect(result).toBe(slack);
+  });
+
+  it('still resolves the github adapter for a github.com URL (not shadowed by slack)', () => {
+    const result = findAdapterForUrl(adapters, new URL('https://github.com/o/r/pull/1'));
+
+    expect(result).toBe(github);
   });
 });
