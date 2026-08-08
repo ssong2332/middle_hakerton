@@ -29,7 +29,18 @@ export interface Layer2Adapter {
  * 때만 "입력창에 삽입" 버튼을 렌더한다(AC-053②, 비활성 버튼이 아니라 부재). `adapters`가 빈
  * 배열이어도(층 2 전면 컷) 이 함수는 정상적으로 `null`을 반환하고 예외를 던지지 않는다
  * (AC-053③).
+ *
+ * 🔴 T57 QA 이월 — `matches()`는 어댑터 구현이며 신뢰할 수 없다. throw하면 이 함수 밖으로
+ * 전파되지 않고 해당 어댑터만 건너뛴다(Insert 실패보다 심각한 "패널 자체가 안 열림"을 막는다).
  */
 export function findAdapterForUrl(adapters: Layer2Adapter[], url: URL): Layer2Adapter | null {
-  return adapters.find((adapter) => adapter.matches(url)) ?? null;
+  return (
+    adapters.find((adapter) => {
+      try {
+        return adapter.matches(url);
+      } catch {
+        return false;
+      }
+    }) ?? null
+  );
 }
