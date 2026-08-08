@@ -28,4 +28,24 @@ describe('findAdapterForUrl', () => {
   it('returns null for an empty adapters array', () => {
     expect(findAdapterForUrl([], new URL('https://example.com'))).toBeNull();
   });
+
+  // T57 QA 이월 — matches()가 throw하면 층 1 패널 열기 자체가 죽는다(Insert 실패보다 심각).
+  // 어댑터의 matches()는 신뢰할 수 없는 구현일 수 있으므로 조회 자체가 방어적이어야 한다.
+  it('skips an adapter whose matches() throws and still finds a later match', () => {
+    const broken = makeAdapter('slack', () => {
+      throw new Error('boom');
+    });
+    const github = makeAdapter('github', (url) => url.hostname === 'github.com');
+    const url = new URL('https://github.com/foo/bar');
+
+    expect(findAdapterForUrl([broken, github], url)).toBe(github);
+  });
+
+  it('returns null (not throw) when the only adapter matching would throw', () => {
+    const broken = makeAdapter('slack', () => {
+      throw new Error('boom');
+    });
+    expect(() => findAdapterForUrl([broken], new URL('https://example.com'))).not.toThrow();
+    expect(findAdapterForUrl([broken], new URL('https://example.com'))).toBeNull();
+  });
 });
