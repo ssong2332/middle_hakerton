@@ -44,6 +44,47 @@ describe('github adapter — findInput()', () => {
     document.body.innerHTML = '<textarea id="unrelated"></textarea>';
     expect(github.findInput()).toBeNull();
   });
+
+  // MJ-1 — a PR page can have multiple comment textareas (main box + inline review
+  // reply boxes). document-wide first-match must not silently win over the field the
+  // user actually focused. docs/UX.md:187 (UF-011 step 6) requires "the originating field".
+  it('prefers the focused element over first-match candidate selector', () => {
+    document.body.innerHTML = `
+      <textarea id="new_comment_field"></textarea>
+      <textarea name="comment[body]" id="inline-reply"></textarea>
+    `;
+    const inline = document.getElementById('inline-reply') as HTMLTextAreaElement;
+    inline.focus();
+
+    const el = github.findInput();
+
+    expect(el).toBe(inline);
+  });
+
+  // MJ-1 — when nothing is focused, fall back to resolving the selection's anchor
+  // ancestor (e.g. a contenteditable inline reply box) before the candidate-selector list.
+  it('falls back to the selection anchor ancestor when nothing is focused', () => {
+    document.body.innerHTML = `
+      <textarea id="new_comment_field"></textarea>
+      <div id="reply-editable" contenteditable="true"><p>reply text</p></div>
+    `;
+    const editable = document.getElementById('reply-editable') as HTMLElement;
+    // jsdom does not implement `isContentEditable` (it stays `undefined` regardless of the
+    // `contenteditable` attribute — verified against jsdom directly), so the fixture must
+    // set it explicitly to simulate what a real contenteditable element reports.
+    Object.defineProperty(editable, 'isContentEditable', { value: true, configurable: true });
+    const textNode = editable.querySelector('p')!.firstChild!;
+    const range = document.createRange();
+    range.setStart(textNode, 0);
+    range.setEnd(textNode, 4);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    const el = github.findInput();
+
+    expect(el).toBe(editable);
+  });
 });
 
 describe('github adapter — insert()', () => {
@@ -64,6 +105,43 @@ describe('github adapter — insert()', () => {
     const div = document.createElement('div'); // not a textarea/input, not contenteditable
     expect(() => github.insert(div, 'text')).not.toThrow();
     expect(github.insert(div, 'text')).toBe(false);
+  });
+
+  // MJ-2 — React installs an own-property "value" descriptor on the DOM node itself (a
+  // value tracker) that shadows the prototype's native accessor. Plain `el.value = text`
+  // hits that instance-level shadow, not the native setter — so React's underlying DOM
+  // value never actually changes and the later `input` event looks like a no-op to React.
+  // insert() must fetch and invoke the *prototype's* native setter directly to bypass any
+  // such instance-level shadow.
+  it('updates the underlying native value even when a React-style tracker shadows the instance property', () => {
+    const textarea = document.createElement('textarea');
+    document.body.appendChild(textarea);
+    const nativeDescriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!;
+
+    // Simulate React's value tracker: an own-property on this specific element that
+    // intercepts plain assignment and deliberately does NOT forward to the native setter.
+    Object.defineProperty(textarea, 'value', {
+      configurable: true,
+      get() {
+        return nativeDescriptor.get!.call(textarea);
+      },
+      set() {
+        // swallow the write — this is what makes plain `el.value = text` fail silently
+        // against React-controlled inputs.
+      },
+    });
+
+    try {
+      const result = github.insert(textarea, 'approved text');
+
+      expect(result).toBe(true);
+      // Read via the native getter directly, since `textarea.value` would go through the
+      // shadowed instance getter too (which happens to delegate to native here for the
+      // assertion to be meaningful either way).
+      expect(nativeDescriptor.get!.call(textarea)).toBe('approved text');
+    } finally {
+      delete (textarea as unknown as Record<string, unknown>).value;
+    }
   });
 });
 
