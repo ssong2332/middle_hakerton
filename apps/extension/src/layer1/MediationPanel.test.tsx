@@ -296,5 +296,113 @@ describe('MediationPanel', () => {
       });
       expect(screen.queryByText('삽입됨')).toBeNull();
     });
+
+    // M-1(reviewer) — `docs/UX.md:763`(States) · `docs/UX.md:760`(Exit) · `docs/UX.md:187`
+    // (UF-011 step 7) 세 곳 모두 "성공적으로 삽입되면 패널이 닫힌다"고 명시한다.
+    it('closes the panel (calls onClose) after a successful insert', async () => {
+      const inputEl = document.createElement('textarea');
+      const insert = vi.fn().mockReturnValue(true);
+      const adapter: Layer2Adapter = { id: 'github', matches: () => true, findInput: () => inputEl, insert };
+      mockedGetStoredToken.mockResolvedValue('tok');
+      mockedCallMediationApi.mockResolvedValue({ ok: true, data: successResult() });
+      const onClose = vi.fn();
+      render(<MediationPanel initialText="hello" onClose={onClose} adapter={adapter} />);
+
+      await waitFor(() => screen.getByLabelText('선택한 텍스트'));
+      fireEvent.click(screen.getByRole('button', { name: '중재 실행' }));
+      await waitFor(() => screen.getByRole('button', { name: '클립보드에 복사' }));
+
+      fireEvent.click(screen.getByRole('button', { name: '입력창에 삽입' }));
+
+      await waitFor(() => {
+        expect(onClose).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    // M-1(reviewer) — 실패 시에는 패널이 닫히면 안 된다. 사용자가 InsertFailed 메시지를 보고
+    // 여전히 Copy를 쓸 수 있어야 한다(위 "keeps Copy working" 테스트와 같은 전제).
+    it('does not close the panel when insert fails', async () => {
+      const adapter: Layer2Adapter = {
+        id: 'github',
+        matches: () => true,
+        findInput: () => null,
+        insert: vi.fn().mockReturnValue(true),
+      };
+      mockedGetStoredToken.mockResolvedValue('tok');
+      mockedCallMediationApi.mockResolvedValue({ ok: true, data: successResult() });
+      const onClose = vi.fn();
+      render(<MediationPanel initialText="hello" onClose={onClose} adapter={adapter} />);
+
+      await waitFor(() => screen.getByLabelText('선택한 텍스트'));
+      fireEvent.click(screen.getByRole('button', { name: '중재 실행' }));
+      await waitFor(() => screen.getByRole('button', { name: '클립보드에 복사' }));
+
+      fireEvent.click(screen.getByRole('button', { name: '입력창에 삽입' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert').textContent).toMatch(/삽입/);
+      });
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    // M-2(reviewer) — 층 2 어댑터는 임의의 서드파티 페이지 DOM을 건드린다. `findInput`/`insert`가
+    // throw해도 조용히 아무 일도 없는 것처럼 보이면 안 되고, InsertFailed와 동일하게 처리한다.
+    it('shows InsertFailed (instead of crashing) when findInput() throws', async () => {
+      const adapter: Layer2Adapter = {
+        id: 'github',
+        matches: () => true,
+        findInput: () => {
+          throw new Error('DOM structure changed');
+        },
+        insert: vi.fn().mockReturnValue(true),
+      };
+      mockedGetStoredToken.mockResolvedValue('tok');
+      mockedCallMediationApi.mockResolvedValue({ ok: true, data: successResult() });
+      const onClose = vi.fn();
+      render(<MediationPanel initialText="hello" onClose={onClose} adapter={adapter} />);
+
+      await waitFor(() => screen.getByLabelText('선택한 텍스트'));
+      fireEvent.click(screen.getByRole('button', { name: '중재 실행' }));
+      await waitFor(() => screen.getByRole('button', { name: '클립보드에 복사' }));
+
+      fireEvent.click(screen.getByRole('button', { name: '입력창에 삽입' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert').textContent).toMatch(/삽입/);
+      });
+      expect(onClose).not.toHaveBeenCalled();
+
+      // Copy는 여전히 동작해야 한다 (findInput이 throw해도 dead end가 아니다).
+      fireEvent.click(screen.getByRole('button', { name: '클립보드에 복사' }));
+      await waitFor(() => {
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith('transformed text');
+        expect(screen.getByText('복사됨')).toBeTruthy();
+      });
+    });
+
+    it('shows InsertFailed (instead of crashing) when insert() throws', async () => {
+      const inputEl = document.createElement('textarea');
+      const adapter: Layer2Adapter = {
+        id: 'github',
+        matches: () => true,
+        findInput: () => inputEl,
+        insert: () => {
+          throw new Error('detached node');
+        },
+      };
+      mockedGetStoredToken.mockResolvedValue('tok');
+      mockedCallMediationApi.mockResolvedValue({ ok: true, data: successResult() });
+      render(<MediationPanel initialText="hello" onClose={vi.fn()} adapter={adapter} />);
+
+      await waitFor(() => screen.getByLabelText('선택한 텍스트'));
+      fireEvent.click(screen.getByRole('button', { name: '중재 실행' }));
+      await waitFor(() => screen.getByRole('button', { name: '클립보드에 복사' }));
+
+      fireEvent.click(screen.getByRole('button', { name: '입력창에 삽입' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert').textContent).toMatch(/삽입/);
+      });
+    });
   });
 });
