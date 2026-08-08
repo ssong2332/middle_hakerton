@@ -13,6 +13,12 @@
 // 막을 근거가 아니다(`docs/UX.md:926` Personalization-off indicator).
 // T56 담당자에게: 이 페이지에 실제 로직(토큰 postMessage 등)을 채울 때도 이 예외를 유지한다 —
 // 새로 온보딩 가드를 추가하려면 그 전에 이 판단을 재검토하고 근거를 갱신해야 한다.
+//
+// 🔴 T56 — 실제 로직(`useEffect`, `chrome.runtime.sendMessage` 등)은 `ExtensionConnect.tsx`(클라
+// 이언트 컴포넌트)에 있다. `useSearchParams()`를 쓰는 `LoginForm`과 달리 Suspense 경계가 필요
+// 없어(쿼리 파라미터를 읽지 않는다) 이 파일은 얇은 서버 컴포넌트 래퍼로 남긴다.
+import { ExtensionConnect } from './ExtensionConnect';
+
 export default function ExtensionConnectPage() {
-  return <main>Extension Connect (TODO: T56)</main>;
+  return <ExtensionConnect />;
 }

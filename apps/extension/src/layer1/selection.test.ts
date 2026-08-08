@@ -3,7 +3,12 @@
 // (`docs/CodingRules.md` Tests 절 semantic vs structural 구분) — 그래서 픽셀 값이 아니라
 // "코드가 selection의 rect를 실제로 읽어 버튼 위치 계산에 썼는지"를 구조적으로 검증한다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { computeClampedPosition, initSelectionOverlay, removeFloatingButton } from './selection';
+import {
+  computeClampedPosition,
+  focusFloatingButtonIfPresent,
+  initSelectionOverlay,
+  removeFloatingButton,
+} from './selection';
 
 const BUTTON_ID = 'cbm-layer1-selection-button';
 
@@ -524,5 +529,49 @@ describe('removeFloatingButton (module-level export)', () => {
 
   it('is a no-op when no button exists', () => {
     expect(() => removeFloatingButton()).not.toThrow();
+  });
+});
+
+// M-7(reviewer) — UX-016 Accessibility: "focus ... returns to the triggering floating button on
+// close." panel-mount.tsx가 패널을 닫을 때 이 헬퍼로 위임한다. 버튼이 이미 사라진 경우(실사용
+// 흐름에서 흔하다 — 패널 안 요소를 클릭하면 그 mousedown이 문서 selection을 collapse시켜
+// selectionchange가 버튼을 먼저 지운다)에는 조용히 아무 일도 하지 않는다 — 존재하지 않는
+// 요소에 포커스를 강제하지 않는다.
+describe('focusFloatingButtonIfPresent (module-level export, M-7)', () => {
+  // jsdom은 Range.prototype.getBoundingClientRect를 구현하지 않는다 — 위 다른 describe들과
+  // 같은 스텁(파일 상단 주석 참조).
+  let originalGetBoundingClientRect: typeof Range.prototype.getBoundingClientRect | undefined;
+
+  beforeEach(() => {
+    originalGetBoundingClientRect = Range.prototype.getBoundingClientRect;
+    Range.prototype.getBoundingClientRect = vi.fn(() => FAKE_RECT);
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    if (originalGetBoundingClientRect) {
+      Range.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    } else {
+      delete (Range.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+    }
+  });
+
+  it('is a no-op when no button exists', () => {
+    expect(() => focusFloatingButtonIfPresent()).not.toThrow();
+  });
+
+  it('focuses the floating button when it still exists', () => {
+    const content = renderGenericSiteA();
+    const cleanup = initSelectionOverlay();
+
+    selectTextIn(content);
+    fireMouseUp();
+    const button = getButton();
+    expect(button).not.toBeNull();
+
+    focusFloatingButtonIfPresent();
+
+    expect(document.activeElement).toBe(button);
+    cleanup();
   });
 });

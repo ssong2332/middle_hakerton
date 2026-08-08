@@ -52,9 +52,17 @@ export default defineConfig({
           // "테스트" 행 "웹앱·확장·코어가 한 러너로 돈다"가 `tests/`도 예외 없이 포함한다 —
           // 별도 러너를 만들면 T11이 요구하는 "하나의 실행 출력"이 갈라진다.
           // 🔴 T55가 `apps/web/**/*.test.tsx`에 이어 `apps/extension/**/*.test.ts`도 제외했다 —
-          // 아래 `extension` 프로젝트로 옮겼다(이유는 그 프로젝트 주석 참조).
+          // 아래 `extension` 프로젝트로 옮겼다(이유는 그 프로젝트 주석 참조). T56 — 그 프로젝트가
+          // 이제 `.test.tsx`도 커버하므로(실제 React 컴포넌트가 생겼다) 여기서도 `.test.tsx`를
+          // 같이 제외해야 한다 — 안 그러면 이 `node` 프로젝트가 `jsdom`이 필요한 DOM 테스트를
+          // `environment:'node'`로 중복 실행해 `document is not defined`로 깨진다(measured).
           include: ['{apps,packages,tests}/**/*.test.{ts,tsx}'],
-          exclude: [...sharedExclude, 'apps/web/**/*.test.tsx', 'apps/extension/**/*.test.ts'],
+          exclude: [
+            ...sharedExclude,
+            'apps/web/**/*.test.tsx',
+            'apps/extension/**/*.test.ts',
+            'apps/extension/**/*.test.tsx',
+          ],
           environment: 'node',
         },
       },
@@ -79,9 +87,15 @@ export default defineConfig({
           // 프로젝트의 `setupFiles`(`apps/web/vitest.setup.ts`)는 `next/font/google` 목킹 등
           // 웹앱 컴포넌트 테스트 전용 셋업이라 확장 테스트에는 무관한 결합이 생긴다. 환경만
           // 공유하고 셋업은 공유하지 않는 편이 "이 프로젝트가 무엇을 위한 것인지" 읽기 쉽다.
-          include: ['apps/extension/**/*.test.ts'],
+          // 🔴 T56 — `panel-mount.tsx`/`MediationPanel.tsx`(실제 React 컴포넌트)가 생기면서
+          // `.test.tsx`도 이 프로젝트가 커버해야 한다(이전에는 `.test.ts`뿐이었다 — T55는 DOM
+          // API만 썼고 컴포넌트 렌더링은 없었다).
+          include: ['apps/extension/**/*.test.{ts,tsx}'],
           exclude: sharedExclude,
           environment: 'jsdom',
+          // `@testing-library/react` 렌더 청소 — `apps/web/vitest.setup.ts`와 같은 이유,
+          // 웹앱 전용 셋업과는 결합시키지 않는다(별도 파일, 위 주석 참조).
+          setupFiles: ['./apps/extension/vitest.setup.ts'],
         },
       },
     ],
