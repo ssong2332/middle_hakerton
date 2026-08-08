@@ -233,8 +233,10 @@ describe('MediationPanel', () => {
       };
       await runToSuccess(adapter);
 
-      const insertButton = screen.getByRole('button', { name: '입력창에 삽입' });
-      expect(insertButton).not.toBeDisabled();
+      const insertButton = screen.getByRole('button', {
+        name: '입력창에 삽입',
+      }) as HTMLButtonElement;
+      expect(insertButton.disabled).toBe(false);
     });
 
     it('clicking Insert calls findInput then insert and shows a success confirmation', async () => {

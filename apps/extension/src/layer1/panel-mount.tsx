@@ -14,6 +14,7 @@
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { MediationPanel } from './MediationPanel';
+import type { Layer2Adapter } from './registry';
 import { focusFloatingButtonIfPresent, type SelectionPayload } from './selection';
 
 const HOST_ID = 'cbm-layer1-panel-host';
@@ -25,8 +26,18 @@ function removeExistingHost(): void {
   document.getElementById(HOST_ID)?.remove();
 }
 
-/** 패널을 (다시) 연다. 이미 열려 있으면 먼저 정리해 동시에 하나만 존재하게 한다. */
-export function openMediationPanel(payload: SelectionPayload): void {
+/**
+ * 패널을 (다시) 연다. 이미 열려 있으면 먼저 정리해 동시에 하나만 존재하게 한다.
+ *
+ * 🔴 T57 — `adapter`는 이 함수의 호출자(`content.ts`, 진입점)가 레지스트리 조회
+ * (`registry.ts`의 `findAdapterForUrl`)로 미리 판정해 넘긴다. 이 파일(`layer1/`)은
+ * `layer2/**`를 import하지 않는다(`docs/CodingRules.md` Directory Rules) — 조회 로직 자체를
+ * 여기 두지 않고 주입만 받는 이유가 그것이다.
+ */
+export function openMediationPanel(
+  payload: SelectionPayload,
+  adapter: Layer2Adapter | null = null,
+): void {
   closeMediationPanel();
   if (!document.body) return;
 
@@ -44,7 +55,13 @@ export function openMediationPanel(payload: SelectionPayload): void {
   // `openMediationPanel()` 호출 직후 DOM/shadow root 상태를 즉시 관찰할 수 있다(테스트도 이를
   // 전제한다 — `panel-mount.test.tsx`).
   flushSync(() => {
-    activeRoot!.render(<MediationPanel initialText={payload.text} onClose={closeMediationPanel} />);
+    activeRoot!.render(
+      <MediationPanel
+        initialText={payload.text}
+        onClose={closeMediationPanel}
+        adapter={adapter}
+      />,
+    );
   });
 }
 

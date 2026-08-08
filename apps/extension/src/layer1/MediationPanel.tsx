@@ -1,16 +1,16 @@
 /**
  * UX-016 Universal Selection Mediation Panel — T56 서브셋(AC-052②, AC-053, AC-010, AC-066,
- * AC-028 + NotLoggedIn). 이 태스크 범위 밖(다른 태스크 소관): Interpret 모드(T59) · 수신자 후보
- * 탐지(T66) · Mark 모드(T71) · 실제 "입력창에 삽입" DOM 조작(T57, `registry.ts`).
+ * AC-028 + NotLoggedIn) + T57("입력창에 삽입" 실제 동작, AC-053②①④·AC-040). 이 태스크 범위 밖
+ * (다른 태스크 소관): Interpret 모드(T59) · 수신자 후보 탐지(T66) · Mark 모드(T71).
  *
  * 🔴 파일명(PascalCase) — `docs/CodingRules.md` Naming "컴포넌트를 export하는 .tsx는
  * PascalCase" 규칙에 맞춰 T2 스캐폴드의 `panel.tsx`에서 이 이름으로 옮겼다(`git mv`, T56).
  *
- * 🔴 층 2 레지스트리(`registry.ts`)는 아직 `export {}`뿐인 순수 스텁이다(T57 소유,
- * `Layer2Adapter` 인터페이스 미정) — 여기서 그 계약을 대신 만들지 않는다. 대신 아래
- * `hasLayer2Adapter = false` 상수가 T57이 실제 조회 함수로 교체할 자리를 표시한다. 그 결과 이
- * 패널은 지금 **항상** ClipboardOnly다 — `docs/UX.md:763`가 이것을 "특수 상태가 아니라 일상
- * 케이스"로 명시한다(AC-053②③).
+ * T57 — `adapter` prop은 `panel-mount.tsx`(→ 그 호출자인 `content.ts`)가 레지스트리 조회
+ * (`registry.ts`의 `findAdapterForUrl`) 결과를 그대로 전달한다. 이 컴포넌트 자신은 조회하지
+ * 않는다 — `layer1/`은 `layer2/**`를 import할 수 없다(`docs/CodingRules.md` Directory Rules).
+ * `adapter`가 `null`이면(층 2 미등록 사이트 — 일상 케이스, `docs/UX.md:763`) "입력창에 삽입"은
+ * 아예 렌더되지 않는다(비활성 버튼 금지 — AC-053②).
  *
  * 수신자 필드를 두지 않는다 — 수신자 후보 탐지(AC-067/068, T66)가 아직 없는 상태에서 수동 입력
  * 필드만 먼저 만들면 다음 라운드에 다시 손대야 한다. 필드가 아예 없으면 recipient는 항상
@@ -23,17 +23,17 @@ import type { MediationResult } from '@cross-border/core';
 import { callMediationApi } from '../shared/api';
 import { getStoredToken } from '../shared/token-storage';
 import { NON_LIVE_NOTICE } from '../shared/non-live-notice';
+import type { Layer2Adapter } from './registry';
 
 export interface MediationPanelProps {
   initialText: string;
   onClose: () => void;
+  /** T57 — 현재 사이트에 매칭된 층 2 어댑터, 없으면 `null`(기본값). */
+  adapter?: Layer2Adapter | null;
 }
 
 type Status = 'checkingAuth' | 'notLoggedIn' | 'idle' | 'loading' | 'success' | 'error';
-
-// 🔴 T57 seam — 지금은 항상 false. T57이 registry.ts에 실제 조회 함수를 채우면 이 상수를
-// 그 호출로 바꾼다(`docs/CodingRules.md` Directory Rules — layer1은 layer2를 import하지 않는다).
-const hasLayer2Adapter = false;
+type InsertStatus = 'idle' | 'inserted' | 'failed';
 
 const APP_ORIGIN = (import.meta.env.VITE_APP_ORIGIN as string | undefined) ?? '';
 
@@ -57,7 +57,7 @@ function fallbackCopyToClipboard(text: string): boolean {
   }
 }
 
-export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
+export function MediationPanel({ initialText, onClose, adapter = null }: MediationPanelProps) {
   const [status, setStatus] = useState<Status>('checkingAuth');
   const [text, setText] = useState(initialText);
   const [result, setResult] = useState<MediationResult | null>(null);
@@ -65,6 +65,7 @@ export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const [insertStatus, setInsertStatus] = useState<InsertStatus>('idle');
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   // 🔴 M-4(reviewer) — `getStoredToken()`이 reject해도(예: `chrome.storage.session`의 access
@@ -113,6 +114,7 @@ export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
     setResult(response.data);
     setFinalText(response.data.transformed);
     setCopied(false);
+    setInsertStatus('idle');
     setStatus('success');
   }
 
@@ -135,6 +137,27 @@ export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
       setCopied(false);
       setCopyError('클립보드 복사에 실패했습니다. 텍스트를 직접 선택해 복사해 주세요.');
     }
+  }
+
+  // 🔴 T57/AC-053④ — 이 함수를 호출하는 코드 경로는 "입력창에 삽입" 버튼의 명시적 클릭
+  // 하나뿐이다. 🔴 AC-040 — `adapter.insert()` 호출 외에는 어떤 전송/제출/`.click()` 코드도
+  // 실행하지 않는다(대상 사이트의 send/submit 컨트롤을 자동 클릭하지 않는다).
+  // findInput()이 null이거나 insert()가 false를 반환하는 두 경우를 하나의 `catch-all`
+  // (`||`/`??`)로 뭉치지 않는다 — 둘 다 결과적으로 InsertFailed로 보이지만, 각각 명시적
+  // 조건문으로 구분해 "어댑터 자체가 없음"(ClipboardOnly)과 혼동하지 않는다.
+  function handleInsert() {
+    if (!adapter) return;
+    const inputEl = adapter.findInput();
+    if (inputEl === null) {
+      setInsertStatus('failed');
+      return;
+    }
+    const inserted = adapter.insert(inputEl, finalText);
+    if (inserted === false) {
+      setInsertStatus('failed');
+      return;
+    }
+    setInsertStatus('inserted');
   }
 
   const c2Source = result?.stepSources?.c2 ?? result?.source;
@@ -208,6 +231,7 @@ export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
                   setFinalText(event.target.value);
                   setCopied(false);
                   setCopyError(null);
+                  setInsertStatus('idle');
                 }}
               />
 
@@ -217,9 +241,10 @@ export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
               </p>
 
               <div>
-                {/* AC-053①②③④ — Copy는 결과가 있을 때만 활성화된다. Insert는 hasLayer2Adapter가
-                    false인 한(T57 이전) 아예 렌더되지 않는다 — 회색 비활성 버튼을 두지 않는다
-                    (`docs/UX.md:929` Absent-not-disabled controls). */}
+                {/* AC-053①②③④ — Copy는 결과가 있을 때만 활성화된다. Insert는 `adapter`가
+                    `null`인 한(현재 사이트에 매칭되는 층 2 모듈이 없음) 아예 렌더되지 않는다 —
+                    회색 비활성 버튼을 두지 않는다(`docs/UX.md:929` Absent-not-disabled
+                    controls). `adapter`가 있으면 실제로 클릭 가능한 버튼으로 렌더된다. */}
                 <button
                   type="button"
                   onClick={() => void handleCopy()}
@@ -227,14 +252,25 @@ export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
                 >
                   클립보드에 복사
                 </button>
-                {hasLayer2Adapter && (
-                  <button type="button" disabled>
+                {adapter && (
+                  <button
+                    type="button"
+                    onClick={handleInsert}
+                    disabled={finalText.trim() === ''}
+                  >
                     입력창에 삽입
                   </button>
                 )}
               </div>
               {copied && <p role="status">복사됨</p>}
               {copyError && <p role="alert">{copyError}</p>}
+              {insertStatus === 'inserted' && <p role="status">삽입됨</p>}
+              {insertStatus === 'failed' && (
+                <p role="alert">
+                  입력창에 삽입하지 못했습니다. 대상 사이트의 화면 구조가 바뀌었을 수 있습니다 —
+                  클립보드 복사를 이용해 주세요.
+                </p>
+              )}
             </div>
           )}
         </>
