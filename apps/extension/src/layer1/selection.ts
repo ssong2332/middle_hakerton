@@ -8,6 +8,13 @@ const BUTTON_ID = 'cbm-layer1-selection-button';
 export interface SelectionPayload {
   text: string;
   rect: DOMRect;
+  /**
+   * ADR-0010/F4-a — the Element the selection came from, captured at selection time
+   * (not judged for eligibility here — layer1 does not decide whether it's an input;
+   * see docs/Architecture.md F4-a 층 1 쪽 계약 #2). `null` when it could not be
+   * captured (e.g. selection collapsed before this ran).
+   */
+  origin: HTMLElement | null;
 }
 
 export interface SelectionOverlayOptions {
@@ -195,7 +202,8 @@ function getFormControlSelectionPayload(): SelectionPayload | null {
     }
     const text = value.slice(selectionStart, selectionEnd).trim();
     if (text === '') return null;
-    return { text, rect: active.getBoundingClientRect() };
+    // ADR-0010/F4-a — origin is the control itself for a form-control selection.
+    return { text, rect: active.getBoundingClientRect(), origin: active };
   } catch {
     // 일부 <input type="number"|"email"|...>은 selectionStart 접근 시 예외를 던진다
     // (그 타입은 텍스트 선택을 지원하지 않는다는 뜻) — 버튼을 띄우지 않는다.
@@ -203,12 +211,23 @@ function getFormControlSelectionPayload(): SelectionPayload | null {
   }
 }
 
+/**
+ * ADR-0010/F4-a — the nearest Element ancestor of a Range's commonAncestorContainer
+ * (itself if it's already an Element, its parentElement if it's a text/other node).
+ */
+function nearestElementAncestor(node: Node): HTMLElement | null {
+  const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+  return el instanceof HTMLElement ? el : null;
+}
+
 function getSelectionPayload(): SelectionPayload | null {
   const selection = window.getSelection();
   const text = selection?.toString().trim() ?? '';
   if (selection && selection.rangeCount > 0 && text !== '') {
-    const rect = selection.getRangeAt(0).getBoundingClientRect();
-    return { text, rect };
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    const origin = nearestElementAncestor(range.commonAncestorContainer);
+    return { text, rect, origin };
   }
   return getFormControlSelectionPayload();
 }

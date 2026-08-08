@@ -35,7 +35,7 @@ describe('panel-mount', () => {
   });
 
   it('mounts the panel inside a shadow root host attached to document.body', () => {
-    openMediationPanel({ text: 'selected text', rect: FAKE_RECT });
+    openMediationPanel({ text: 'selected text', rect: FAKE_RECT, origin: null });
 
     const host = document.getElementById('cbm-layer1-panel-host');
     expect(host).not.toBeNull();
@@ -46,8 +46,8 @@ describe('panel-mount', () => {
   });
 
   it('only one panel host exists at a time — opening again replaces the previous one', () => {
-    openMediationPanel({ text: 'first', rect: FAKE_RECT });
-    openMediationPanel({ text: 'second', rect: FAKE_RECT });
+    openMediationPanel({ text: 'first', rect: FAKE_RECT, origin: null });
+    openMediationPanel({ text: 'second', rect: FAKE_RECT, origin: null });
 
     expect(document.querySelectorAll('#cbm-layer1-panel-host').length).toBe(1);
     expect(document.getElementById('cbm-layer1-panel-host')!.shadowRoot!.textContent).toContain(
@@ -56,14 +56,14 @@ describe('panel-mount', () => {
   });
 
   it('closeMediationPanel removes the host entirely', () => {
-    openMediationPanel({ text: 'selected text', rect: FAKE_RECT });
+    openMediationPanel({ text: 'selected text', rect: FAKE_RECT, origin: null });
     closeMediationPanel();
 
     expect(document.getElementById('cbm-layer1-panel-host')).toBeNull();
   });
 
   it('the mocked panel onClose callback also closes the panel', () => {
-    openMediationPanel({ text: 'selected text', rect: FAKE_RECT });
+    openMediationPanel({ text: 'selected text', rect: FAKE_RECT, origin: null });
     const host = document.getElementById('cbm-layer1-panel-host')!;
     const closeButton = host.shadowRoot!.querySelector('button')!;
     closeButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -79,7 +79,7 @@ describe('panel-mount', () => {
     triggerButton.id = 'cbm-layer1-selection-button';
     document.body.appendChild(triggerButton);
 
-    openMediationPanel({ text: 'selected text', rect: FAKE_RECT });
+    openMediationPanel({ text: 'selected text', rect: FAKE_RECT, origin: null });
     closeMediationPanel();
 
     expect(document.activeElement).toBe(triggerButton);
@@ -88,7 +88,7 @@ describe('panel-mount', () => {
   // T57/AC-053③ — 어댑터를 넘기지 않으면(기본값) 패널은 null을 받는다 — 층 2 없는 사이트의
   // 일상 경로.
   it('defaults to a null adapter when none is passed', () => {
-    openMediationPanel({ text: 'x', rect: FAKE_RECT });
+    openMediationPanel({ text: 'x', rect: FAKE_RECT, origin: null });
 
     const host = document.getElementById('cbm-layer1-panel-host')!;
     expect(host.shadowRoot!.querySelector('[data-testid="adapter-id"]')!.textContent).toBe(
@@ -104,7 +104,7 @@ describe('panel-mount', () => {
       findInput: () => null,
       insert: () => true,
     };
-    openMediationPanel({ text: 'x', rect: FAKE_RECT }, fakeAdapter);
+    openMediationPanel({ text: 'x', rect: FAKE_RECT, origin: null }, fakeAdapter);
 
     const host = document.getElementById('cbm-layer1-panel-host')!;
     expect(host.shadowRoot!.querySelector('[data-testid="adapter-id"]')!.textContent).toBe(

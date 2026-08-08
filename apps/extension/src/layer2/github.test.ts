@@ -22,68 +22,95 @@ describe('github adapter — matches()', () => {
 });
 
 describe('github adapter — findInput()', () => {
+  const NO_ORIGIN = { element: null };
+
   beforeEach(() => {
     document.body.innerHTML = '';
   });
 
   it('returns the element when a candidate selector matches (#new_comment_field)', () => {
     document.body.innerHTML = '<textarea id="new_comment_field"></textarea>';
-    const el = github.findInput();
+    const el = github.findInput(NO_ORIGIN);
     expect(el).not.toBeNull();
     expect(el?.id).toBe('new_comment_field');
   });
 
   it('returns the element when a candidate selector matches (textarea[name="comment[body]"])', () => {
     document.body.innerHTML = '<textarea name="comment[body]"></textarea>';
-    const el = github.findInput();
+    const el = github.findInput(NO_ORIGIN);
     expect(el).not.toBeNull();
     expect((el as HTMLTextAreaElement).name).toBe('comment[body]');
   });
 
-  it('returns null when no candidate selector matches', () => {
+  it('returns null when no candidate selector matches and there is no origin', () => {
     document.body.innerHTML = '<textarea id="unrelated"></textarea>';
-    expect(github.findInput()).toBeNull();
+    expect(github.findInput(NO_ORIGIN)).toBeNull();
   });
 
-  // MJ-1 — a PR page can have multiple comment textareas (main box + inline review
-  // reply boxes). document-wide first-match must not silently win over the field the
-  // user actually focused. docs/UX.md:187 (UF-011 step 6) requires "the originating field".
-  it('prefers the focused element over first-match candidate selector', () => {
+  // ADR-0010/F4-a rule 2 — the adapter resolves upward from the origin element itself
+  // (it *is* the eligible field here, a top-level PR comment textarea).
+  it('resolves the origin element itself when it is already an eligible field', () => {
     document.body.innerHTML = `
       <textarea id="new_comment_field"></textarea>
       <textarea name="comment[body]" id="inline-reply"></textarea>
     `;
     const inline = document.getElementById('inline-reply') as HTMLTextAreaElement;
-    inline.focus();
 
-    const el = github.findInput();
+    const el = github.findInput({ element: inline });
 
     expect(el).toBe(inline);
   });
 
-  // MJ-1 — when nothing is focused, fall back to resolving the selection's anchor
-  // ancestor (e.g. a contenteditable inline reply box) before the candidate-selector list.
-  it('falls back to the selection anchor ancestor when nothing is focused', () => {
+  // ADR-0010/F4-a rule 2 — the adapter may `.closest()` upward from the origin to
+  // resolve a composer (e.g. a contenteditable inline reply box the selection started
+  // inside of, like a <p> inside the editable root).
+  it('resolves upward from the origin via .closest() to the nearest eligible composer', () => {
     document.body.innerHTML = `
       <textarea id="new_comment_field"></textarea>
-      <div id="reply-editable" contenteditable="true"><p>reply text</p></div>
+      <div id="reply-editable" contenteditable="true"><p id="reply-p">reply text</p></div>
     `;
     const editable = document.getElementById('reply-editable') as HTMLElement;
-    // jsdom does not implement `isContentEditable` (it stays `undefined` regardless of the
-    // `contenteditable` attribute — verified against jsdom directly), so the fixture must
-    // set it explicitly to simulate what a real contenteditable element reports.
+    // jsdom does not implement `isContentEditable` (verified against jsdom directly), so
+    // the fixture must set it explicitly to simulate what a real element reports.
     Object.defineProperty(editable, 'isContentEditable', { value: true, configurable: true });
-    const textNode = editable.querySelector('p')!.firstChild!;
-    const range = document.createRange();
-    range.setStart(textNode, 0);
-    range.setEnd(textNode, 4);
-    const selection = window.getSelection()!;
-    selection.removeAllRanges();
-    selection.addRange(range);
+    const originP = document.getElementById('reply-p') as HTMLElement;
 
-    const el = github.findInput();
+    const el = github.findInput({ element: originP });
 
     expect(el).toBe(editable);
+  });
+
+  // ADR-0010/F4-a rule 1 — mouseup(capture) and the Insert click can be separated in
+  // time by a host-page re-render (common on Slack/Gmail, and possible on GitHub too);
+  // a detached origin node must not be used and must fall through to the candidate
+  // selectors instead.
+  it('falls through to the candidate selectors when origin.element.isConnected is false', () => {
+    document.body.innerHTML = '<textarea id="new_comment_field"></textarea>';
+    const detached = document.createElement('textarea');
+    detached.id = 'detached-origin';
+    expect(detached.isConnected).toBe(false);
+
+    const el = github.findInput({ element: detached });
+
+    expect(el).not.toBe(detached);
+    expect(el?.id).toBe('new_comment_field');
+  });
+
+  // ADR-0010/F4-a rules 3/5 — findInput() must not read document.activeElement or call
+  // window.getSelection() (those were the two branches proven dead by reviewer trace,
+  // ADR-0010 Context), and must declare the origin parameter.
+  it('does not read document.activeElement or window.getSelection()', () => {
+    document.body.innerHTML = '<textarea id="new_comment_field"></textarea>';
+    const activeElementSpy = vi.spyOn(document, 'activeElement', 'get');
+    const getSelectionSpy = vi.spyOn(window, 'getSelection');
+
+    github.findInput({ element: null });
+
+    expect(activeElementSpy).not.toHaveBeenCalled();
+    expect(getSelectionSpy).not.toHaveBeenCalled();
+
+    activeElementSpy.mockRestore();
+    getSelectionSpy.mockRestore();
   });
 });
 
@@ -157,7 +184,7 @@ describe('github adapter — AC-040 (never auto-submit)', () => {
       .mockImplementation(() => {});
 
     github.matches(new URL('https://github.com/owner/repo/pull/1'));
-    github.findInput();
+    github.findInput({ element: null });
     github.insert(textarea, 'approved text');
 
     expect(clickSpy).not.toHaveBeenCalled();

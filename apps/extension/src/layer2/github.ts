@@ -2,7 +2,7 @@
  * GitHub 역삽입 어댑터 — T29(AC-021, AC-040). T57(F4)이 동결한 `Layer2Adapter` 계약을 구현한다.
  * 중재 호출·패널 표시는 층 1(T55~T56) 소유 — 여기 남는 것은 DOM 선택자 + 삽입 함수뿐이다.
  */
-import type { Layer2Adapter } from '../layer1/registry';
+import type { InsertionOrigin, Layer2Adapter } from '../layer1/registry';
 
 function matches(url: URL): boolean {
   try {
@@ -32,30 +32,34 @@ function isEligibleField(el: Element | null): el is HTMLElement {
 }
 
 /**
- * PR 페이지에는 코멘트 입력창이 여러 개 있을 수 있다(메인 "leave a comment" 박스 +
- * 인라인 리뷰 스레드 답글 박스들). 문서 전체를 대상으로 한 첫 매치 선택자는 사용자가
- * 실제로 선택한 필드와 다른 필드를 조용히 골라버릴 수 있다 — `docs/UX.md:187`(UF-011
- * step 6)·`docs/UX.md:760`(UX-016 Exit) 모두 "선택이 시작된 필드"로의 삽입을 요구한다.
- * 후보 선택자 목록보다 먼저, 실제 포커스·선택 위치를 우선 확인한다.
+ * ADR-0010/F4-a — PR 페이지에는 코멘트 입력창이 여러 개 있을 수 있다(메인 "leave a
+ * comment" 박스 + 인라인 리뷰 스레드 답글 박스들). 문서 전체를 대상으로 한 첫 매치
+ * 선택자는 사용자가 실제로 선택한 필드와 다른 필드를 조용히 골라버릴 수 있다 —
+ * `docs/UX.md:187`(UF-011 step 6)·`docs/UX.md:760`(UX-016 Exit) 모두 "선택이 시작된
+ * 필드"로의 삽입을 요구한다.
+ *
+ * 🔴 F4-a 층 2 규칙 3 — 포커스/선택 상태를 여기서 직접 읽지 않는다. 층 1이 선택 시점에
+ * 캡처해 넘긴 `origin`만 검증(`isConnected`)·해석(`closest`)한다.
  */
-function findOriginatingInput(): HTMLElement | null {
-  const active = document.activeElement;
-  if (isEligibleField(active)) return active;
+function resolveFromOrigin(origin: InsertionOrigin): HTMLElement | null {
+  const element = origin.element;
+  if (!element || !element.isConnected) return null;
+  if (isEligibleField(element)) return element;
 
-  const selection = window.getSelection?.();
-  let node: Node | null = selection?.anchorNode ?? null;
-  while (node) {
-    if (isEligibleField(node as Element)) return node as HTMLElement;
-    node = node.parentNode;
-  }
-  return null;
+  // `element` is narrowed to `never` here by TS after the `isEligibleField` guard above
+  // (its static type was already `HTMLElement`) — cast back to `Element` to call `.closest()`.
+  const closest = (element as Element).closest<HTMLElement>(
+    [...CANDIDATE_SELECTORS, '[contenteditable="true"]'].join(', '),
+  );
+  return isEligibleField(closest) ? closest : null;
 }
 
-function findInput(): HTMLElement | null {
+function findInput(origin: InsertionOrigin): HTMLElement | null {
   try {
-    const originating = findOriginatingInput();
-    if (originating) return originating;
+    const resolved = resolveFromOrigin(origin);
+    if (resolved) return resolved;
 
+    // 마지막 폴백 — origin이 없거나·끊겼거나·해석 불가일 때만(F4-a 층 2 규칙 4).
     for (const selector of CANDIDATE_SELECTORS) {
       const el = document.querySelector<HTMLElement>(selector);
       if (el) return el;
