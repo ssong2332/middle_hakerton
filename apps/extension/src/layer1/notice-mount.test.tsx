@@ -3,6 +3,7 @@
 // 대체하고, 여기서는 "shadow root 마운트 여부 / 버전 비교로 스킵하는지 / 확인 후 버전을
 // 기록하는지"만 검증한다(고지 내용 자체는 `PrivacyNotice.test.tsx`가 이미 커버한다).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { waitFor } from '@testing-library/react';
 
 vi.mock('./PrivacyNotice', () => ({
   PrivacyNotice: ({ onAcknowledge }: { onAcknowledge: () => void }) => (
@@ -43,19 +44,20 @@ describe('notice-mount — ensureNoticeAcknowledged', () => {
   });
 
   // AC-076③ 케이스 1 — 낮은(또는 없는) 버전 기록 → 재표시 1회.
+  // 🔴 reviewer(2026-08-09) — 마운트가 끝났는지를 고정된 microtask 횟수로 추측하지 않고
+  // `waitFor`로 폴링한다(storage 목의 `async`/`await` 체인 깊이가 바뀌어도 깨지지 않는다).
   it('mounts the notice inside a shadow root host when no version is recorded yet', async () => {
     const pending = ensureNoticeAcknowledged();
 
-    // 마운트는 storage 조회가 끝난 뒤 일어나므로 다음 microtask까지 기다린다.
-    await Promise.resolve();
-    await Promise.resolve();
+    const host = await waitFor(() => {
+      const el = document.getElementById('cbm-layer1-privacy-notice-host');
+      if (!el) throw new Error('not mounted yet');
+      return el;
+    });
+    expect(host.shadowRoot).not.toBeNull();
+    expect(host.shadowRoot!.textContent).toContain('mock-acknowledge');
 
-    const host = document.getElementById('cbm-layer1-privacy-notice-host');
-    expect(host).not.toBeNull();
-    expect(host!.shadowRoot).not.toBeNull();
-    expect(host!.shadowRoot!.textContent).toContain('mock-acknowledge');
-
-    host!.shadowRoot!.querySelector('button')!.dispatchEvent(
+    host.shadowRoot!.querySelector('button')!.dispatchEvent(
       new MouseEvent('click', { bubbles: true }),
     );
     await pending;
@@ -63,10 +65,12 @@ describe('notice-mount — ensureNoticeAcknowledged', () => {
 
   it('acknowledging removes the host and records the current version', async () => {
     const pending = ensureNoticeAcknowledged();
-    await Promise.resolve();
-    await Promise.resolve();
+    const host = await waitFor(() => {
+      const el = document.getElementById('cbm-layer1-privacy-notice-host');
+      if (!el) throw new Error('not mounted yet');
+      return el;
+    });
 
-    const host = document.getElementById('cbm-layer1-privacy-notice-host')!;
     host.shadowRoot!.querySelector('button')!.dispatchEvent(
       new MouseEvent('click', { bubbles: true }),
     );
