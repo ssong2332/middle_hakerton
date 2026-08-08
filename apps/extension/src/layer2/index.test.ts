@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { findAdapterForUrl } from '../layer1/registry';
 import { adapters } from './index';
 import { github } from './github';
+import { slack } from './slack';
 import { gmail } from './gmail';
 
 describe('layer2/index — adapters registration', () => {
@@ -32,8 +33,22 @@ describe('layer2/index — adapters registration', () => {
     expect(result).toBeNull();
   });
 
-  // T49 — gmail adapter must be registered alongside github so the mediation panel
-  // renders an "Insert" affordance on mail.google.com (AC-051).
+  // T47 — slack adapter must be registered alongside github/gmail so the mediation
+  // panel renders an "Insert" affordance on app.slack.com (AC-042).
+  it('resolves the slack adapter for an app.slack.com URL', () => {
+    const result = findAdapterForUrl(adapters, new URL('https://app.slack.com/client/T000/C000'));
+
+    expect(result).toBe(slack);
+  });
+
+  it('still resolves the github adapter for a github.com URL (not shadowed by slack)', () => {
+    const result = findAdapterForUrl(adapters, new URL('https://github.com/o/r/pull/1'));
+
+    expect(result).toBe(github);
+  });
+
+  // T49 — gmail adapter must be registered alongside github/slack so the mediation
+  // panel renders an "Insert" affordance on mail.google.com (AC-051).
   it('resolves the gmail adapter for a mail.google.com URL', () => {
     const result = findAdapterForUrl(adapters, new URL('https://mail.google.com/mail/u/0/#inbox'));
 
