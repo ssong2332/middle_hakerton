@@ -3,24 +3,34 @@
 // 검증한다(컴포넌트 자체 상태 전이는 `MediationPanel.test.tsx`가 이미 커버한다).
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// ADR-0010/F4-a — `receivedOrigin` lets a test assert on the exact `origin` reference
+// `MediationPanel` was actually rendered with (identity check, not just truthiness) —
+// see the "passes the origin element through" test below.
+let receivedOrigin: HTMLElement | null | undefined;
+
 vi.mock('./MediationPanel', () => ({
   MediationPanel: ({
     initialText,
     onClose,
     adapter,
+    origin,
   }: {
     initialText: string;
     onClose: () => void;
     adapter?: { id: string } | null;
-  }) => (
-    <div data-testid="mock-panel">
-      <span>{initialText}</span>
-      <span data-testid="adapter-id">{adapter ? adapter.id : 'none'}</span>
-      <button type="button" onClick={onClose}>
-        close
-      </button>
-    </div>
-  ),
+    origin?: HTMLElement | null;
+  }) => {
+    receivedOrigin = origin;
+    return (
+      <div data-testid="mock-panel">
+        <span>{initialText}</span>
+        <span data-testid="adapter-id">{adapter ? adapter.id : 'none'}</span>
+        <button type="button" onClick={onClose}>
+          close
+        </button>
+      </div>
+    );
+  },
 }));
 
 import { closeMediationPanel, openMediationPanel } from './panel-mount';
@@ -32,6 +42,7 @@ describe('panel-mount', () => {
   afterEach(() => {
     closeMediationPanel();
     document.body.innerHTML = '';
+    receivedOrigin = undefined;
   });
 
   it('mounts the panel inside a shadow root host attached to document.body', () => {
@@ -110,5 +121,28 @@ describe('panel-mount', () => {
     expect(host.shadowRoot!.querySelector('[data-testid="adapter-id"]')!.textContent).toBe(
       'github',
     );
+  });
+
+  // ADR-0010/F4-a — MJ-A(reviewer follow-up, T29 round 2): this is the one production
+  // line (`panel-mount.tsx`'s `origin={payload.origin}`) connecting origin *capture*
+  // (`selection.ts`) to origin *consumption* (`MediationPanel.handleInsert()` →
+  // `adapter.findInput(origin)`). Before this test, deleting that line left all other
+  // tests green — nothing watched it. Identity check, not just truthiness: a bug that
+  // passed *some* element (e.g. always `null`, or the wrong one) must fail this.
+  //
+  // 🔴 Red evidence (2026-08-08) — temporarily removed the `origin={payload.origin}`
+  // line from `panel-mount.tsx` and ran
+  // `npx vitest run apps/extension/src/layer1/panel-mount.test.tsx --pool=threads`:
+  //   × passes the payload origin element through to MediationPanel
+  //     AssertionError: expected undefined to be <textarea></textarea>
+  // (1 failed, 7 passed — only this test caught it). The line was then restored and
+  // all 8 tests passed again.
+  it('passes the payload origin element through to MediationPanel', () => {
+    const originEl = document.createElement('textarea');
+    document.body.appendChild(originEl);
+
+    openMediationPanel({ text: 'x', rect: FAKE_RECT, origin: originEl });
+
+    expect(receivedOrigin).toBe(originEl);
   });
 });

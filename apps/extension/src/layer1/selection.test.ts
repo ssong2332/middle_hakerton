@@ -2,6 +2,24 @@
 // jsdom은 실제 레이아웃 엔진이 없어 `getBoundingClientRect()`가 기본적으로 0을 반환한다
 // (`docs/CodingRules.md` Tests 절 semantic vs structural 구분) — 그래서 픽셀 값이 아니라
 // "코드가 selection의 rect를 실제로 읽어 버튼 위치 계산에 썼는지"를 구조적으로 검증한다.
+//
+// 🔴 MJ-B red evidence (reviewer follow-up, T29 round 2, re-verified 2026-08-08) — the 4
+// ADR-0010/F4-a `origin` tests below (`captures the nearest Element ancestor...` ×2 —
+// generic site A/B, `captures the form control itself as origin for a <textarea>/<input>
+// selection` ×2) were added in commit 7efb351 without a recorded red run. Re-checked by
+// temporarily checking out the pre-ADR-0010 implementation files
+// (`git checkout 991229f -- apps/extension/src/layer1/selection.ts` + the other 4 files
+// changed in that commit) and running
+// `npx vitest run apps/extension/src/layer1/selection.test.ts --pool=threads`:
+//   × generic site A > captures the nearest Element ancestor of the selection as origin
+//   × generic site B > captures the nearest Element ancestor of the selection as origin
+//     AssertionError: expected undefined to be an instance of Element
+//   × captures the form control itself as origin for a <textarea> selection
+//     AssertionError: expected undefined to be <textarea id="ta"></textarea>
+//   × captures the form control itself as origin for an <input> selection
+//     AssertionError: expected undefined to be <input id="inp" .../>
+// (4 failed, 31 passed). Implementation files then restored
+// (`git checkout HEAD -- ...`) and all 35 tests passed again.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   computeClampedPosition,

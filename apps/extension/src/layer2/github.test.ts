@@ -3,6 +3,30 @@
  * github.ts 단위 테스트 — T29(AC-021, AC-040).
  * `findInput()` 선택자는 추정(라이브 미검증)이므로 실제 DOM 대신 손으로 만든 fixture로
  * 선택자 매칭·이벤트 디스패치 로직만 검증한다.
+ *
+ * 🔴 MJ-B red evidence (reviewer follow-up, T29 round 2, re-verified 2026-08-08) — the 3
+ * origin-based `findInput()` tests below (`resolves the origin element itself...`,
+ * `resolves upward from the origin via .closest()...`, `does not read
+ * document.activeElement or window.getSelection()`) were added in commit 7efb351 without
+ * a recorded red run. Re-checked by temporarily checking out the pre-ADR-0010
+ * implementation files (`git checkout 991229f -- apps/extension/src/layer2/github.ts` +
+ * the other 4 files changed in that commit) and running
+ * `npx vitest run apps/extension/src/layer2/github.test.ts --pool=threads`:
+ *   × resolves the origin element itself when it is already an eligible field
+ *     AssertionError: expected <textarea id="new_comment_field"/> to be
+ *     <textarea id="inline-reply" .../> — old code's document-wide fallback picked the
+ *     wrong composer instead of resolving the origin.
+ *   × resolves upward from the origin via .closest() to the nearest eligible composer
+ *     AssertionError: expected <textarea id="new_comment_field"/> to be
+ *     <div id="reply-editable" .../> — same wrong-fallback shape.
+ *   × does not read document.activeElement or window.getSelection()
+ *     AssertionError: expected "get activeElement" to not be called at all, but actually
+ *     been called 1 times — old code's dead `activeElement` branch was still present.
+ * (3 failed, 11 passed — the 4th new test, "falls through to the candidate selectors
+ * when origin.element.isConnected is false", already passed against the old code, since a
+ * disconnected/unused origin degrades to the same document-wide fallback either way).
+ * Implementation files then restored (`git checkout HEAD -- ...`) and all 14 tests
+ * passed again.
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { github } from './github';

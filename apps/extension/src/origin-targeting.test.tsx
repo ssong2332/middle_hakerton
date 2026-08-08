@@ -12,6 +12,24 @@
 // This file lives outside `layer1/` and `layer2/` (like `content.ts`) because it composes
 // both — `apps/extension/src/layer1` must not import `layer2/**`
 // (`docs/CodingRules.md` Directory Rules), so this composition can only happen here.
+//
+// 🔴 MJ-B red evidence (reviewer follow-up, T29 round 2, re-verified 2026-08-08) — this
+// file's one test was added in commit 7efb351 without a recorded red run. Re-checked by
+// temporarily checking out the pre-ADR-0010 implementation files
+// (`git checkout 991229f -- apps/extension/src/layer1/selection.ts` + the other 4 files
+// changed in that commit) and running
+// `npx vitest run apps/extension/src/origin-targeting.test.tsx --pool=threads`:
+//   × inserts into the textarea the user actually selected in, not the other composer or
+//     the document-wide first match
+//     AssertionError: expected undefined to be <textarea id="inline-reply" .../>
+// Honest caveat (reviewer-noted): this red run stops at the `capturedPayload!.origin`
+// prerequisite assertion (line ~96, `SelectionPayload.origin` didn't exist yet on the old
+// `selection.ts`) — it does NOT reach and therefore does not prove the actual
+// insert-targeting assertions further down (`insertSpy.mock.calls[0][0]`). Those are
+// covered instead by `github.test.ts`'s 3 origin-based `findInput()` unit tests (see that
+// file's red evidence) plus this test's green run proving the full wiring end-to-end.
+// (1 failed, 0 passed — single test in this file). Implementation files then restored
+// (`git checkout HEAD -- ...`) and the test passed again.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import type { MediationResult } from '@cross-border/core';

@@ -26,7 +26,7 @@ const CANDIDATE_SELECTORS = [
   'textarea[aria-label="Comment body"]',
 ] as const;
 
-function isEligibleField(el: Element | null): el is HTMLElement {
+function isEligibleField(el: Element | null): boolean {
   if (!el) return false;
   return el instanceof HTMLTextAreaElement || (el instanceof HTMLElement && el.isContentEditable);
 }
@@ -46,9 +46,7 @@ function resolveFromOrigin(origin: InsertionOrigin): HTMLElement | null {
   if (!element || !element.isConnected) return null;
   if (isEligibleField(element)) return element;
 
-  // `element` is narrowed to `never` here by TS after the `isEligibleField` guard above
-  // (its static type was already `HTMLElement`) — cast back to `Element` to call `.closest()`.
-  const closest = (element as Element).closest<HTMLElement>(
+  const closest = element.closest<HTMLElement>(
     [...CANDIDATE_SELECTORS, '[contenteditable="true"]'].join(', '),
   );
   return isEligibleField(closest) ? closest : null;
