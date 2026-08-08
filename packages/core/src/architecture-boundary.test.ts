@@ -24,14 +24,14 @@
  *   `createOpenAiLLMClient()` 인스턴스**(`llm`, route.ts:91)를 주입한다(route.ts:96,114,127).
  *   이 사실은 `apps/web/app/api/mediate/route.test.ts`가 이미 `/api/mediate` 통합 테스트로
  *   간접 커버하고 있어(각 스텝 mock이 호출됨을 검증) 여기서 중복 테스트를 추가하지 않았다.
- * - **절 2 중 확장 어댑터 쪽 — 물리적으로 검증 불가**: `apps/extension/src/`(layer1
- *   selection.ts/panel.tsx/registry.ts/notice.ts)는 T55~T58(M3) 소관의 스텁이며, 2026-08-05
- *   measured로 `apps/extension/src/**` 전체에 `@cross-border/core` import가 **0건**이다(아래
- *   "확장 어댑터 미호출 measured" 테스트가 이 수치를 실행마다 재확인한다 — `apps/extension/package.json`의
- *   의존성 선언 1건은 있으나 실제 import는 없다). 확장이 core를 실제로 호출하는 코드가 아직 없으므로
- *   "두 어댑터에서 호출된다"의 확장 쪽 절반은 **지금 시점에 증명할 대상 자체가 없다** — T55~T58이
- *   그 소비 코드를 만들 때 검증 대상이 생긴다. 이 파일에서 억지로 확장 쪽에 core를 호출하는 최소
- *   스텁을 추가하지 않았다(T55~T58이 소유할 실제 구현을 침범하지 않기 위함 — orchestrator 지시).
+ * - **절 2 중 확장 어댑터 쪽 — 2026-08-08(T56)부터 검증 가능**: `apps/extension/src/layer1/
+ *   MediationPanel.tsx`·`apps/extension/src/shared/api.ts`가 `@cross-border/core`의
+ *   `MediationResult` 타입을 import한다 — 웹앱(`apps/web/app/api/mediate/route.ts`)이 만드는
+ *   응답과 **같은 계약 타입**을 확장이 그대로 소비한다는 뜻이다(AC-028 "동일 인터페이스로 두
+ *   어댑터에서 호출된다"). 아래 "확장 어댑터 core 소비 measured" 테스트가 이 수치를 실행마다
+ *   재확인한다. 이전 버전(2026-08-05)의 이 문단은 "0건"이었다 — 111~115행 M-3 주석이 예고한 대로,
+ *   T56이 착수하며 그 assert를 뒤집었다(스텁이 실제 구현으로 바뀌면 반드시 뒤집어야 한다고
+ *   그 주석이 미리 지시했다).
  */
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -108,30 +108,43 @@ function safeListExtensionFiles(): string[] {
   }
 }
 
-// 🔴 M-3(2026-08-05, reviewer REJECTED → 수정) — `⚠️ 역설 주의`: 아래 두 테스트는 AC-028의
-// **목표 상태**(확장이 core를 실제로 호출)가 되면 오히려 **실패**하는 구조다. T55~T58 착수 후
-// 확장이 `@cross-border/core`를 실제로 import하기 시작하면, 아래 "0건" assert를 뒤집어야 한다
-// (예: "허용된 진입점 파일에서만 import되는지" 같은 형태로) — 지금은 "아직 호출 코드가 없다"는
-// 사실을 고정할 뿐, "호출하면 안 된다"는 규칙이 아니다.
+// 🔴 M-3(2026-08-05, reviewer REJECTED → 수정)이 예고한 시점 — T56이 착수하며 확장이
+// `@cross-border/core`를 실제로 import하기 시작했다. "0건" assert를 뒤집는다: 이제는 "core를
+// import하는 파일이 최소 1개 존재하고, 그 파일이 웹앱과 같은 계약 타입(`MediationResult`)을
+// 쓴다"를 AC-028(절 2, 확장 쪽)의 measured 근거로 고정한다.
 describe('T15/AC-028(절 2, 확장 쪽) — apps/extension/src의 @cross-border/core 호출 측정', () => {
   // 🔴 M-3 — core 쪽 스캔(84~89행)과 달리 이 스캔은 `safeListExtensionFiles()`가 에러를 삼키고
   // 빈 배열을 반환한다(87행 주석 참조). "파일 0개면 안 됨" 가드가 없으면, `apps/extension/src`가
-  // 사라지거나 이름이 바뀌어도(디렉터리 자체가 없어져 스캔이 공허하게 통과) 아래 "import 0건"
-  // assert가 조용히 green이 된다 — 디렉터리는 있지만 그 안의 import만 0건인 정상 상태와,
-  // 디렉터리 자체가 없어 스캔 대상이 없는 회귀를 구분해야 한다. 2026-08-05 measured 값은 10개
-  // (`apps/extension/src/**/*.{ts,tsx}` 전수) — 그 절반 미만이면 대부분 삭제·이름변경된 것으로
-  // 보고 실패시킨다.
+  // 사라지거나 이름이 바뀌어도(디렉터리 자체가 없어져 스캔이 공허하게 통과) 아래 assert가 조용히
+  // green이 된다. 2026-08-08(T56) measured 값은 apps/extension/src/**/*.{ts,tsx} 전수 20개 이상 —
+  // 그 절반 미만이면 대부분 삭제·이름변경된 것으로 보고 실패시킨다.
   it('스캔 대상 파일이 존재한다(디렉터리가 사라지거나 이름이 바뀌면 위 검사가 공허하게 통과하므로 회귀 방지용으로 먼저 확인)', () => {
     const files = safeListExtensionFiles();
     expect(files.length).toBeGreaterThanOrEqual(5);
   });
 
-  it('확장 어댑터 소스에 @cross-border/core import가 0건이다(measured, 2026-08-05 — T55~T58 소관 스텁이라 아직 없음. 이 값이 0이 아니게 되면 위 헤더 주석의 "검증 대상 없음" 판단을 다시 확인해야 한다)', () => {
+  it('확장 소스가 실제로 @cross-border/core를 import한다(AC-028 절 2 확장 쪽 — measured, 2026-08-08 T56)', () => {
     const files = safeListExtensionFiles();
-    const offenders = files.filter((file) =>
+    const importers = files.filter((file) =>
       extractImportSpecifiers(readFileSync(file, 'utf8')).some((s) => s === '@cross-border/core'),
     );
-    expect(offenders).toEqual([]);
+    expect(importers.length).toBeGreaterThan(0);
+  });
+
+  // AC-028 "동일 인터페이스로 호출" — 확장이 core의 아무 심볼이나 쓰는 게 아니라, 웹앱
+  // (`apps/web/app/api/mediate/route.ts`)이 `POST /api/mediate` 응답으로 만드는 것과 **같은**
+  // `MediationResult` 계약 타입을 참조하는지 확인한다(타입 레벨 검증 — 별도 어댑터 타입을
+  // 새로 만들면 이 grep이 잡지 못한 채 "같은 인터페이스"라는 주장만 남는 것을 막는다).
+  it('그 import가 웹앱과 같은 계약 타입(MediationResult)을 참조한다(AC-028)', () => {
+    const files = safeListExtensionFiles();
+    const usesSharedContractType = files.some((file) => {
+      const content = readFileSync(file, 'utf8');
+      return (
+        extractImportSpecifiers(content).some((s) => s === '@cross-border/core') &&
+        content.includes('MediationResult')
+      );
+    });
+    expect(usesSharedContractType).toBe(true);
   });
 });
 
