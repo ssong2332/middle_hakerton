@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { findAdapterForUrl } from '../layer1/registry';
 import { adapters } from './index';
 import { github } from './github';
+import { gmail } from './gmail';
 
 describe('layer2/index — adapters registration', () => {
   it('resolves the github adapter for a github.com PR URL', () => {
@@ -29,5 +30,13 @@ describe('layer2/index — adapters registration', () => {
     const result = findAdapterForUrl(adapters, new URL('https://example.com'));
 
     expect(result).toBeNull();
+  });
+
+  // T49 — gmail adapter must be registered alongside github so the mediation panel
+  // renders an "Insert" affordance on mail.google.com (AC-051).
+  it('resolves the gmail adapter for a mail.google.com URL', () => {
+    const result = findAdapterForUrl(adapters, new URL('https://mail.google.com/mail/u/0/#inbox'));
+
+    expect(result).toBe(gmail);
   });
 });
