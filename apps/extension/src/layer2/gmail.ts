@@ -14,17 +14,20 @@ function matches(url: URL): boolean {
 }
 
 /**
- * 🔴 추정 — 라이브 미검증. 이 환경에는 로그인된 Gmail 세션이 없어(작성 창은 인증된 사용자에게만
- * 렌더된다) 실제 DOM을 확인할 수 없었다. 아래 선택자는 Gmail 작성 창의 일반 지식 기반
- * best-effort이며, 배포 전 실제 mail.google.com 페이지에서 라이브 확인이 필요하다(이 프로젝트의
- * 다른 라이브 검증 이월 항목과 같은 부류 — 여기서 별도로 해소하지 않는다). 삽입 메커니즘
- * (아래 `insert()`의 execCommand 기반 접근) 역시 라이브 미검증이다 — 같은 추정 기준을 그대로
- * 적용한다.
+ * 2026-08-08 사용자 라이브 확인(실제 로그인 Gmail 계정, 한국어 로케일) — 본문 편집 요소는
+ * `<div id=":qz" class="Am aiL Al editable LW-avf tS-tW" aria-label="메일 본문"
+ * contenteditable="true" role="textbox" ...>`. iframe 래핑 없음(Console에서
+ * `el.ownerDocument === document` === true로 확정) — `manifest.json`에 `all_frames`
+ * 불필요. `aria-label`은 로케일에 따라 값이 바뀐다(영어 "Message Body" / 한국어 "메일 본문")는
+ * 것도 이때 확인됐으므로 두 값 모두 후보에 둔다. `class`/`g_editable` 기반 선택자는 로케일
+ * 무관하게 안정적이라 우선 후보로 유지한다. 삽입 메커니즘(`insert()`의 execCommand 기반
+ * 접근)은 여전히 라이브 미검증이다.
  */
 const CANDIDATE_SELECTORS = [
-  'div[aria-label="Message Body"]',
   'div.Am.Al.editable',
   'div[g_editable="true"]',
+  'div[aria-label="메일 본문"]',
+  'div[aria-label="Message Body"]',
 ] as const;
 
 function isEligibleField(el: Element | null): boolean {
