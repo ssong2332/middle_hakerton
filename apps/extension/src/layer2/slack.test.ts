@@ -211,6 +211,41 @@ describe('slack adapter — insert()', () => {
     expect(() => slack.insert(div, 'text')).not.toThrow();
     expect(slack.insert(div, 'text')).toBe(false);
   });
+
+  // MJ-2 (review follow-up) — the textContent fallback must not claim success blindly.
+  // If the write does not actually take effect (e.g. the editor's internal model rejects
+  // or reverts it), insert() must report failure via a read-back check, not a hardcoded
+  // `true`.
+  it('returns false when the textContent fallback write does not take effect (read-back check)', () => {
+    const execCommandSpy = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    // Simulate an editor whose textContent setter silently no-ops (write doesn't stick).
+    Object.defineProperty(editor, 'textContent', {
+      get: () => 'stale content that never changed',
+      set: () => {},
+      configurable: true,
+    });
+
+    const result = slack.insert(editor, 'fallback text 3');
+
+    expect(result).toBe(false);
+
+    execCommandSpy.mockRestore();
+  });
+
+  // MJ-1 (review follow-up) — F4-a rule 3 (ADR-0010) bans `window.getSelection()` in
+  // layer2/** production code entirely; execCommand('selectAll', false) alone is
+  // sufficient (scoped to the focused editing host), so insert() must not call it either.
+  it('does not call window.getSelection() (F4-a rule 3)', () => {
+    const execCommandSpy = vi.spyOn(document, 'execCommand').mockReturnValue(true);
+    const getSelectionSpy = vi.spyOn(window, 'getSelection');
+
+    slack.insert(editor, 'approved text');
+
+    expect(getSelectionSpy).not.toHaveBeenCalled();
+
+    execCommandSpy.mockRestore();
+    getSelectionSpy.mockRestore();
+  });
 });
 
 describe('slack adapter — AC-040 (never auto-submit)', () => {
