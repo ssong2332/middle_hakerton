@@ -4,7 +4,15 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fetchLearnedItems, fetchSenderProfile, saveOnboardingProfile } from './storage';
+import {
+  deleteLearnedItem,
+  fetchLearnedItems,
+  fetchLearnedItemsDetailed,
+  fetchProfileWithMeta,
+  fetchSenderProfile,
+  resetProfile,
+  saveOnboardingProfile,
+} from './storage';
 
 interface FakeProfileHandle {
   client: SupabaseClient;
@@ -271,5 +279,242 @@ describe('saveOnboardingProfile — AC-011/AC-046②/AC-059(나란히 스킵·�
     await expect(
       saveOnboardingProfile(client, 'user-1', { onboardingState: 'skipped' }),
     ).rejects.toEqual({ message: 'connection failed' });
+  });
+});
+
+// T21 — GET /api/profile(UX-009)가 쓰는 updatedAt 포함 조회. AC-014, AC-059.
+describe('fetchProfileWithMeta', () => {
+  it('user_id로 스코프해 조회한다(profiles PK, T18 스키마)', async () => {
+    const { client, eqCalls } = createFakeProfileSupabase({ row: null });
+
+    await fetchProfileWithMeta(client, 'user-1');
+
+    expect(eqCalls).toEqual([['user_id', 'user-1']]);
+  });
+
+  it('행이 없으면 not_started + 전부 null + updatedAt null인 기본 프로필을 반환한다(AC-059②)', async () => {
+    const { client } = createFakeProfileSupabase({ row: null });
+
+    const result = await fetchProfileWithMeta(client, 'user-1');
+
+    expect(result).toEqual({
+      onboardingState: 'not_started',
+      directness: null,
+      emojiPreference: null,
+      formality: null,
+      honorificLevel: null,
+      updatedAt: null,
+    });
+  });
+
+  it('행이 있으면 updated_at까지 카멜로 변환해 반환한다', async () => {
+    const { client } = createFakeProfileSupabase({
+      row: {
+        onboarding_state: 'completed',
+        directness: 'direct',
+        emoji_preference: 'avoids',
+        formality: 'high',
+        honorific_level: 'hapsyo',
+        updated_at: '2026-08-07T00:00:00Z',
+      },
+    });
+
+    const result = await fetchProfileWithMeta(client, 'user-1');
+
+    expect(result).toEqual({
+      onboardingState: 'completed',
+      directness: 'direct',
+      emojiPreference: 'avoids',
+      formality: 'high',
+      honorificLevel: 'hapsyo',
+      updatedAt: '2026-08-07T00:00:00Z',
+    });
+  });
+
+  it('조회 실패 시 에러를 던진다(에러 삼키기 금지)', async () => {
+    const { client } = createFakeProfileSupabase({ error: { message: 'connection failed' } });
+
+    await expect(fetchProfileWithMeta(client, 'user-1')).rejects.toEqual({
+      message: 'connection failed',
+    });
+  });
+});
+
+// T21 — DELETE /api/profile(UX-009). AC-014, AC-059.
+describe('resetProfile — AC-014/AC-059(DELETE /api/profile, 계정은 삭제하지 않는다)', () => {
+  it('스타일 4필드를 전부 null로, onboarding_state를 not_started로 upsert한다', async () => {
+    const { client, upsertCalls } = createFakeUpsertSupabase();
+
+    const result = await resetProfile(client, 'user-1');
+
+    expect(upsertCalls[0][0]).toMatchObject({
+      user_id: 'user-1',
+      onboarding_state: 'not_started',
+      directness: null,
+      emoji_preference: null,
+      formality: null,
+      honorific_level: null,
+    });
+    expect(upsertCalls[0][1]).toEqual({ onConflict: 'user_id' });
+    expect(result.onboardingState).toBe('not_started');
+    expect(result.directness).toBeNull();
+    expect(typeof result.updatedAt).toBe('string');
+  });
+
+  it('실패 시 에러를 던진다(에러 삼키기 금지)', async () => {
+    const { client } = createFakeUpsertSupabase({ error: { message: 'connection failed' } });
+
+    await expect(resetProfile(client, 'user-1')).rejects.toEqual({
+      message: 'connection failed',
+    });
+  });
+});
+
+// T21 — GET /api/profile/learned(UX-009 화면용, id·observedCount·appliedAt 포함). AC-013, AC-014.
+interface FakeLearnedDetailHandle {
+  client: SupabaseClient;
+  eqCalls: Array<[string, unknown]>;
+}
+
+function createFakeLearnedDetailSupabase(
+  options: { rows?: unknown[]; error?: { message: string } | null } = {},
+): FakeLearnedDetailHandle {
+  const eqCalls: Array<[string, unknown]> = [];
+  const client = {
+    from(table: string) {
+      if (table !== 'profile_learned_items') throw new Error(`unexpected table: ${table}`);
+      return {
+        select: () => ({
+          eq: (column: string, value: unknown) => {
+            eqCalls.push([column, value]);
+            return Promise.resolve({
+              data: options.error ? null : (options.rows ?? []),
+              error: options.error ?? null,
+            });
+          },
+        }),
+      };
+    },
+  } as unknown as SupabaseClient;
+  return { client, eqCalls };
+}
+
+describe('fetchLearnedItemsDetailed', () => {
+  it('user_id로 스코프해 조회한다(profile_learned_items, T18 스키마)', async () => {
+    const { client, eqCalls } = createFakeLearnedDetailSupabase({ rows: [] });
+
+    await fetchLearnedItemsDetailed(client, 'user-1');
+
+    expect(eqCalls).toEqual([['user_id', 'user-1']]);
+  });
+
+  it('비어 있으면 []를 반환한다(AC-059 — 정상 상태)', async () => {
+    const { client } = createFakeLearnedDetailSupabase({ rows: [] });
+
+    const result = await fetchLearnedItemsDetailed(client, 'user-1');
+
+    expect(result).toEqual([]);
+  });
+
+  it('행을 id·observedCount·appliedAt까지 카멜케이스로 변환한다(docs/API.md 응답 계약)', async () => {
+    const { client } = createFakeLearnedDetailSupabase({
+      rows: [
+        {
+          id: 'item-1',
+          pattern_key: 'emoji_removed',
+          value: 'avoids',
+          observed_count: 3,
+          applied_at: '2026-08-07T00:00:00Z',
+        },
+      ],
+    });
+
+    const result = await fetchLearnedItemsDetailed(client, 'user-1');
+
+    expect(result).toEqual([
+      {
+        id: 'item-1',
+        patternKey: 'emoji_removed',
+        value: 'avoids',
+        observedCount: 3,
+        appliedAt: '2026-08-07T00:00:00Z',
+      },
+    ]);
+  });
+
+  it('조회 실패 시 에러를 던진다(에러 삼키기 금지)', async () => {
+    const { client } = createFakeLearnedDetailSupabase({ error: { message: 'connection failed' } });
+
+    await expect(fetchLearnedItemsDetailed(client, 'user-1')).rejects.toEqual({
+      message: 'connection failed',
+    });
+  });
+});
+
+// T21 — DELETE /api/profile/learned/{id}(UX-009). AC-013, AC-014.
+interface FakeDeleteLearnedHandle {
+  client: SupabaseClient;
+  eqCalls: Array<[string, unknown]>;
+}
+
+function createFakeDeleteLearnedSupabase(
+  options: { deletedRows?: unknown[]; error?: { message: string } | null } = {},
+): FakeDeleteLearnedHandle {
+  const eqCalls: Array<[string, unknown]> = [];
+  const client = {
+    from(table: string) {
+      if (table !== 'profile_learned_items') throw new Error(`unexpected table: ${table}`);
+      return {
+        delete: () => ({
+          eq: (column: string, value: unknown) => {
+            eqCalls.push([column, value]);
+            return {
+              eq: (column2: string, value2: unknown) => {
+                eqCalls.push([column2, value2]);
+                return {
+                  select: () =>
+                    Promise.resolve({
+                      data: options.error ? null : (options.deletedRows ?? []),
+                      error: options.error ?? null,
+                    }),
+                };
+              },
+            };
+          },
+        }),
+      };
+    },
+  } as unknown as SupabaseClient;
+  return { client, eqCalls };
+}
+
+describe('deleteLearnedItem — AC-013/AC-014(DELETE /api/profile/learned/{id})', () => {
+  it('id와 user_id 둘 다로 스코프해 삭제한다(타인 소유 방지)', async () => {
+    const { client, eqCalls } = createFakeDeleteLearnedSupabase({
+      deletedRows: [{ id: 'item-1' }],
+    });
+
+    await deleteLearnedItem(client, 'user-1', 'item-1');
+
+    expect(eqCalls).toEqual([
+      ['id', 'item-1'],
+      ['user_id', 'user-1'],
+    ]);
+  });
+
+  it('삭제된 행이 0개면(존재하지 않거나 타인 소유) NotFoundError를 던진다(404)', async () => {
+    const { client } = createFakeDeleteLearnedSupabase({ deletedRows: [] });
+
+    await expect(deleteLearnedItem(client, 'user-1', 'item-1')).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+
+  it('삭제 실패 시 원본 에러를 던진다(에러 삼키기 금지)', async () => {
+    const { client } = createFakeDeleteLearnedSupabase({ error: { message: 'connection failed' } });
+
+    await expect(deleteLearnedItem(client, 'user-1', 'item-1')).rejects.toEqual({
+      message: 'connection failed',
+    });
   });
 });

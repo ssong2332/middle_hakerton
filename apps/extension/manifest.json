@@ -5,6 +5,9 @@
   "description": "선택한 텍스트를 즉시 중재한다 (개발자 모드 로드 전용 — Planning Decision #4).",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

@@ -1,0 +1,214 @@
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 56px 24px;
+}
+
+.title {
+  font: 800 24px var(--font-sans);
+  letter-spacing: -0.01em;
+  margin-bottom: 10px;
+}
+
+.lead {
+  font: 400 13px var(--font-sans);
+  color: var(--text-muted-75);
+  margin-bottom: 24px;
+}
+
+.skeleton {
+  display: grid;
+  gap: 12px;
+}
+
+.skeletonRow {
+  height: 48px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--border-thin);
+}
+
+.banner {
+  border: 2px solid var(--color-focus);
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font: 400 12px var(--font-sans);
+}
+
+.banner p {
+  margin: 0 0 6px;
+}
+
+.retryButton {
+  min-height: 44px;
+  padding: 6px 10px;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  font: 800 11px var(--font-sans);
+}
+
+.retryButton:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.skippedBox {
+  border: 1px solid var(--border-thin);
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.skippedMessage {
+  font: 700 14px var(--font-sans);
+}
+
+.completeOnboardingButton {
+  min-height: 44px;
+  padding: 10px 16px;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  font: 800 12px var(--font-sans);
+  justify-self: start;
+}
+
+.completeOnboardingButton:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.section {
+  margin-bottom: 28px;
+}
+
+.sectionTitle {
+  font: 700 13px var(--font-sans);
+  margin-bottom: 10px;
+}
+
+.emptyMessage {
+  font: 400 13px var(--font-sans);
+  color: var(--text-muted-60);
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--border-thin);
+  padding: 12px 14px;
+}
+
+.itemHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.itemLabel {
+  font: 700 12px var(--font-sans);
+}
+
+.tag {
+  font: 700 10px var(--font-sans);
+  padding: 2px 6px;
+  border: 1px solid var(--border-thin);
+  color: var(--text-muted-75);
+}
+
+.itemValue {
+  font: 400 13px var(--font-sans);
+}
+
+.itemActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.editButton,
+.deleteButton {
+  min-height: 44px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  font: 700 11px var(--font-sans);
+}
+
+.editForm {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.editForm label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 13px var(--font-sans);
+}
+
+.editActions {
+  display: flex;
+  gap: 8px;
+}
+
+.saveButton {
+  min-height: 44px;
+  padding: 4px 10px;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  font: 700 11px var(--font-sans);
+}
+
+.saveButton:disabled {
+  opacity: 0.45;
+}
+
+.cancelButton {
+  min-height: 44px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border-thin);
+  font: 700 11px var(--font-sans);
+}
+
+.confirmBox {
+  border: 1px solid var(--color-focus);
+  padding: 8px 10px;
+  margin-top: 4px;
+  display: grid;
+  gap: 8px;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+}
+
+.confirmDeleteButton {
+  min-height: 44px;
+  padding: 4px 10px;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  font: 700 11px var(--font-sans);
+}
+
+.errorText {
+  font: 400 11px var(--font-sans);
+  color: var(--color-danger-text);
+}

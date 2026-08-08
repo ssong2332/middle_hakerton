@@ -90,6 +90,8 @@
 | `LLM_PROVIDER` | 🔴 선택·로컬 테스트 전용(정식 아키텍처 결정 아님). `'gemini'`로 설정하면 `apps/web/lib/llm/gemini.ts` 구현체를 쓴다. 그 외/미설정이면 항상 OpenAI. **Vercel 프로덕션에는 설정하지 않는다** |
 | `GEMINI_API_KEY` | 🔴 선택·로컬 테스트 전용. `LLM_PROVIDER=gemini`일 때만 쓰이는 서버 전용 키. **Vercel 프로덕션에는 설정하지 않는다** |
 | `GEMINI_MODEL` | 🔴 선택·로컬 테스트 전용. 사용할 Gemini 모델명(예: `gemini-2.5-flash`). `LLM_PROVIDER=gemini`일 때만 쓰인다. **Vercel 프로덕션에는 설정하지 않는다** |
+| `VITE_APP_ORIGIN` | Chrome 확장(T56)이 읽는 우리 앱 자신의 origin(예: `http://localhost:3000`). `apps/extension`의 Vite 빌드가 `POST /api/mediate` 절대 URL과 `manifest.json`의 `externally_connectable.matches`/`host_permissions`를 채우는 데 쓴다 |
+| `NEXT_PUBLIC_EXTENSION_ID` | Chrome 확장(T56)의 ID. `apps/web/app/extension/connect/page.tsx`가 `chrome.runtime.sendMessage(EXTENSION_ID, ...)`로 로그인 토큰을 확장에 넘길 때 대상으로 쓴다. `chrome://extensions`에서 개발자 모드로 로드한 뒤 복사해 채운다 |
 
 Supabase URL/키, OpenAI 키 등 실제 값은 이 저장소에 없습니다 — 팀 내부에서 직접 전달받아 로컬 `.env`에 채워 넣으세요.
 

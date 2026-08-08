@@ -1,7 +1,13 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { MediationResult, UrgencyLevel } from '@cross-border/core';
+import {
+  TICKET_DRAFT_RECIPIENT_SESSION_KEY,
+  TICKET_DRAFT_SESSION_KEY,
+  TICKET_RESTORE_SESSION_KEY,
+} from '../lib/ticket-draft';
 import { RecipientPanel } from './RecipientPanel';
 import { SenderPanel } from './SenderPanel';
 import styles from './MediationWorkspace.module.css';
@@ -92,6 +98,7 @@ const srOnlyStyle = {
  * 서버가 실제 단계별 진행을 노출하게 되면(향후 범위 밖) 그때 실제 값 기반으로 교체한다.
  */
 export function MediationWorkspace() {
+  const router = useRouter();
   const [text, setText] = useState('');
   const [recipient, setRecipient] = useState('');
   const [status, setStatus] = useState<MediationStatus>('idle');
@@ -121,6 +128,45 @@ export function MediationWorkspace() {
   // 최종문 편집처럼 실제로 다른 내용이 되면 새 키를 발급하며, 전송 성공(`approveStatus==='sent'`)
   // 후에는 다음 승인 시도를 위해 초기화한다.
   const idempotencyKeyRef = useRef<{ identity: string; key: string } | null>(null);
+
+  // T25/Major-1 — `/ticket`(UX-007)에서 돌아왔을 때 작성창을 복원한다(`apps/web/lib/ticket-draft.ts`
+  // 헤더 주석 참조 — `TICKET_RESTORE_SESSION_KEY`는 작성창 복원 전용, `TICKET_DRAFT_SESSION_KEY`는
+  // 티켓 변환 API 소스 전용으로 역할이 분리되어 있다). "Back to message"면 변환 클릭 시점의
+  // 라이브 원문이, "Use this ticket"이면 티켓 조립문이 이 키에 들어 있다 — 어느 쪽이든 그대로
+  // 작성창에 채운다. 읽는 즉시 세션에서 지워, 이후 이 컴포넌트가 다시 마운트되는 관계없는 방문
+  // (예: `/mediate`를 새로고침)에서 같은 값이 다시 나타나지 않게 한다(스테일 재노출 방지, T21/T23
+  // 리뷰 교훈).
+  // 🔴 `react-hooks/set-state-in-effect` — `apps/web/app/(app)/(with-nav)/profile/page.tsx`의
+  // fetch-on-mount 이펙트가 이미 세운 선례를 그대로 따른다: 이 규칙은 이펙트 콜백의 호출
+  // 그래프에서 setState 호출이 "도달 가능"하기만 하면 경고하고, 실제로 렌더 중 동기 실행되는지는
+  // 구분하지 않는다. 이 이펙트는 마운트 시 1회 외부 저장소(`sessionStorage`)를 읽어 초기 상태를
+  // 채우는 정당한 용례이며, 규칙 전체가 아니라 이 한 줄만 억제한다.
+  /* eslint-disable react-hooks/set-state-in-effect -- mount 시 sessionStorage 읽기, 위 근거 참조 */
+  useEffect(() => {
+    const draft = sessionStorage.getItem(TICKET_RESTORE_SESSION_KEY);
+    if (draft !== null) {
+      setText(draft);
+      sessionStorage.removeItem(TICKET_RESTORE_SESSION_KEY);
+    }
+    // M-A(reviewer 발견 → 수정) — `TICKET_DRAFT_SESSION_KEY`(API 소스 스냅샷)도 여기서 함께
+    // 지운다. 이 이펙트는 마운트 시 1회만 도므로, 이 시점 이후 "Convert to Task Ticket"을 실제로
+    // 클릭하기 전까지는 이 방문에서 그 클릭이 있었을 수 없다 — 즉 지금 이 값이 남아 있다면 그건
+    // 이전 방문(직전 티켓 전환)이 남긴 것이고, 이번 방문에서 아직 소비되지 않은 새 값일 수는
+    // 없다. 지우지 않으면 이 키가 탭 세션 내내(원래 설계는 "한 번 쓰고 한 번 읽히는" 값이었다,
+    // `apps/web/lib/ticket-draft.ts` 헤더 주석) 영구히 남아, AC-058 게이트(이 버튼 클릭)를 거치지
+    // 않은 이후의 `/ticket` 진입(브라우저 Back/Forward, 북마크, 직접 URL)이 스테일 원문으로
+    // `POST /api/ticket`을 다시 호출해버린다 — `TicketWorkspace`는 그 경우 `no-source` 상태를
+    // 보여줘야 정상이다.
+    sessionStorage.removeItem(TICKET_DRAFT_SESSION_KEY);
+    // MAJ-3(reviewer follow-up) — 원문과 같은 원리로, 받는 사람 값도 있으면 복원하고 즉시
+    // 소비(삭제)한다(스테일 재노출 방지, 위 원문 복원과 같은 이유).
+    const recipientDraft = sessionStorage.getItem(TICKET_DRAFT_RECIPIENT_SESSION_KEY);
+    if (recipientDraft !== null) {
+      setRecipient(recipientDraft);
+      sessionStorage.removeItem(TICKET_DRAFT_RECIPIENT_SESSION_KEY);
+    }
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const displayedUrgency = urgencyOverride ?? result?.urgency ?? null;
   const isOverridden =
@@ -323,6 +369,29 @@ export function MediationWorkspace() {
     }
   }
 
+  // 🔴 T25/AC-058① — `RecipientPanel`의 "Convert to Task Ticket" 클릭 핸들러. 승인 대상
+  // 스냅샷 시점의 원문(`approvalSnapshot.text` — `SenderPanel`의 `originalTextSnapshot`과 같은
+  // 이유: 이 원문이 실제로 `ticketOption.offered`를 판정한 그 텍스트다)을 API 소스 키에 저장하고
+  // `/ticket`으로 이동한다. 스냅샷이 없으면(이 버튼은 `hasResult`가 true일 때만 렌더되므로
+  // 실무에서는 항상 존재하지만) 방어적으로 라이브 `text`로 degrade한다.
+  //
+  // 🔴 Major-1(QA GO, follow-up → 수정) — 위 스냅샷 원문과는 별개로, 클릭 시점의 **라이브**
+  // 작성창 텍스트를 복원 전용 키(`TICKET_RESTORE_SESSION_KEY`)에 함께 저장한다. 승인 성공 이후
+  // (재실행 없이) 사용자가 원문을 더 편집했다면 그 편집분은 아직 어떤 중재 결과로도 검토되지
+  // 않았으므로 `/api/ticket` 호출에는 반영하면 안 되지만(위 스냅샷 키가 그 보장을 지킨다),
+  // "Back to message"로 돌아왔을 때 작성창은 사용자가 실제로 쓰고 있던 텍스트를 보여줘야 한다
+  // (`docs/UX.md:513` UX-007 Exit — "Back to message" returns to UX-004 with the original
+  // free-text message unchanged; `docs/UX.md:515` Secondary Actions — Back to message discards
+  // the ticket but keeps the free text) — 스냅샷으로 조용히 되돌리면 그 편집을 잃는다.
+  function handleConvertToTicket() {
+    sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, approvalSnapshot?.text ?? text);
+    sessionStorage.setItem(TICKET_RESTORE_SESSION_KEY, text);
+    // MAJ-3(reviewer follow-up) — 받는 사람도 함께 들고 나간다. `/ticket`은 이 값을 쓰지 않고
+    // 그대로 통과시킬 뿐이지만, 돌아왔을 때(재마운트) 복원할 수 있어야 재입력 마찰이 없다.
+    sessionStorage.setItem(TICKET_DRAFT_RECIPIENT_SESSION_KEY, recipient);
+    router.push('/ticket');
+  }
+
   return (
     <div>
       {/* Major 6① — 시각적으로는 숨기고 스크린리더에만 노출한다(중복 시각 텍스트를 만들지
@@ -363,6 +432,8 @@ export function MediationWorkspace() {
               onApprove={handleApprove}
               approveStatus={approveStatus}
               sentAt={sentAt}
+              ticketOffered={hasResult && result?.ticketOption.offered === true}
+              onConvertToTicket={handleConvertToTicket}
             />
           </div>
         </div>

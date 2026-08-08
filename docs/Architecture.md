@@ -2,7 +2,8 @@
 
 Owner: architect (see AGENTS.md). Others read-only.
 Major decisions are logged in DECISIONS.md; details in adr/.
-Based on PRD Version: v3.2 · Based on UX Version: 6.0 · Last Updated: 2026-08-05
+Based on PRD Version: v3.2 · Based on UX Version: 6.0 · Last Updated: 2026-08-08
+(2026-08-08 **7차 패스** — 🔴 **버전 헤더를 올리지 않았다. 이건 실수가 아니라 정확성 유지다**: 이 패스는 **F4 한 절만** 재검증했고(`docs/UX.md:187`·`:760` 두 문장 + 확장 코드 트레이스), PRD 나머지 절에 대한 재검증은 하지 않았다. 헤더를 올리면 문서 전체가 최신 PRD 기준으로 검토됐다고 잘못 주장하게 된다. <br>⚠️ **버전 격차는 실재하며 미해소다(measured 2026-08-08 — architect가 두 문서 헤더 직접 열람)**: 실제 `docs/PRD.md:4` = **v4.0**, `docs/UX.md:10` = **6.1** 인데 이 문서의 기준은 **v3.2 / 6.0** 이다. **PRD 2단계·UX 1단계 뒤처져 있다** — 다음 architect 패스의 첫 안건은 이 격차의 전면 재검증이다. <br>이 패스가 바꾼 것은 **F4 변경 1건뿐**이다: **F4-a — `findInput()` 이 `InsertionOrigin` 인자를 받는다**(DECISIONS #51 · ADR-0010). T29 리뷰가 찾아낸 **조용한 오대상 삽입**의 처리이며, 🔴 **이 커밋은 계약만 확정한다** — `selection.ts`·`panel-mount.tsx`·`MediationPanel.tsx`·`layer2/github.ts` 배선은 implementer(T29 후속) 소관이고 T47·T49 는 처음부터 새 형태로 구현한다)
 (2026-08-05 **6차 패스** — **PRD·UX 버전 갱신 없음**(v3.2 / 6.0 그대로, 버전 격차 0 — architect가 `docs/PRD.md`·`docs/UX.md` 의 Document Version 헤더를 직접 재확인). 이 패스가 바꾼 것은 **F1 확장 1건뿐**이다: **F1-e 신설 — `MediationResult` 에 스텝별 출처 `stepSources` 13번째 필드 추가**(DECISIONS #48 · ADR-0009). T15/T16 라운드에서 implementer가 architect로 라우팅한 Open Question(*"부분 폴백 시 어느 스텝이 통조림인지 화면이 구분할 수 없다"* — `apps/web/components/ComparisonView.tsx:33~39`)의 처리다. 🔴 **이 커밋은 계약만 확정한다** — `route.ts`·UI 컴포넌트를 채우는 작업은 implementer 다음 라운드이며 목록은 F1-e 절의 이월 표에 있다)
 (2026-08-05 **5차 패스** — **PRD·UX 버전 갱신 없음**(v3.2 / 6.0 그대로, 버전 격차 0 — architect가 두 문서의 Document Version 헤더를 직접 재확인). 이 패스가 바꾼 것은 **누적된 정정 5건 + 결정 기록 1건**이다: **① 라우트 이름 6건을 `docs/UX.md` IA(:890)에 맞춰 정정 + 루트 `/` 리다이렉트 확정**(DECISIONS #43) **② 로컬 env 파일 표기 `.env.local` → `.env`**(#44) **③ `POST /api/deadline/check` 에 `urgency` 추가 — AC-005 지연 절반의 서버 게이트**(#45, `docs/API.md`) **④ F1-d 신설 — 기준일을 `MediationDeps` 로**(#46 · ADR-0008) **⑤ RLS 소유자 컬럼명 정정**(#47, `docs/Database.md`) **⑥ T15 AC-028 확장 절반 이월의 사용자 승인 기록**(#42) **⑦ 설계 제1원칙의 진척 수치 갱신** — `docs/UpdateRequests.md` #2 resolved)
 (2026-08-05 4차 패스 — **PRD·UX 버전 갱신 없음**(v3.2 / 6.0 그대로, 버전 격차 0). 이 패스가 바꾼 것: **① 존댓말 레벨 결정 규칙 신설**(Data Flow 1-a — AC-046 ②의 "규약 우선" 절을 MVP 구현 대상에서 제외하고, 빈 프로필에 기본 레벨을 지정하지 않는다. DECISIONS #39·#40 · ADR-0007) **② Conventions 14 신설** **③ `docs/Database.md`·`docs/API.md` 의 AC-073 ② 오인용 정정**)
@@ -223,6 +224,8 @@ apps/web/components/*    apps/extension/src/layer2/*  (선택)
 | **F2** | HTTP 계약 | `docs/API.md` (본 문서와 함께 이 커밋) | T1 파생 | [FE]가 백엔드 완성을 기다리지 않는다. 경로·상태코드·에러코드가 고정되면 목 서버로 진행 | M0 |
 | **F3** | 저장 스키마 | `docs/Database.md` + `supabase/migrations/0001_init.sql` | **T18** (설계는 본 커밋) | [BE-B] 저장 로직과 [FE] 조회 화면이 동시에. **T45 인증이 T18보다 먼저**(Planning Decision #43)이므로 마이그레이션은 인증 완료 직후 적용 | M2 첫날 (08-12) |
 | **F4** | 층 2 어댑터 계약 | `apps/extension/src/layer1/registry.ts` | **T57** | T29·T47·T49가 **서로 독립적인 3개 파일**이 된다. 스파이크 결과로 순서를 바꿔도 다른 둘이 영향받지 않는다 | M3 앞단 (08-16) |
+
+**F4 동결 후의 변경 이력 — 1건**: **F4-a**(`findInput()` 이 `InsertionOrigin` 을 받는다 — DECISIONS **#51** · ADR-**0010**, 2026-08-08). 🔴 **F1 변경 5건과 달리 이것은 기존 시그니처를 바꾸는 breaking change 다** — 근거·영향 범위·어댑터 3개 공통 규칙은 아래 **F4** 절이 단일 출처다.
 
 **F1이 늦어지면 4명 전원이 멈춘다.** `docs/Tasks.md` Rules 첫 줄이 이미 이 규칙을 명시하고 있다("T1 완료 전 T5 이후 착수 금지").
 
@@ -606,18 +609,84 @@ export interface MediationResult {
 
 ### F4 — 층 2 어댑터 계약 (`registry.ts`)
 
+> 🔴 **F4 변경 1건(F4-a, 2026-08-08 · DECISIONS #51 · ADR-0010) — `findInput()` 이 인자를 받는다.** 동결 후 첫 변경이며, 아래 코드 블록이 **확정형**이다(이전 형태는 이 절 끝 "F4-a 이전 형태" 에 이력으로만 남긴다). 소비처: **UX-016**(층 1 패널) / **UF-011·UF-012·UF-014**(GitHub·Slack·Gmail Insert 경로) / 태스크: **T57**(계약 파일) · **T29**(GitHub 후속) · **T47**(Slack) · **T49**(Gmail).
+
 ```ts
 // apps/extension/src/layer1/registry.ts  — 🔒 Freeze Point F4
 // (파일 안의 라벨도 "F4" 로 쓴다 — 위 동결 지점 표의 번호가 단일 출처다)
+
+/**
+ * 선택이 시작된 위치. 층 1이 **선택 시점에** 캡처해 층 2로 넘긴다(F4-a).
+ * 객체로 감싼 이유는 아래 "왜 `HTMLElement | null` 을 그대로 넘기지 않는가" 참조.
+ */
+export interface InsertionOrigin {
+  /** 선택이 시작된 host 페이지 요소. 캡처할 수 없었으면 `null`. */
+  element: HTMLElement | null;
+}
+
 export interface Layer2Adapter {
   id: 'github' | 'slack' | 'gmail';
-  matches(url: URL): boolean;            // origin/path 판정만
-  findInput(): HTMLElement | null;       // 입력창 DOM 노드
-  insert(el: HTMLElement, text: string): boolean;  // 삽입만. 🔴 전송 버튼 클릭 코드 없음 (AC-040)
+  matches(url: URL): boolean;                        // origin/path 판정만
+  findInput(origin: InsertionOrigin): HTMLElement | null;  // 삽입 대상 DOM 노드
+  insert(el: HTMLElement, text: string): boolean;    // 삽입만. 🔴 전송 버튼 클릭 코드 없음 (AC-040)
 }
 ```
 
 층 1은 `adapters.find(a => a.matches(url))` 결과가 있을 때만 "입력창에 삽입" 버튼을 렌더한다. 없으면 **렌더하지 않는다**(비활성 버튼 금지 — AC-053②). `layer2/index.ts` 가 빈 배열이어도 층 1 전체 경로가 동작한다 = AC-053③.
+
+#### F4-a — 왜 바꿨나 (근본 원인 2개, 둘 다 브라우저 규격)
+
+`docs/UX.md:187`(UF-011 step 6, *"targeting the field the selection came from"*)와 `docs/UX.md:760`(UX-016 Exit, *"approved text written into the originating field"*)는 **선택이 시작된 그 필드**로의 삽입을 요구한다. 인자 없는 `findInput()` 으로는 이 요구를 만족할 수 없다 — 어댑터가 실행 시점에 "원본 필드"를 알아낼 방법이 **원리적으로** 없기 때문이다. T29 구현은 두 가지 방법으로 추론을 시도했고 **둘 다 실행 경로에서 죽어 있다**(reviewer 트레이스, 2026-08-08):
+
+| 추론 수단 | 왜 죽어 있나 | 근거 |
+|---|---|---|
+| `document.activeElement` | 패널은 **open shadow root** 안에 마운트되고(`panel-mount.tsx` 의 `attachShadow({mode:'open'})`), 마운트 직후 자기 자신에게 포커스를 준다(`MediationPanel.tsx:87~89`). `findInput()` 은 그보다 **한참 뒤**(사용자가 Insert 를 누를 때) 실행된다. shadow **retargeting** 규격상 그 시점의 `document.activeElement` 는 shadow **host `<div>`** 로 보고된다 — 어떤 textarea 도 아니다 | 같은 retargeting 현상이 이미 이 저장소에 기록돼 있다: `selection.ts:86~98` |
+| `window.getSelection()?.anchorNode` | `<textarea>`/`<input>` **안**의 선택은 `window.getSelection()` 에 나타나지 않는다(빈 문자열). 이건 새 발견이 아니라 이 저장소가 이미 아는 사실이며, 바로 그 때문에 `getFormControlSelectionPayload()` 라는 별도 함수가 `selectionStart`/`selectionEnd` 로 폼 컨트롤 선택을 따로 읽는다 | `selection.ts:178~204` |
+
+**따라서 두 분기는 항상 실패하고, `findInput()` 은 조용히 문서 전역 후보 선택자 목록의 첫 매치를 고른다.** 크래시가 아니라 **조용한 오대상 삽입**이며, 컴포저가 여러 개 동시에 떠 있는 것이 일상인 Slack(채널 컴포저 + 열린 스레드 컴포저)·Gmail(다중 작성창)에서는 GitHub 보다 훨씬 자주 발생한다.
+
+**원본 요소는 선택 시점에는 알 수 있다** — 잃어버리는 것은 그 뒤(패널 오픈 → 포커스 이동 → 중재 호출 완료)다. 그러므로 고칠 자리는 어댑터의 추론이 아니라 **층 1이 선택 시점에 잡아 두고 넘기는 배선**이다.
+
+#### F4-a — 층 1 쪽 계약 (공유 코드 1곳, 어댑터가 각자 재발명하지 않는다)
+
+| # | 파일 | 무엇을 |
+|---|---|---|
+| 1 | `apps/extension/src/layer1/selection.ts` | `SelectionPayload` 에 **`origin: HTMLElement \| null`** 을 추가하고 **선택 시점에** 채운다. 폼 컨트롤 분기(`getFormControlSelectionPayload`)는 그 `HTMLTextAreaElement`/`HTMLInputElement` 자신을, 문서 selection 분기는 `range.commonAncestorContainer` 에서 가장 가까운 **Element** 조상(텍스트 노드면 `parentElement`)을 넣는다 |
+| 2 | 같은 파일 | 🔴 **층 1은 그 요소가 "입력창인지" 판정하지 않는다** — 있는 그대로 보고만 한다. 적격 판정은 어댑터 소관이다(사이트 지식이 층 1로 새면 `docs/CodingRules.md` Directory Rules 와 AC-052③ 위반) |
+| 3 | `panel-mount.tsx` | `openMediationPanel(payload, adapter)` 이 `payload.origin` 을 `MediationPanel` 에 prop 으로 전달한다(시그니처 추가 없음 — 이미 `payload` 전체를 받는다) |
+| 4 | `MediationPanel.tsx` | prop 을 그대로 보관했다가 `handleInsert()` 에서 `adapter.findInput({ element: origin })` 으로 넘긴다. 🔴 **모듈 레벨 전역에 담지 않는다** — 패널 인스턴스와 함께 해제되어야 detached 노드를 붙들지 않는다 |
+
+#### F4-a — 층 2 쪽 계약 (T29 후속 · T47 · T49 공통, 3개 어댑터 동일)
+
+| # | 규칙 | 판정 (무엇이 위반인가) |
+|---|---|---|
+| 1 | **검증** — `origin.element` 는 `null` 이 아니고 **`isConnected === true`** 일 때만 쓴다. mouseup(캡처) 과 Insert 클릭 사이에 host 페이지가 그 노드를 다시 그렸을 수 있다(Slack/Gmail 에서 실제로 흔하다) | `isConnected`(또는 `document.contains`) 확인 없이 `origin.element` 를 반환하면 위반 |
+| 2 | **해석** — 어댑터는 자신의 선택자로 origin 에서 위로 올라가 컴포저를 찾을 수 있다(`element.closest(...)`). origin 자체가 적격 필드면 그대로 쓴다 | — |
+| 3 | 🔴 **`findInput()` 안에서 `document.activeElement` · `window.getSelection()` 을 읽지 않는다.** 위 표대로 그 시점엔 둘 다 무의미하며, 읽으면 "동작하는 것처럼 보이는 죽은 분기"가 다시 생긴다 | `rg 'activeElement\|getSelection\(' apps/extension/src/layer2/` 가 **0건**이어야 한다 |
+| 4 | **폴백** — 문서 전역 후보 선택자는 **origin 이 없거나·끊겼거나·해석 불가일 때만** 쓰는 **마지막** 분기다(읽기 전용 영역에서 선택한 뒤 유일한 컴포저에 삽입하는 경로는 실제로 있으므로 폴백 자체는 유지한다) | 후보 선택자 조회가 origin 검사보다 먼저 나오면 위반 |
+| 5 | `findInput` 을 **인자 없이 선언하지 않는다** — TypeScript 구조적 타이핑상 무인자 함수도 이 인터페이스에 대입되므로 컴파일러가 잡아주지 않는다. **reviewer 의 눈이 판정 수단이다** | `layer2/**` 의 `function findInput()` 처럼 파라미터 0개면 위반 |
+
+#### F4-a — 검토한 대안
+
+| 안 | 기각/채택 이유 |
+|---|---|
+| **(채택) `findInput(origin: InsertionOrigin)`** | 원본 캡처가 **공유 층 1 코드 1곳**에 남고 어댑터 3개는 "받은 힌트를 검증·해석"만 한다. 층 2 → 층 1 의 **타입 import 만** 유지된다(기존 규칙 그대로) |
+| `findInput()` 유지 + 어댑터가 선택 시점 훅을 자체 등록 | 🔴 기각. 어댑터마다 document 리스너와 원본 캡처를 **3번 중복** 구현하게 되고, 선택 감지가 층 1 소유라는 정의(AC-052①②③)와 정면 충돌한다 |
+| `findInput()` 유지 + 삽입 대상 결정을 층 1이 수행 | 🔴 기각. 층 1이 "이 요소가 이 사이트의 입력창인가"를 판정해야 하므로 사이트 지식이 층 1로 들어온다(AC-052③ 위반) |
+| 인자를 **선택적**(`origin?: InsertionOrigin`) 으로 | 기각. 무시해도 컴파일이 통과하므로 **지금과 똑같은 조용한 오대상 삽입**으로 되돌아갈 여지를 남긴다. 필수 파라미터는 최소한 어댑터 작성자가 한 번은 마주보게 한다 |
+| `HTMLElement \| null` 을 그대로 넘기기 | 기각. F4 는 동결 지점이라 **깨는 변경은 한 번으로 끝내고 싶다.** 나중에 캐럿 위치(`selectionStart`/`selectionEnd`)나 rect 를 넘겨야 하면 `InsertionOrigin` 에 필드를 더하면 되고 시그니처는 그대로다 |
+
+#### F4-a — 알려진 한계(설계상 수용, 지어내지 않는다)
+
+- host 페이지의 **closed shadow root** 안이나 **다른 프레임** 안에서 시작된 선택은 origin 이 `null` 이다. `manifest.json:11~16` 의 콘텐츠 스크립트에 `all_frames` 가 없으므로 **iframe 안은 애초에 층 1이 동작하지 않는다** — 그 경우 어댑터는 규칙 4의 폴백으로 내려간다. Gmail 작성 본문이 iframe 인지 여부는 **미검증(추정)** 이며 T49 스파이크(`docs/Tasks.md` Open Question "Gmail 작성창의 DOM 텍스트 삽입 난이도")에서 확인한다.
+- 이 변경은 **삽입 대상 선정**만 고친다. 캐럿 위치 보존(선택 구간만 치환 vs 전체 값 교체)은 현재 계약대로 `insert()` 소관이며 **바꾸지 않는다** — 요구한 AC 가 없다.
+
+#### F4-a 이전 형태 (이력 — 사용 금지)
+
+```ts
+// 2026-08-08 이전. findInput 이 원본 필드를 스스로 추론해야 했고, 위 표의 이유로 항상 실패했다.
+findInput(): HTMLElement | null;
+```
 
 ---
 
