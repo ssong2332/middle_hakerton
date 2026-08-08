@@ -60,6 +60,7 @@ export function openMediationPanel(
         initialText={payload.text}
         onClose={closeMediationPanel}
         adapter={adapter}
+        origin={payload.origin}
       />,
     );
   });

@@ -3,24 +3,34 @@
 // 검증한다(컴포넌트 자체 상태 전이는 `MediationPanel.test.tsx`가 이미 커버한다).
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// ADR-0010/F4-a — `receivedOrigin` lets a test assert on the exact `origin` reference
+// `MediationPanel` was actually rendered with (identity check, not just truthiness) —
+// see the "passes the origin element through" test below.
+let receivedOrigin: HTMLElement | null | undefined;
+
 vi.mock('./MediationPanel', () => ({
   MediationPanel: ({
     initialText,
     onClose,
     adapter,
+    origin,
   }: {
     initialText: string;
     onClose: () => void;
     adapter?: { id: string } | null;
-  }) => (
-    <div data-testid="mock-panel">
-      <span>{initialText}</span>
-      <span data-testid="adapter-id">{adapter ? adapter.id : 'none'}</span>
-      <button type="button" onClick={onClose}>
-        close
-      </button>
-    </div>
-  ),
+    origin?: HTMLElement | null;
+  }) => {
+    receivedOrigin = origin;
+    return (
+      <div data-testid="mock-panel">
+        <span>{initialText}</span>
+        <span data-testid="adapter-id">{adapter ? adapter.id : 'none'}</span>
+        <button type="button" onClick={onClose}>
+          close
+        </button>
+      </div>
+    );
+  },
 }));
 
 import { closeMediationPanel, openMediationPanel } from './panel-mount';
@@ -32,10 +42,11 @@ describe('panel-mount', () => {
   afterEach(() => {
     closeMediationPanel();
     document.body.innerHTML = '';
+    receivedOrigin = undefined;
   });
 
   it('mounts the panel inside a shadow root host attached to document.body', () => {
-    openMediationPanel({ text: 'selected text', rect: FAKE_RECT });
+    openMediationPanel({ text: 'selected text', rect: FAKE_RECT, origin: null });
 
     const host = document.getElementById('cbm-layer1-panel-host');
     expect(host).not.toBeNull();
@@ -46,8 +57,8 @@ describe('panel-mount', () => {
   });
 
   it('only one panel host exists at a time — opening again replaces the previous one', () => {
-    openMediationPanel({ text: 'first', rect: FAKE_RECT });
-    openMediationPanel({ text: 'second', rect: FAKE_RECT });
+    openMediationPanel({ text: 'first', rect: FAKE_RECT, origin: null });
+    openMediationPanel({ text: 'second', rect: FAKE_RECT, origin: null });
 
     expect(document.querySelectorAll('#cbm-layer1-panel-host').length).toBe(1);
     expect(document.getElementById('cbm-layer1-panel-host')!.shadowRoot!.textContent).toContain(
@@ -56,14 +67,14 @@ describe('panel-mount', () => {
   });
 
   it('closeMediationPanel removes the host entirely', () => {
-    openMediationPanel({ text: 'selected text', rect: FAKE_RECT });
+    openMediationPanel({ text: 'selected text', rect: FAKE_RECT, origin: null });
     closeMediationPanel();
 
     expect(document.getElementById('cbm-layer1-panel-host')).toBeNull();
   });
 
   it('the mocked panel onClose callback also closes the panel', () => {
-    openMediationPanel({ text: 'selected text', rect: FAKE_RECT });
+    openMediationPanel({ text: 'selected text', rect: FAKE_RECT, origin: null });
     const host = document.getElementById('cbm-layer1-panel-host')!;
     const closeButton = host.shadowRoot!.querySelector('button')!;
     closeButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -79,7 +90,7 @@ describe('panel-mount', () => {
     triggerButton.id = 'cbm-layer1-selection-button';
     document.body.appendChild(triggerButton);
 
-    openMediationPanel({ text: 'selected text', rect: FAKE_RECT });
+    openMediationPanel({ text: 'selected text', rect: FAKE_RECT, origin: null });
     closeMediationPanel();
 
     expect(document.activeElement).toBe(triggerButton);
@@ -88,7 +99,7 @@ describe('panel-mount', () => {
   // T57/AC-053③ — 어댑터를 넘기지 않으면(기본값) 패널은 null을 받는다 — 층 2 없는 사이트의
   // 일상 경로.
   it('defaults to a null adapter when none is passed', () => {
-    openMediationPanel({ text: 'x', rect: FAKE_RECT });
+    openMediationPanel({ text: 'x', rect: FAKE_RECT, origin: null });
 
     const host = document.getElementById('cbm-layer1-panel-host')!;
     expect(host.shadowRoot!.querySelector('[data-testid="adapter-id"]')!.textContent).toBe(
@@ -104,11 +115,34 @@ describe('panel-mount', () => {
       findInput: () => null,
       insert: () => true,
     };
-    openMediationPanel({ text: 'x', rect: FAKE_RECT }, fakeAdapter);
+    openMediationPanel({ text: 'x', rect: FAKE_RECT, origin: null }, fakeAdapter);
 
     const host = document.getElementById('cbm-layer1-panel-host')!;
     expect(host.shadowRoot!.querySelector('[data-testid="adapter-id"]')!.textContent).toBe(
       'github',
     );
+  });
+
+  // ADR-0010/F4-a — MJ-A(reviewer follow-up, T29 round 2): this is the one production
+  // line (`panel-mount.tsx`'s `origin={payload.origin}`) connecting origin *capture*
+  // (`selection.ts`) to origin *consumption* (`MediationPanel.handleInsert()` →
+  // `adapter.findInput(origin)`). Before this test, deleting that line left all other
+  // tests green — nothing watched it. Identity check, not just truthiness: a bug that
+  // passed *some* element (e.g. always `null`, or the wrong one) must fail this.
+  //
+  // 🔴 Red evidence (2026-08-08) — temporarily removed the `origin={payload.origin}`
+  // line from `panel-mount.tsx` and ran
+  // `npx vitest run apps/extension/src/layer1/panel-mount.test.tsx --pool=threads`:
+  //   × passes the payload origin element through to MediationPanel
+  //     AssertionError: expected undefined to be <textarea></textarea>
+  // (1 failed, 7 passed — only this test caught it). The line was then restored and
+  // all 8 tests passed again.
+  it('passes the payload origin element through to MediationPanel', () => {
+    const originEl = document.createElement('textarea');
+    document.body.appendChild(originEl);
+
+    openMediationPanel({ text: 'x', rect: FAKE_RECT, origin: originEl });
+
+    expect(receivedOrigin).toBe(originEl);
   });
 });

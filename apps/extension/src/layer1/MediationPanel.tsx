@@ -30,6 +30,12 @@ export interface MediationPanelProps {
   onClose: () => void;
   /** T57 — 현재 사이트에 매칭된 층 2 어댑터, 없으면 `null`(기본값). */
   adapter?: Layer2Adapter | null;
+  /**
+   * ADR-0010/F4-a — 선택이 시작된 host 페이지 요소. `panel-mount.tsx`가
+   * `SelectionPayload.origin`을 그대로 전달한다. prop으로만 보관한다 — 패널 인스턴스가
+   * 해제되면 함께 사라져야 detached 노드를 붙들지 않는다(모듈 전역에 담지 않는다).
+   */
+  origin?: HTMLElement | null;
 }
 
 type Status = 'checkingAuth' | 'notLoggedIn' | 'idle' | 'loading' | 'success' | 'error';
@@ -57,7 +63,12 @@ function fallbackCopyToClipboard(text: string): boolean {
   }
 }
 
-export function MediationPanel({ initialText, onClose, adapter = null }: MediationPanelProps) {
+export function MediationPanel({
+  initialText,
+  onClose,
+  adapter = null,
+  origin = null,
+}: MediationPanelProps) {
   const [status, setStatus] = useState<Status>('checkingAuth');
   const [text, setText] = useState(initialText);
   const [result, setResult] = useState<MediationResult | null>(null);
@@ -153,7 +164,7 @@ export function MediationPanel({ initialText, onClose, adapter = null }: Mediati
   function handleInsert() {
     if (!adapter) return;
     try {
-      const inputEl = adapter.findInput();
+      const inputEl = adapter.findInput({ element: origin });
       if (inputEl === null) {
         setInsertStatus('failed');
         return;

@@ -2,6 +2,24 @@
 // jsdom은 실제 레이아웃 엔진이 없어 `getBoundingClientRect()`가 기본적으로 0을 반환한다
 // (`docs/CodingRules.md` Tests 절 semantic vs structural 구분) — 그래서 픽셀 값이 아니라
 // "코드가 selection의 rect를 실제로 읽어 버튼 위치 계산에 썼는지"를 구조적으로 검증한다.
+//
+// 🔴 MJ-B red evidence (reviewer follow-up, T29 round 2, re-verified 2026-08-08) — the 4
+// ADR-0010/F4-a `origin` tests below (`captures the nearest Element ancestor...` ×2 —
+// generic site A/B, `captures the form control itself as origin for a <textarea>/<input>
+// selection` ×2) were added in commit 7efb351 without a recorded red run. Re-checked by
+// temporarily checking out the pre-ADR-0010 implementation files
+// (`git checkout 991229f -- apps/extension/src/layer1/selection.ts` + the other 4 files
+// changed in that commit) and running
+// `npx vitest run apps/extension/src/layer1/selection.test.ts --pool=threads`:
+//   × generic site A > captures the nearest Element ancestor of the selection as origin
+//   × generic site B > captures the nearest Element ancestor of the selection as origin
+//     AssertionError: expected undefined to be an instance of Element
+//   × captures the form control itself as origin for a <textarea> selection
+//     AssertionError: expected undefined to be <textarea id="ta"></textarea>
+//   × captures the form control itself as origin for an <input> selection
+//     AssertionError: expected undefined to be <input id="inp" .../>
+// (4 failed, 31 passed). Implementation files then restored
+// (`git checkout HEAD -- ...`) and all 35 tests passed again.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   computeClampedPosition,
@@ -182,6 +200,27 @@ describe('initSelectionOverlay', () => {
 
         expect(onSelect).toHaveBeenCalledTimes(1);
         expect(onSelect.mock.calls[0][0].text.length).toBeGreaterThan(0);
+      });
+
+      // ADR-0010/F4-a — the payload must carry the Element the selection came from
+      // (captured at selection time, before focus can move to the panel). For a
+      // document-range selection, origin is the nearest Element ancestor of
+      // range.commonAncestorContainer (the text node's parentElement here).
+      it('captures the nearest Element ancestor of the selection as origin', () => {
+        const content = renderSite();
+        const onSelect = vi.fn();
+        cleanup = initSelectionOverlay({ onSelect });
+
+        selectTextIn(content);
+        fireMouseUp();
+
+        const button = getButton();
+        button!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(onSelect).toHaveBeenCalledTimes(1);
+        const origin = onSelect.mock.calls[0][0].origin;
+        expect(origin).toBeInstanceOf(Element);
+        expect(content.contains(origin)).toBe(true);
       });
     });
   }
@@ -406,6 +445,40 @@ describe('initSelectionOverlay — form control selections (M-2)', () => {
     button!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect.mock.calls[0][0].text).toBe('selectable');
+  });
+
+  // ADR-0010/F4-a — for a form-control selection, origin is the control itself
+  // (getFormControlSelectionPayload() already holds a reference to it).
+  it('captures the form control itself as origin for a <textarea> selection', () => {
+    document.body.innerHTML = '<textarea id="ta">Hello selectable body copy</textarea>';
+    const textarea = document.getElementById('ta') as HTMLTextAreaElement;
+    const onSelect = vi.fn();
+    cleanup = initSelectionOverlay({ onSelect });
+
+    selectInFormControl(textarea, 6, 16); // "selectable"
+    fireMouseUp();
+
+    const button = getButton();
+    button!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect.mock.calls[0][0].origin).toBe(textarea);
+  });
+
+  it('captures the form control itself as origin for an <input> selection', () => {
+    document.body.innerHTML = '<input id="inp" value="Hello selectable body copy" />';
+    const input = document.getElementById('inp') as HTMLInputElement;
+    const onSelect = vi.fn();
+    cleanup = initSelectionOverlay({ onSelect });
+
+    selectInFormControl(input, 6, 16); // "selectable"
+    fireMouseUp();
+
+    const button = getButton();
+    button!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect.mock.calls[0][0].origin).toBe(input);
   });
 
   it('does not show the button for an empty/collapsed textarea selection', () => {

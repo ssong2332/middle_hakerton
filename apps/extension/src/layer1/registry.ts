@@ -5,10 +5,22 @@
  */
 
 // F4
+// 🔴 F4-a(2026-08-08 · DECISIONS #51 · ADR-0010) — `findInput()`이 `InsertionOrigin`을
+// 받는다. docs/Architecture.md "F4 — 층 2 어댑터 계약" 절이 이 코드 블록의 단일 출처다.
+
+/**
+ * 선택이 시작된 위치. 층 1이 **선택 시점에** 캡처해 층 2로 넘긴다(F4-a).
+ * 객체로 감싼 이유는 docs/Architecture.md F4-a "검토한 대안" 참조.
+ */
+export interface InsertionOrigin {
+  /** 선택이 시작된 host 페이지 요소. 캡처할 수 없었으면 `null`. */
+  element: HTMLElement | null;
+}
+
 export interface Layer2Adapter {
   id: 'github' | 'slack' | 'gmail';
   matches(url: URL): boolean; // origin/path 판정만
-  findInput(): HTMLElement | null; // 입력창 DOM 노드
+  findInput(origin: InsertionOrigin): HTMLElement | null; // 삽입 대상 DOM 노드
   insert(el: HTMLElement, text: string): boolean; // 삽입만. 🔴 전송 버튼 클릭 코드 없음 (AC-040)
 }
 

@@ -46,7 +46,7 @@ describe('content.ts wiring (T57)', () => {
 
     await import('./content');
     const onSelect = getWiredOnSelect();
-    const payload: SelectionPayload = { text: 'hi', rect: {} as DOMRect };
+    const payload: SelectionPayload = { text: 'hi', rect: {} as DOMRect, origin: null };
     onSelect(payload);
 
     expect(mockOpenMediationPanel).toHaveBeenCalledWith(payload, fakeAdapter);
@@ -56,7 +56,7 @@ describe('content.ts wiring (T57)', () => {
   it('passes null when no registered adapter matches (empty registry)', async () => {
     await import('./content');
     const onSelect = getWiredOnSelect();
-    const payload: SelectionPayload = { text: 'hi', rect: {} as DOMRect };
+    const payload: SelectionPayload = { text: 'hi', rect: {} as DOMRect, origin: null };
     onSelect(payload);
 
     expect(mockOpenMediationPanel).toHaveBeenCalledWith(payload, null);
