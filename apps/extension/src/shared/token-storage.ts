@@ -23,3 +23,12 @@ export async function getStoredToken(): Promise<string | null> {
 export async function setStoredToken(token: string): Promise<void> {
   await chrome.storage.session.set({ [TOKEN_STORAGE_KEY]: token });
 }
+
+/**
+ * 🔴 M-6(reviewer, 2026-08-08) — background가 `/api/mediate` 401 `AUTH_REQUIRED` 응답을 받으면
+ * 이걸로 만료 토큰을 지운다. 지우지 않으면 브라우저 세션이 끝날 때까지(chrome.storage.session의
+ * 생명주기) 같은 만료 토큰을 계속 보내 매번 401을 받게 된다.
+ */
+export async function clearStoredToken(): Promise<void> {
+  await chrome.storage.session.set({ [TOKEN_STORAGE_KEY]: '' });
+}

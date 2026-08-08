@@ -37,6 +37,26 @@ const hasLayer2Adapter = false;
 
 const APP_ORIGIN = (import.meta.env.VITE_APP_ORIGIN as string | undefined) ?? '';
 
+// 🔴 M-3(reviewer) — `navigator.clipboard`가 아예 없는 비-보안 컨텍스트(`http://` 호스트 페이지)
+// 를 위한 `execCommand('copy')` 폴백. 실패하면 false를 반환해 handleCopy가 에러 메시지를 보여주게
+// 한다 — 실패를 삼키지 않는다.
+function fallbackCopyToClipboard(text: string): boolean {
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
   const [status, setStatus] = useState<Status>('checkingAuth');
   const [text, setText] = useState(initialText);
@@ -44,13 +64,20 @@ export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
   const [finalText, setFinalText] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
+  // 🔴 M-4(reviewer) — `getStoredToken()`이 reject해도(예: `chrome.storage.session`의 access
+  // level이 아직 올라가기 전 race) "확인 중…"에 무한히 머물지 않고 NotLoggedIn으로 빠진다.
   useEffect(() => {
     let cancelled = false;
-    void getStoredToken().then((token) => {
-      if (!cancelled) setStatus(token ? 'idle' : 'notLoggedIn');
-    });
+    getStoredToken()
+      .then((token) => {
+        if (!cancelled) setStatus(token ? 'idle' : 'notLoggedIn');
+      })
+      .catch(() => {
+        if (!cancelled) setStatus('notLoggedIn');
+      });
     return () => {
       cancelled = true;
     };
@@ -68,6 +95,7 @@ export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
   async function runMediation() {
     setStatus('loading');
     setErrorMessage(null);
+    setCopyError(null);
     const response = await callMediationApi({
       text,
       recipient: null,
@@ -89,9 +117,24 @@ export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
   }
 
   // 🔴 AC-010/AC-053 — 클립보드 복사는 이 명시적 클릭 핸들러 하나에서만 일어난다.
+  // 🔴 M-3(reviewer) — `navigator.clipboard.writeText`는 비-보안(`http://`) 호스트 페이지에서
+  // `navigator.clipboard` 자체가 없거나, 문서 포커스 상실·권한 거부로 reject할 수 있다. 조용히
+  // 죽지 않고(UX-016 Failure "Copy는 절대 dead end가 아니다") 눈에 보이는 실패 메시지를 보여준다.
+  // 보안 컨텍스트가 아니라 Clipboard API 자체가 없는 경우엔 `execCommand('copy')` 폴백을 먼저
+  // 시도한다.
   async function handleCopy() {
-    await navigator.clipboard.writeText(finalText);
-    setCopied(true);
+    setCopyError(null);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(finalText);
+      } else if (!fallbackCopyToClipboard(finalText)) {
+        throw new Error('clipboard unavailable');
+      }
+      setCopied(true);
+    } catch {
+      setCopied(false);
+      setCopyError('클립보드 복사에 실패했습니다. 텍스트를 직접 선택해 복사해 주세요.');
+    }
   }
 
   const c2Source = result?.stepSources?.c2 ?? result?.source;
@@ -164,6 +207,7 @@ export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
                 onChange={(event) => {
                   setFinalText(event.target.value);
                   setCopied(false);
+                  setCopyError(null);
                 }}
               />
 
@@ -190,6 +234,7 @@ export function MediationPanel({ initialText, onClose }: MediationPanelProps) {
                 )}
               </div>
               {copied && <p role="status">복사됨</p>}
+              {copyError && <p role="alert">{copyError}</p>}
             </div>
           )}
         </>

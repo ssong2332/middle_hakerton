@@ -25,18 +25,22 @@ function copyManifest(): Plugin {
   return {
     name: 'copy-manifest',
     closeBundle() {
-      const manifest = JSON.parse(readFileSync(resolve(dirname, 'manifest.json'), 'utf-8'));
-      if (APP_ORIGIN) {
-        const pattern = `${APP_ORIGIN}/*`;
-        manifest.externally_connectable = { matches: [pattern] };
-        manifest.host_permissions = [pattern];
-      } else {
-        console.warn(
+      // 🔴 M-5(reviewer, 2026-08-08) — 이전에는 여기서 `console.warn`만 하고 빈
+      // `externally_connectable.matches`/`host_permissions`로 빌드를 **성공**시켰다. 그 결과로
+      // 나온 확장은 인증 핸드오프 전체와(C-1 반영 이후) background의 `/api/mediate` fetch까지
+      // 조용히 동작하지 않는다 — 런타임에서야 혼란스러운 실패로 드러난다. T55의 이 패키징 계열
+      // 결함이 T55 QA 라운드 전체를 한 번 더 돌게 만든 전례가 있다 — 빌드가 조용히 깨지는 대신
+      // 시끄럽게 실패해야 한다.
+      if (!APP_ORIGIN) {
+        throw new Error(
           '[apps/extension build] VITE_APP_ORIGIN이 설정되지 않았습니다 — ' +
-            'externally_connectable/host_permissions가 비어 있는 채로 빌드됩니다. ' +
             '리포 루트 .env에 VITE_APP_ORIGIN을 채운 뒤 다시 빌드하세요.',
         );
       }
+      const manifest = JSON.parse(readFileSync(resolve(dirname, 'manifest.json'), 'utf-8'));
+      const pattern = `${APP_ORIGIN}/*`;
+      manifest.externally_connectable = { matches: [pattern] };
+      manifest.host_permissions = [pattern];
       writeFileSync(resolve(dirname, 'dist/manifest.json'), JSON.stringify(manifest, null, 2));
     },
   };

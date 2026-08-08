@@ -67,6 +67,28 @@ export function removeFloatingButton(): void {
   getExistingButton()?.remove();
 }
 
+/**
+ * 🔴 M-7(reviewer, 2026-08-08) — UX-016 Accessibility "focus ... returns to the triggering
+ * floating button on close." `panel-mount.tsx`가 패널을 닫을 때 이 헬퍼로 위임한다.
+ *
+ * 🔴 알려진 한계(구현 완료 보고에 기록) — 실사용 흐름 대부분에서 패널을 닫을 시점에는 이 버튼이
+ * 이미 DOM에서 사라져 있다. 버튼 자신의 mousedown 핸들러만 `preventDefault`로 selection-collapse를
+ * 막는다(위 `createFloatingButton`의 M-1 주석) — 패널 안의 다른 어떤 요소(텍스트영역, 실행/복사
+ * 버튼 등)도 그렇게 하지 않으므로, 패널을 열고 그 안의 아무 요소나 한 번이라도 클릭하면 그
+ * mousedown의 네이티브 기본 동작이 host 문서의 selection을 그 클릭 위치로 이동시킨다(shadow
+ * DOM 안이라도 마찬가지). 그 결과 `selectionchange`가 발동하고, `document.activeElement`가
+ * (open shadow root의 retarget 규칙상) 패널 내부 요소가 아니라 shadow host `<div>` 자체로
+ * 보고되므로 `getFormControlSelectionPayload()`가 그걸 폼 컨트롤로 인식하지 못해 `null`을
+ * 반환한다 — `handleSelectionChange`가 버튼을 지운다. 즉 "패널을 열자마자 아무것도 클릭하지 않고
+ * Escape로 닫는" 좁은 경로에서만 이 함수가 실제로 포커스를 되돌린다. 이건 코드 결함이 아니라
+ * T55(선택 오버레이)가 이미 확정한 selectionchange 동작과 T56(패널)이 상호작용하는 방식에서
+ * 나오는 구조적 한계라 T55 쪽을 건드리지 않고는 "패널 클릭 후에도 버튼이 살아있게" 만들 수
+ * 없다 — orchestrator/ux-design에 스펙 질문으로 보고한다(구현 완료 보고 참조).
+ */
+export function focusFloatingButtonIfPresent(): void {
+  getExistingButton()?.focus();
+}
+
 function defaultOnSelect(payload: SelectionPayload): void {
   // 🔴 T56 마운트 지점 — 선택 텍스트로 채운 중재 패널을 여기서 연다(AC-052 ②, 이 태스크(T55) 범위 밖).
   console.info(

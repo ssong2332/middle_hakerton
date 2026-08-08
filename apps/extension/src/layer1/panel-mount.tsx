@@ -14,7 +14,7 @@
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { MediationPanel } from './MediationPanel';
-import type { SelectionPayload } from './selection';
+import { focusFloatingButtonIfPresent, type SelectionPayload } from './selection';
 
 const HOST_ID = 'cbm-layer1-panel-host';
 
@@ -48,8 +48,16 @@ export function openMediationPanel(payload: SelectionPayload): void {
   });
 }
 
-/** 패널을 닫는다. 열려 있지 않으면 아무 일도 하지 않는다. */
+/**
+ * 패널을 닫는다. 열려 있지 않으면 아무 일도 하지 않는다.
+ *
+ * 🔴 M-7(reviewer) — UX-016 Accessibility "focus ... returns to the triggering floating button
+ * on close." 언마운트/호스트 제거 뒤 `selection.ts`의 `focusFloatingButtonIfPresent()`로
+ * 위임한다 — 버튼이 여전히 DOM에 있을 때만 실제로 포커스를 옮긴다(그 함수 헤더 주석에 기록된
+ * "실사용 흐름 대부분에서는 이미 사라져 있다"는 알려진 한계 참조).
+ */
 export function closeMediationPanel(): void {
   activeRoot?.unmount();
   removeExistingHost();
+  focusFloatingButtonIfPresent();
 }

@@ -538,8 +538,22 @@ describe('removeFloatingButton (module-level export)', () => {
 // selectionchange가 버튼을 먼저 지운다)에는 조용히 아무 일도 하지 않는다 — 존재하지 않는
 // 요소에 포커스를 강제하지 않는다.
 describe('focusFloatingButtonIfPresent (module-level export, M-7)', () => {
+  // jsdom은 Range.prototype.getBoundingClientRect를 구현하지 않는다 — 위 다른 describe들과
+  // 같은 스텁(파일 상단 주석 참조).
+  let originalGetBoundingClientRect: typeof Range.prototype.getBoundingClientRect | undefined;
+
+  beforeEach(() => {
+    originalGetBoundingClientRect = Range.prototype.getBoundingClientRect;
+    Range.prototype.getBoundingClientRect = vi.fn(() => FAKE_RECT);
+  });
+
   afterEach(() => {
     document.body.innerHTML = '';
+    if (originalGetBoundingClientRect) {
+      Range.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    } else {
+      delete (Range.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+    }
   });
 
   it('is a no-op when no button exists', () => {
