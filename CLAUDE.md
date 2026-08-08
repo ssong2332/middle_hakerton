@@ -74,9 +74,11 @@ Record commands verbatim after the first success. Reuse without modification; if
 
 | Purpose | Command | Verified on |
 |---|---|---|
-| Build | {{...}} | {{date}} |
-| Test | {{...}} | {{date}} |
-| Run | {{...}} | {{date}} |
+| Build (web) | `npm run build` | 2026-08-08 |
+| Build (extension) | `VITE_APP_ORIGIN=<origin> npm run build:ext` | 2026-08-08 |
+| Test | `npm test` | 2026-08-08 |
+| Typecheck | `npm run typecheck` | 2026-08-08 |
+| Lint | `npm run lint` | 2026-08-08 |
 
 ---
 
