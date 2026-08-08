@@ -34,4 +34,10 @@ jobs:
         run: npm run build
 
       - name: Build (apps/extension)
+        # apps/extension/vite.background.config.ts의 copyManifest()는 VITE_APP_ORIGIN이
+        # 비어 있으면 빌드를 throw로 실패시킨다(M-5, 조용히 깨지는 확장 패키징 방지).
+        # CI는 실제 배포 origin이 아니라 빌드 성공 여부·manifest 구조만 검증하면 되므로,
+        # 보안상 민감하지 않은 플레이스홀더 origin을 빌드 시점에만 주입한다.
         run: npm run build:ext
+        env:
+          VITE_APP_ORIGIN: https://example.invalid
