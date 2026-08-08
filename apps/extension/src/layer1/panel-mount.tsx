@@ -53,8 +53,12 @@ export function openMediationPanel(payload: SelectionPayload): void {
  *
  * 🔴 M-7(reviewer) — UX-016 Accessibility "focus ... returns to the triggering floating button
  * on close." 언마운트/호스트 제거 뒤 `selection.ts`의 `focusFloatingButtonIfPresent()`로
- * 위임한다 — 버튼이 여전히 DOM에 있을 때만 실제로 포커스를 옮긴다(그 함수 헤더 주석에 기록된
- * "실사용 흐름 대부분에서는 이미 사라져 있다"는 알려진 한계 참조).
+ * 위임한다 — 버튼이 여전히 DOM에 있을 때만 실제로 포커스를 옮긴다. 🔴 정정(M-A, reviewer,
+ * 2026-08-08) — 실제 배선(`initSelectionOverlay()`의 document-레벨 keydown 리스너)에서는
+ * 이 시점에 버튼이 이미 없거나(다른 요소 클릭 경로) 이 호출 직후 같은 keydown 이벤트가
+ * document까지 버블돼 곧바로 지워진다(즉시 Escape 경로도 포함) — 현재 어떤 경로로도 포커스가
+ * 실제로 되돌아가지 않는다. 자세한 근거는 `selection.ts`의 `focusFloatingButtonIfPresent()`
+ * 헤더 주석과 `panel-focus-return.test.tsx` 참조.
  */
 export function closeMediationPanel(): void {
   activeRoot?.unmount();
