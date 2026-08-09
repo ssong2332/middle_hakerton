@@ -69,6 +69,23 @@
   margin-top: 6px;
 }
 
+.concernIncludeRow {
+  margin-bottom: 12px;
+}
+
+.concernIncludeLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 700 12px var(--font-sans);
+}
+
+.concernIncludeStatus {
+  font: 400 11px var(--font-sans);
+  color: var(--text-muted-75);
+  margin-top: 4px;
+}
+
 .actions {
   display: flex;
   gap: 10px;

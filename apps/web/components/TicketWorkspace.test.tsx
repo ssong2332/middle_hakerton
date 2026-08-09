@@ -209,6 +209,47 @@ describe('TicketWorkspace', () => {
     expect(mockPush).toHaveBeenCalledWith('/mediate');
   });
 
+  it('AC-087①④ — 기본 상태(체크박스 미체크)로 "Use this ticket"을 누르면 조립문에 [우려 수준]이 0건이다', async () => {
+    window.sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, '원문');
+    const fetchMock = vi.fn().mockResolvedValue(ticketResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<TicketWorkspace />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: '문제 정의' })).toBeTruthy();
+    });
+    const checkbox = screen.getByLabelText('발신 본문에 [우려 수준] 포함') as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+    expect(screen.getByText('[우려 수준]은 발신 본문에 포함되지 않습니다')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /Use this ticket/ }));
+
+    const stored = window.sessionStorage.getItem(TICKET_RESTORE_SESSION_KEY);
+    expect(stored).not.toContain('[우려 수준]');
+    expect(stored).not.toContain('높음');
+  });
+
+  it('AC-087③④ — 체크박스를 체크하면 상태 문구가 즉시 바뀌고, "Use this ticket" 조립문에 [우려 수준]이 1건 포함된다', async () => {
+    window.sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, '원문');
+    const fetchMock = vi.fn().mockResolvedValue(ticketResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<TicketWorkspace />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: '문제 정의' })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByLabelText('발신 본문에 [우려 수준] 포함'));
+    expect(screen.getByText('[우려 수준]이 발신 본문에 포함됩니다')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /Use this ticket/ }));
+
+    const stored = window.sessionStorage.getItem(TICKET_RESTORE_SESSION_KEY);
+    expect(stored).toContain('[우려 수준]');
+    expect(stored).toContain('높음');
+  });
+
   it('"Back to message" — 세션의 원문/복원값을 건드리지 않고 /mediate로 돌아간다(원문 보존)', async () => {
     window.sessionStorage.setItem(TICKET_DRAFT_SESSION_KEY, '원문');
     window.sessionStorage.setItem(TICKET_RESTORE_SESSION_KEY, '편집 중이던 원문');
