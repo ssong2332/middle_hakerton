@@ -22,6 +22,21 @@ const repoRoot = resolve(dirname, '../..');
 export default defineConfig({
   envDir: repoRoot,
   plugins: [react()],
+  // 🔴 T35 리허설 Scene 7 발 발견(2026-08-09, 실브라우저 실측) — `content.ts`가 React(패널·고지
+  // UI, T56/T58)를 번들하는데, React 내부 곳곳이 `process.env.NODE_ENV`를 참조한다. Next.js
+  // 빌드(`apps/web`)는 이 치환을 프레임워크가 자동으로 해 주지만, 이 파일은 순수 `vite build`라
+  // 아무도 치환해 주지 않는다 — 콘텐츠 스크립트가 실행되는 브라우저 페이지 전역에는 Node의
+  // `process` 객체가 아예 없으므로, `define` 없이 빌드한 `dist/content.js`는 로드되는 **모든
+  // 페이지에서** `Uncaught ReferenceError: process is not defined`로 즉시 죽는다(youtube.com
+  // 등에서 실측·`edge://extensions`의 확장 오류 로그로 확인, content.js:13:1). jsdom 기반
+  // vitest 테스트는 Node 환경이라 `process`가 항상 존재해 이 결함을 잡지 못했다 — T55~T58이
+  // `done`으로 QA GO를 받는 동안 실브라우저 로드가 한 번도 검증되지 않았기 때문에 발현하지
+  // 않고 남아 있었다. `production`으로 고정하는 이유: 이 확장은 개발자 모드 로드 전용이라
+  // 별도 dev/prod 모드 분기가 없고(Planning Decision #4), React의 프로덕션 경로(전체 개발자
+  // 경고 코드 제거)가 배포판에도 맞다.
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
