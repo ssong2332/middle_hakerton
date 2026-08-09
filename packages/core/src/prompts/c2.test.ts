@@ -15,10 +15,10 @@ import { C2_PROMPT_VERSION, buildC2Payload } from './c2';
 
 describe('C2_PROMPT_VERSION', () => {
   it(
-    "T22(C5 용어사전 주입 규칙 + unregisteredHonorifics 응답 필드 추가)로 'c2-v4'로 " +
+    "T79(directness/emojiPreference 축 반영 — 자기신고+학습 병합)로 'c2-v5'로 " +
       '올라가 있다(docs/Architecture.md Conventions 10)',
     () => {
-      expect(C2_PROMPT_VERSION).toBe('c2-v4');
+      expect(C2_PROMPT_VERSION).toBe('c2-v5');
     },
   );
 });
@@ -55,6 +55,44 @@ describe('buildC2Payload — honorificLevel: null(en-ko, 빈 프로필)', () => 
     const haeyoPayload = buildC2Payload('hi', 'en-ko', 'haeyo', REF_DATE);
     expect(nullPayload.instruction).not.toBe(hapsyoPayload.instruction);
     expect(nullPayload.instruction).not.toBe(haeyoPayload.instruction);
+  });
+});
+
+/**
+ * T79 — `directness`/`emojiPreference` 축 반영(Planning Decision #124). C3 자기신고와
+ * `profile_learned_items` 학습값이 (핸들러에서 병합된 뒤) 여기 도달하는 계약이라, 이 파일은
+ * "받은 값을 payload/instruction에 어떻게 싣는가"만 검증한다 — 병합 로직 자체(학습이 자기신고를
+ * 덮어씀)는 `pipeline.test.ts`의 몫이다(honorificLevel의 null-미기본값 원칙과 같은 분리).
+ */
+describe('buildC2Payload — directness/emojiPreference', () => {
+  it('둘 다 null이면 payload에 null로 그대로 실리고 instruction에 추측 지시가 없다', () => {
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE, [], null, null);
+    expect(payload.directness).toBeNull();
+    expect(payload.emojiPreference).toBeNull();
+  });
+
+  it('directness="indirect"면 instruction이 완곡한 표현 유지를 지시한다', () => {
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE, [], 'indirect', null);
+    expect(payload.directness).toBe('indirect');
+    expect(payload.instruction).toMatch(/indirect|soften|cushion/i);
+  });
+
+  it('directness="direct"면 instruction이 완곡 표현을 덧붙이지 말라고 지시한다', () => {
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE, [], 'direct', null);
+    expect(payload.directness).toBe('direct');
+    expect(payload.instruction).toMatch(/direct/i);
+  });
+
+  it('emojiPreference="avoids"면 instruction이 이모지를 넣지 말라고 지시한다', () => {
+    const payload = buildC2Payload('hi', 'ko-en', null, REF_DATE, [], null, 'avoids');
+    expect(payload.emojiPreference).toBe('avoids');
+    expect(payload.instruction).toMatch(/emoji/i);
+  });
+
+  it('null과 값이 있는 경우의 instruction이 서로 다르다(캐시 키가 두 상태를 구분한다)', () => {
+    const nullPayload = buildC2Payload('hi', 'ko-en', null, REF_DATE, [], null, null);
+    const indirectPayload = buildC2Payload('hi', 'ko-en', null, REF_DATE, [], 'indirect', null);
+    expect(nullPayload.instruction).not.toBe(indirectPayload.instruction);
   });
 });
 

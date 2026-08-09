@@ -11,7 +11,13 @@ import type { LLMClient } from '../llm/client';
 import type { LanguageDirection, MisreadRisk, PreservedItem, ResponseSource } from '../contract';
 import type { DictionaryEntry } from '../pipeline';
 import { LLMMalformedResponseError } from '../errors';
-import { buildC2Payload, C2_PROMPT_VERSION, type HonorificLevel } from '../prompts/c2';
+import {
+  buildC2Payload,
+  C2_PROMPT_VERSION,
+  type Directness,
+  type EmojiPreference,
+  type HonorificLevel,
+} from '../prompts/c2';
 import { preservedItemsSchema } from '../rules/preservation';
 import { misreadRisksSchema } from '../rules/misread-risk';
 import { findFallbackResponse, type FallbackResponseEntry } from '../data/fallback-responses';
@@ -67,6 +73,14 @@ export interface RunToneTransformInput {
    * 무관한 기존 테스트 다수를 깨지 않기 위함, `prompts/c2.ts` `buildC2Payload` JSDoc 참조).
    */
   dictionary?: DictionaryEntry[];
+  /**
+   * 🔴 T79(Planning Decision #124) — 자기신고+학습값 병합 결과(`pipeline.ts` 3단계가 병합한다,
+   * 이 함수는 병합하지 않는다). 생략하면 `null`과 동치(`honorificLevel`과 같은 이유로 기본값을
+   * 지어내지 않는다).
+   */
+  directness?: Directness | null;
+  /** 🔴 T79 — 위 `directness`와 같다. */
+  emojiPreference?: EmojiPreference | null;
 }
 
 export interface RunToneTransformResult {
@@ -202,6 +216,8 @@ export async function runToneTransform(
     input.honorificLevel,
     input.referenceDate,
     input.dictionary ?? [],
+    input.directness ?? null,
+    input.emojiPreference ?? null,
   );
   const response = await llm.complete('c2', C2_PROMPT_VERSION, payload);
 
