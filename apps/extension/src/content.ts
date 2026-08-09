@@ -8,15 +8,22 @@
  * `layer2/**`를 import할 수 없으므로(`docs/CodingRules.md` Directory Rules), 이 조합은 layer1도
  * layer2도 아닌 이 진입점 파일만 할 수 있다 — `host === 'github.com'` 같은 사이트 식별 분기가
  * 아니라 제네릭 레지스트리 조회다(층 1의 정의, Planning Decision #61과 충돌하지 않는다).
+ *
+ * T58 — `ensureNoticeAcknowledged()`가 끝난 뒤에만 선택 오버레이를 켠다(UX-017 Entry:
+ * "shown before any floating-button/panel interaction is reachable"). 이미 최신 버전이
+ * 확인된 상태(AC-076③)라면 이 await는 사실상 즉시 통과한다.
  */
 import { initSelectionOverlay } from './layer1/selection';
 import { openMediationPanel } from './layer1/panel-mount';
 import { findAdapterForUrl } from './layer1/registry';
+import { ensureNoticeAcknowledged } from './layer1/notice-mount';
 import { adapters } from './layer2';
 
-initSelectionOverlay({
-  onSelect: (payload) => {
-    const adapter = findAdapterForUrl(adapters, new URL(window.location.href));
-    openMediationPanel(payload, adapter);
-  },
+void ensureNoticeAcknowledged().then(() => {
+  initSelectionOverlay({
+    onSelect: (payload) => {
+      const adapter = findAdapterForUrl(adapters, new URL(window.location.href));
+      openMediationPanel(payload, adapter);
+    },
+  });
 });

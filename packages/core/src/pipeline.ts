@@ -55,6 +55,7 @@ import { resolveDeliveryPath, resolveEffectiveUrgency } from './rules/urgency-ro
 import { combineSource } from './rules/response-source';
 import { honorificMixedWarning, honorificNotRegisteredWarnings } from './rules/honorific';
 import { ticketOptionFrom } from './rules/ticket-gate';
+import type { Directness, EmojiPreference } from './prompts/c2';
 
 /**
  * `run()` 의 두 번째 인자 — **실행 수단과 조회 결과**.
@@ -170,19 +171,39 @@ export type MediationPipeline = (
  * 이 둘의 역할은 **C2 호출의 입력으로 흘려보내는 것**뿐이다 — 그래서 AC-032의 핵심 증거는
  * "LLM 호출이 C1 → C2 → C4 순서로 일어난다"는 사실이다(`pipeline.test.ts`가 그 순서를 고정한다).
  *
- * 🔴 **`deps.data.learnedItems`(profile_learned_items) 소비 여부 — 이번 태스크의 판단.**
- * `docs/Architecture.md:384`가 "C3 단계에서 `profiles`/`profile_learned_items`를 함께 조회한다"고
- * 적어 두었지만, 그 값을 **변환 로직이 어떻게 반영해야 하는지 정의한 AC·태스크가 없다** —
- * `packages/core/src/prompts/c2.ts`의 `C2Payload`에는 `honorificLevel`(프로필 자기신고 값) 자리만
- * 있고 `directness`/`emojiPreference`에 대응하는 자리가 없으며(`pattern-detection.ts`의
- * `profileValueForPattern` 헤더 주석도 "이 함수는 `profile_learned_items` 테이블에 쓸 값만
- * 만든다 … `profiles` 테이블 자체를 갱신하는 것은 이 태스크(T20)의 범위가 아니다"라고 명시한다),
- * `docs/TestCases.md`에도 learnedItems가 변환 결과를 바꾸는 케이스가 없다. 즉 **T20이 쓰기
- * 측만 만들었고 읽어서 변환에 반영하는 태스크는 아직 어디에도 배정되지 않았다.** 이 함수는
- * 계약대로 `deps.data.learnedItems`를 받기만 하고(타입 체크 통과), **소비 로직을 지어내지
- * 않는다** — 근거 없는 개인화 동작을 만드는 것은 Conventions 9 위반이다. 소비 지점이 정해지면
- * 그 태스크가 이 자리에 로직을 추가한다.
+ * 🔴 **`deps.data.learnedItems`(profile_learned_items) 소비 — T79(Planning Decision #124).**
+ * T35 리허설(Scene 5a "학습 전/후")에서 이 값이 파이프라인 어디에도 반영되지 않는다는 gap이
+ * 드러났다 — `docs/Architecture.md:384`는 조회를 요구했지만 변환 로직 반영 지점이 어느
+ * 태스크에도 배정돼 있지 않았다(T20은 쓰기만, T21은 열람 화면만). 이제 `resolveMergedStyle()`
+ * (아래)가 `directness`/`emojiPreference` 두 축에서 **학습값이 자기신고를 덮어쓴다** —
+ * `apps/web/app/(app)/(with-nav)/profile/page.tsx`의 `PATTERN_TO_FIELD` 표시 우선순위와
+ * 같은 규칙(둘 다 `pattern-detection.ts`의 `DiffPatternKey` 어휘를 단일 출처로 삼는다).
+ * `honorificLevel`은 학습 대상이 아니므로(`DiffPatternKey`에 대응 패턴 없음) 이 병합의 범위
+ * 밖이며 지금처럼 자기신고 값만 그대로 흘려보낸다.
  */
+const PATTERN_TO_STYLE_FIELD: Record<string, 'directness' | 'emojiPreference'> = {
+  cushion_insert: 'directness',
+  emoji_removed: 'emojiPreference',
+};
+
+/**
+ * `directness`/`emojiPreference` 한 축을 자기신고+학습값으로 병합한다 — **학습이 자기신고를
+ * 덮어쓴다**(우선순위 근거는 위 step ③ 주석). `learnedItems`에 해당 축의 패턴이 없으면 자기신고
+ * 값을 그대로 쓰고, 그것도 `null`이면(미응답) `null`이다 — 추측 기본값을 채우지 않는다
+ * (Conventions 9, `honorificLevel`과 같은 원칙).
+ *
+ * `LearnedItem.patternKey`는 DB CHECK 제약이 `DiffPatternKey` 두 값으로 좁히지만 타입 자체는
+ * `string`이다(`LearnedItem` 인터페이스 주석) — 여기서 매핑에 없는 값은 그냥 무시한다(어느
+ * 축에도 속하지 않는 패턴을 지어내 반영하지 않는다).
+ */
+function resolveMergedStyle<T extends string>(
+  field: 'directness' | 'emojiPreference',
+  selfReported: T | null,
+  learnedItems: LearnedItem[],
+): T | null {
+  const learned = learnedItems.find((item) => PATTERN_TO_STYLE_FIELD[item.patternKey] === field);
+  return learned ? (learned.value as T) : selfReported;
+}
 export const run: MediationPipeline = async (input, deps) => {
   const { llm } = deps;
 
@@ -207,9 +228,21 @@ export const run: MediationPipeline = async (input, deps) => {
 
   // ③ C3 — 발신자 프로필. `input.sender.profile`은 Route Handler가 `run()` 호출 전에 이미
   // `profiles`/`profile_learned_items`를 조회해 채운 값이다(F1-b, AC-028 — core는 조회하지
-  // 않는다). 이 스텝의 역할은 그 값(`honorificLevel`)을 아래 C2 호출의 입력으로 넘기는 것뿐이다
-  // — 프로필이 비어 있으면(`skipped`/`not_started`) `honorificLevel`도 `null`이고, C2는 기본
-  // 레벨을 지어내지 않는다(`docs/Architecture.md` Data Flow 1-a, DECISIONS #40).
+  // 않는다). `honorificLevel`은 자기신고 그대로 아래 C2 호출의 입력으로 넘긴다 — 프로필이
+  // 비어 있으면(`skipped`/`not_started`) `null`이고, C2는 기본 레벨을 지어내지 않는다
+  // (`docs/Architecture.md` Data Flow 1-a, DECISIONS #40). `directness`/`emojiPreference`는
+  // T79(위 `resolveMergedStyle` 주석) — `deps.data.learnedItems`에 해당 축의 학습값이 있으면
+  // 그 값이 자기신고를 덮어쓴다.
+  const directness = resolveMergedStyle<Directness>(
+    'directness',
+    input.sender.profile.directness,
+    deps.data.learnedItems,
+  );
+  const emojiPreference = resolveMergedStyle<EmojiPreference>(
+    'emojiPreference',
+    input.sender.profile.emojiPreference,
+    deps.data.learnedItems,
+  );
 
   // ④ C5 — 용어사전. `deps.data.dictionary`도 Route Handler가 이미 조회를 마친 값이다(AC-028).
   // 별도 LLM 호출이 아니라 아래 C2 프롬프트에 구조화된 데이터로 주입된다(T22).
@@ -223,6 +256,8 @@ export const run: MediationPipeline = async (input, deps) => {
       honorificLevel: input.sender.profile.honorificLevel,
       referenceDate: deps.referenceDate,
       dictionary: deps.data.dictionary,
+      directness,
+      emojiPreference,
     },
     llm,
   );

@@ -1,7 +1,7 @@
 /**
  * UX-002 Sign Up — `docs/UX.md` Screen Catalog. AC-039, AC-060.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const mockPush = vi.fn();
@@ -22,9 +22,41 @@ function fillForm(email: string, password: string, confirm: string) {
   fireEvent.change(screen.getByLabelText('비밀번호 확인'), { target: { value: confirm } });
 }
 
+// SUCCESS_REDIRECT_DELAY_MS in page.tsx — not exported, kept in sync manually.
+const REDIRECT_DELAY_MS = 300;
+
 describe('SignupPage (UX-002) — AC-060', () => {
+  // 여러 테스트(AC-060②/③, "가입 성공 시 온보딩...")가 가입 성공 경로를 타면서 실제
+  // 300ms `window.setTimeout`을 예약하지만, 그 완료를 기다리지 않고 끝난다. 그 real timer는
+  // 취소되지 않은 채 남아있다가 나중에(다른 테스트가 실행되는 도중) 임의의 시점에 발화해
+  // 공유된 `mockPush`를 호출한다 — "Major 4" 순서 검증 테스트가 CI에서 간헐적으로 실패한
+  // 원인이 바로 이 잔존 타이머였다(로컬 격리 실행 5/5 통과, 전체 스위트 연속 실행 시 재현).
+  // `window.setTimeout`을 지연시간(REDIRECT_DELAY_MS)으로만 선택적으로 가로채, 어떤
+  // 테스트도 진짜 300ms 타이머를 만들지 않게 한다 — 콜백은 캡처만 되고 필요한 테스트에서
+  // 직접 호출해 결정론적으로 트리거한다. 다른 지연시간의 `setTimeout`(RTL 내부 폴링 등)은
+  // 원래 구현으로 그대로 통과시킨다.
+  let redirectCallback: (() => void) | null = null;
+  let setTimeoutSpy: ReturnType<typeof vi.spyOn>;
+  const realSetTimeout = window.setTimeout;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    redirectCallback = null;
+    setTimeoutSpy = vi.spyOn(window, 'setTimeout').mockImplementation(((
+      handler: TimerHandler,
+      timeout?: number,
+      ...args: unknown[]
+    ) => {
+      if (timeout === REDIRECT_DELAY_MS) {
+        redirectCallback = handler as () => void;
+        return 0;
+      }
+      return realSetTimeout(handler, timeout, ...args);
+    }) as typeof window.setTimeout);
+  });
+
+  afterEach(() => {
+    setTimeoutSpy.mockRestore();
   });
 
   it('비밀번호 필드 아래 안내 문구는 정확히 "최소 8자"이다(AC-060③ — 없는 복잡도 요구를 암시하지 않는다)', () => {
@@ -156,8 +188,10 @@ describe('SignupPage (UX-002) — AC-060', () => {
     fireEvent.click(screen.getByRole('button', { name: '회원가입' }));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/onboarding');
+      expect(redirectCallback).not.toBeNull();
     });
+    redirectCallback?.();
+    expect(mockPush).toHaveBeenCalledWith('/onboarding');
   });
 
   // Major 4(reviewer 5차 REJECTED → 수정) — `docs/UX.md:357` States: "Success: brief
@@ -173,9 +207,9 @@ describe('SignupPage (UX-002) — AC-060', () => {
     });
     // 확인 메시지가 보이는 시점에는 아직 이동하지 않았다 — "먼저 보여준 뒤" 이동이어야 한다.
     expect(mockPush).not.toHaveBeenCalled();
+    expect(redirectCallback).not.toBeNull();
 
-    await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/onboarding');
-    });
+    redirectCallback?.();
+    expect(mockPush).toHaveBeenCalledWith('/onboarding');
   });
 });

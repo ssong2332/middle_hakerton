@@ -3,7 +3,7 @@
   "name": "크로스보더 협업 중재",
   "version": "0.0.0",
   "description": "선택한 텍스트를 즉시 중재한다 (개발자 모드 로드 전용 — Planning Decision #4).",
-  "permissions": ["activeTab", "storage"],
+  "permissions": ["storage"],
   "host_permissions": [],
   "background": {
     "service_worker": "background.js"
