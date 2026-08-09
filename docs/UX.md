@@ -7,7 +7,7 @@ Flow IDs and Screen IDs are immutable once assigned — never renumber existing 
 ## Overview
 | Item | Value |
 |---|---|
-| Document Version | 6.2 |
+| Document Version | 6.3 |
 | Based on PRD Version | v3.0 (2026-08-04, incorporating Planning Decisions #101–#112) — unchanged this pass |
 | Last Updated | 2026-08-05 |
 
@@ -505,31 +505,31 @@ Every screen must use this template — do not vary the shape.
 | Item | Value |
 |---|---|
 | Belongs to Flow(s) | UF-004 |
-| Acceptance Criteria | AC-017, AC-018, AC-050, AC-058, AC-062, AC-064 |
+| Acceptance Criteria | AC-017, AC-018, AC-050, AC-058, AC-062, AC-064, AC-087 (v6.3, conditional on the include-concern-level control below) |
 | Purpose | Turn an emotionally-charged message into a structured, actionable ticket without deleting the emotional signal. |
 | User Goal | Get my complaint taken seriously as a real issue, not lost in a wall of text. |
 | Entry | "Convert to Task Ticket" link on UX-004's Recipient panel — reachable only when the emotional-signal detector fired (AC-058①); for a low-signal message the link never appears, so this screen is simply unreachable rather than reachable-but-blocked (AC-058②). |
-| Exit | "Use this ticket" → returns to UX-004 with the ticket content as the message to approve/send. "Back to message" → returns to UX-004 with the original free-text message unchanged. |
+| Exit | "Use this ticket" → returns to UX-004 with the ticket content as the message to approve/send — **the assembled body includes [문제 정의]/[영향·리스크]/[요청 사항] always, and [우려 수준] only when the include-concern-level checkbox below is checked (AC-087①④, default unchecked)**. "Back to message" → returns to UX-004 with the original free-text message unchanged. |
 | Primary Actions | View/edit the 4 sections ([문제 정의] / [영향·리스크] / [요청 사항] / [우려 수준]); Use this ticket. |
-| Secondary Actions | Back to message (discard ticket, keep free text). |
+| Secondary Actions | Back to message (discard ticket, keep free text). **(v6.3, AC-087③④) "발신 본문에 [우려 수준] 포함" checkbox, placed directly above the "Use this ticket" button — unchecked by default, never pre-checked/auto-checked by any code path (AC-087④). Checking it is the only way [우려 수준] enters the assembled body; it never changes what renders in the 4-section display above (that stays governed by AC-017/018/062, unaffected by this control).** |
 | States | Loading: conversion in progress / Error: conversion failed, retry, original message untouched / Result: **all 4 sections are always rendered, regardless of whether the source text has evidence for each one** — each independently editable, and a section with nothing derivable shows an explicit "없음" rather than being omitted or left blank (AC-062, confirmed hard requirement — no section is ever silently skipped) — plus a read-only **결정 권한 상태** (Decision Authority Status) field, backed by the ticket-level single-value `decisionAuthority` (확정/내부 승인 필요/검토 중/불명, AC-064①) — shown alongside its evidence sentence when determined, or explicitly labeled "불명" (never left blank) when the original text has no evidence for it (AC-050①/②). |
 | Validation | No new required fields beyond what the AI populates. **A section with genuinely no derivable content always shows an explicit "없음" — this is now a confirmed hard requirement (AC-062), not a working assumption; this document's own Open Questions #7 is answered.** |
 | Failure | Conversion API fails → error banner + retry; the user can always fall back to sending the original free-text message via "Back to message." |
-| Accessibility | Each of the 4 sections is a labeled region (heading + content) for screen-reader navigation, present even when its content is "없음." [우려 수준] level shown as both a text label (e.g., "높음") and a visual indicator, not color alone. |
+| Accessibility | Each of the 4 sections is a labeled region (heading + content) for screen-reader navigation, present even when its content is "없음." [우려 수준] level shown as both a text label (e.g., "높음") and a visual indicator, not color alone. **(v6.3, AC-087③) The include-concern-level checkbox has a programmatically-associated label ("발신 본문에 [우려 수준] 포함") and a status line next to it that always states the current outcome in text — "[우려 수준]은 발신 본문에 포함되지 않습니다" when unchecked, "[우려 수준]이 발신 본문에 포함됩니다" when checked — updated immediately on toggle, never conveyed by the checkbox's checked/unchecked visual state alone (same "never color/state alone" principle as every other status indicator in this document). This status line is plain text, not a live region — it is not intended to interrupt, only to be present when read.** |
 | Figma Frame | N/A — no Figma reference |
 
 **Architect Handoff**
 | Item | Value |
 |---|---|
 | Priority | Medium (P1 feature) |
-| Business Rules | Emotional intensity must be preserved as metadata, never deleted (AC-018). **All 4 sections are always present in the response payload — an "없음" string for a section with no evidence, never a missing key or empty string with no label (AC-062).** Decision Authority Status is never inferred without textual evidence — absent evidence renders `불명`, matching the no-fabrication principle already applied to AC-020 (Planning Decision #54 — this feature's premise is an unverified hypothesis, not a confirmed fact; do not present the status as more certain than the text supports). **The field name for this screen's Decision Authority value is the ticket-level single-value `decisionAuthority` — distinct from UX-008's per-row `decisions[].authorityStatus`. The two names are intentionally different and both exist simultaneously; neither replaces the other (AC-064①③, PRD Planning Decision #84 — resolves the schema-granularity tension previously logged as Open Questions #9, now answered).** |
+| Business Rules | Emotional intensity must be preserved as metadata, never deleted (AC-018). **All 4 sections are always present in the response payload — an "없음" string for a section with no evidence, never a missing key or empty string with no label (AC-062).** Decision Authority Status is never inferred without textual evidence — absent evidence renders `불명`, matching the no-fabrication principle already applied to AC-020 (Planning Decision #54 — this feature's premise is an unverified hypothesis, not a confirmed fact; do not present the status as more certain than the text supports). **The field name for this screen's Decision Authority value is the ticket-level single-value `decisionAuthority` — distinct from UX-008's per-row `decisions[].authorityStatus`. The two names are intentionally different and both exist simultaneously; neither replaces the other (AC-064①③, PRD Planning Decision #84 — resolves the schema-granularity tension previously logged as Open Questions #9, now answered).** **(v6.3, AC-087, PRD Planning Decision #120) The assembled send-body (the text handed to UX-004 on "Use this ticket") is a distinct surface from this screen's 4-section display — [우려 수준] stays fully rendered here (AC-017/018/062 unchanged) but is excluded from the assembled body unless the user has checked the include-concern-level checkbox for this session's ticket. No default/setting/inferred code path may pre-check it or include the section without the checked state (AC-087④) — this is the same "no silent default inclusion" principle as AC-059③/AC-066③'s personalization-off handling, applied here to a body-assembly step instead of a personalization step.** |
 | Data Required | original message text |
 | Data Operations | Read (original text); no persistent write until the user proceeds to approve/send from UX-004 |
 | External Dependencies | Backend C6 structuring API (LLM-backed, also produces the ticket-level single-value `decisionAuthority` + evidence in the same call — AC-064①; distinct from C7's per-row `decisions[].authorityStatus` on UX-008, never merged or reused as the same field name) |
 | Permissions | Requires authenticated session |
 | Navigation Targets | UX-004 |
 | Events Emitted | `ticket_conversion_requested`, `ticket_used`, `ticket_discarded` |
-| Expected Outputs | Structured 4-section text (all 4 sections always populated, "없음" where evidence is absent — AC-062) plus a Decision Authority Status value (`decisionAuthority`) that replaces free text as the message body if "Use this ticket" is chosen |
+| Expected Outputs | Structured 4-section text (all 4 sections always populated, "없음" where evidence is absent — AC-062) plus a Decision Authority Status value (`decisionAuthority`) that replaces free text as the message body if "Use this ticket" is chosen. **(v6.3, AC-087) The assembled body itself contains 3 sections by default ([문제 정의]/[영향·리스크]/[요청 사항]); a 4th ([우려 수준]) is appended only when the include-concern-level checkbox is checked at the moment "Use this ticket" is clicked.** |
 | Assumptions | The "emotional" trigger detection happens on UX-004 before this screen is reachable. **`decisionAuthority` is confirmed as a single value per ticket (AC-064①) — this document's own prior Open Questions #9 uncertainty is resolved; see UX Decision Log "Decision Authority Field Names Split."** |
 
 ### Decision Summary & Unresolved Detector View (Screen ID: UX-008)
@@ -1553,6 +1553,17 @@ Append-only — never rewrite or delete a past entry. If docs/PRD.md changes mak
 | Alternatives Considered | (a) A live region announcing the count on every change. (b) Color/icon escalation as the count nears/passes 5,000 (e.g., turning amber). |
 | Rejected Because | (a) would announce on every keystroke once past the threshold — the opposite of "advisory," and inconsistent with AC-061②'s "never blocks" intent (a screen reader user would get badgered by their own typing). (b) reintroduces a color-based state for something AC-061 explicitly defines as non-blocking/non-validation — mixing it with this document's error/warning visual vocabulary would misrepresent it as a limit being approached rather than a pure count. |
 | Impact | implementer (T67): can proceed without a separate routing round — format and accessibility are now fixed inputs, applies identically to UX-004 and UX-016's input areas (AC-061③, 2/2). No AC text change (AC-061 already covers the behavior; this only pins copy/a11y). |
+| Status | Active |
+
+### UX-007 Gets an Explicit Include-Concern-Level Checkbox for the Assembled Send Body (v6.3, AC-087, T78 routing, PRD Planning Decision #120)
+
+| Item | Value |
+|---|---|
+| Decision | UX-007's Secondary Actions gain a new control: "발신 본문에 [우려 수준] 포함" checkbox, placed directly above the "Use this ticket" button, **unchecked by default**. A status line next to it always states the current outcome in text (not checkbox state alone): "[우려 수준]은 발신 본문에 포함되지 않습니다" / "...포함됩니다," updated immediately on toggle. The 4-section display itself (AC-017/018/062) is unaffected — this control only changes what "Use this ticket" assembles into the body handed to UX-004. |
+| Reason | PRD Planning Decision #120/AC-087 requires ① default exclusion, ③ no silent handling (the fact must be visible), ④ inclusion only via explicit user action — but named no control's label, position, or accessibility treatment, routing that decision here (same pattern as T67/T76/T77). |
+| Alternatives Considered | (a) A one-shot "포함해서 사용" vs. "포함 안 하고 사용" **choice at the moment of clicking "Use this ticket"** (e.g., two exit buttons) instead of a persistent checkbox. (b) A settings-level default the user sets once, applied silently on every ticket thereafter. |
+| Rejected Because | (a) would work but duplicates the "Use this ticket" exit action into two buttons, which reads as two different features rather than one action with a toggle — the checkbox keeps Exit at one control, matching the existing Exit row's shape. (b) is the "무음 처리" AC-087③ exists to forbid — a silently-applied stored default is exactly the kind of automatic inclusion AC-087④ rules out, and the user would stop seeing the fact stated per-ticket. |
+| Impact | implementer (T78): can proceed without a further routing round. Target is exactly the 3 code points PRD Decision #120④ already scoped (`SECTION_LABELS`/`assembleTicketMessage`/`handleUseTicket` in `TicketWorkspace.tsx`) plus this new checkbox control and its status line. No AC text change (AC-087 already covers the behavior; this only pins the control's label/position/accessibility). AC-017/018/062 (screen's own 4-section render) untouched. |
 | Status | Active |
 
 ## Open Questions
