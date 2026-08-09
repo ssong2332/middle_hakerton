@@ -40,7 +40,7 @@
 }
 
 .nonLiveNotice {
-  font: 600 9px var(--font-mono);
+  font: 600 10px var(--font-mono);
   letter-spacing: 0.06em;
   color: var(--color-accent);
   margin-bottom: 12px;

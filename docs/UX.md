@@ -7,7 +7,7 @@ Flow IDs and Screen IDs are immutable once assigned — never renumber existing 
 ## Overview
 | Item | Value |
 |---|---|
-| Document Version | 6.4 |
+| Document Version | 6.5 |
 | Based on PRD Version | v3.0 (2026-08-04, incorporating Planning Decisions #101–#112) — unchanged this pass |
 | Last Updated | 2026-08-05 |
 
@@ -955,7 +955,10 @@ UF-011, UF-012, and UF-014 (the GitHub/Slack/Gmail flows) are **not** deprecated
 | `--color-surface-alt` | `#eae9e9` | Secondary/alternate surface (e.g., notes, muted blocks) |
 | `--color-accent` | `#ae1800` | Primary action color (buttons, links) |
 | `--color-accent-hover` | `#8a1400` | Hover state for accent-colored controls |
-| `--color-focus` | `#ec3013` | `:focus-visible` outline only — never a fill color (kept distinct from `--color-accent` so focus and "is this the primary action" don't read as the same signal) |
+| `--color-focus` | `#1a56db` (v6.5, was `#ec3013`) | `:focus-visible` outline only — never a fill color. Changed from the original red-orange to blue during T76's Minor cleanup because the prior value shared a hue family with `--color-accent`, so "focused" and "this is the primary action" read as the same signal; blue reads as an unambiguous system-focus color instead |
+| `--color-accent-tint` | `#ffe0d9` (v6.5) | Light accent-family hover background (e.g., outlined-button hover) — promoted from a literal that was hardcoded in one component |
+| `--shadow-color-frame` | `rgba(45,43,43,.16)` (v6.5) | Box-shadow color for the "frame" panel pattern (UX-004) — promoted from a hardcoded literal, value unchanged |
+| `--color-selection-bg` | `rgba(174,24,0,.3)` (v6.5) | Text-selection (`::selection`) highlight — promoted from a hardcoded literal (was independently defined, now derived from `--color-accent`'s RGB) |
 | `--color-danger-bg` | `#fff2ef` | Error/danger banner background |
 | `--color-danger-text` | `#7c1405` | Error/danger text |
 | `--border-thin` | `rgba(32,30,29,.25)` | Default hairline border |

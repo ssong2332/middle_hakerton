@@ -9,7 +9,7 @@
 }
 
 .button:hover:not(:disabled) {
-  background: #ffe0d9;
+  background: var(--color-accent-tint);
 }
 
 .button:disabled {
