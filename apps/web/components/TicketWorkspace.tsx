@@ -34,11 +34,19 @@ const SECTION_LABELS: Array<{ key: SectionKey; label: string }> = [
   { key: 'concernLevel', label: '우려 수준' },
 ];
 
-/** "Use this ticket" 클릭 시 4섹션을 하나의 메시지 본문으로 조립한다(구현 판단 — `docs/UX.md`
+/** "Use this ticket" 클릭 시 섹션들을 하나의 메시지 본문으로 조립한다(구현 판단 — `docs/UX.md`
  * UX-007이 정확한 포맷을 지정하지 않는다, Exit "the ticket content as the message to approve/
- * send"). 라벨을 그대로 살려 사람이 읽어도 어느 섹션인지 알 수 있게 한다. */
-function assembleTicketMessage(sections: TicketSections): string {
-  return SECTION_LABELS.map(({ key, label }) => `[${label}]\n${sections[key]}`).join('\n\n');
+ * send"). 라벨을 그대로 살려 사람이 읽어도 어느 섹션인지 알 수 있게 한다.
+ *
+ * 🔴 T78(AC-087, PRD Planning Decision #120) — [우려 수준](`concernLevel`)은 기본적으로 조립
+ * 대상에서 제외한다. line 918(Risks)이 [우려 수준]을 발신자 본인에게만 보이는 것을 EU AI Act
+ * Art 5(1)(f) 노출의 방어선으로 명시하므로, 수신자에게 가는 본문에 무음으로 섞이면 그 방어선이
+ * 코드 경로에서 무효화된다. `includeConcernLevel`이 true일 때만(사용자가 체크박스를 직접 체크한
+ * 경우에만, `docs/UX.md` UX-007 v6.3) 포함한다 — 기본값·설정·추측으로 자동 포함되는 경로는 없다. */
+function assembleTicketMessage(sections: TicketSections, includeConcernLevel: boolean): string {
+  return SECTION_LABELS.filter(({ key }) => key !== 'concernLevel' || includeConcernLevel)
+    .map(({ key, label }) => `[${label}]\n${sections[key]}`)
+    .join('\n\n');
 }
 
 export function TicketWorkspace() {
@@ -47,6 +55,8 @@ export function TicketWorkspace() {
   const [sourceText, setSourceText] = useState('');
   const [ticket, setTicket] = useState<TicketResult | null>(null);
   const [sections, setSections] = useState<TicketSections | null>(null);
+  // AC-087④ — 기본 미체크. 사용자 체크로만 true가 된다(자동/추측 포함 경로 없음).
+  const [includeConcernLevel, setIncludeConcernLevel] = useState(false);
 
   async function runConversion(text: string) {
     setStatus('loading');
@@ -101,7 +111,10 @@ export function TicketWorkspace() {
   // 채울 값" 하나 — 두 쓰기는 같은 방문 안에서 상호 배타적이다).
   function handleUseTicket() {
     if (!sections) return;
-    sessionStorage.setItem(TICKET_RESTORE_SESSION_KEY, assembleTicketMessage(sections));
+    sessionStorage.setItem(
+      TICKET_RESTORE_SESSION_KEY,
+      assembleTicketMessage(sections, includeConcernLevel),
+    );
     router.push(MEDIATE_ROUTE);
   }
 
@@ -206,6 +219,26 @@ export function TicketWorkspace() {
           <p className={styles.authorityEvidence}>{ticket.decisionAuthorityEvidence}</p>
         )}
       </section>
+
+      {/* AC-087③④, `docs/UX.md` UX-007 v6.3 — 기본 미체크, "Use this ticket" 바로 위. 상태
+          문구는 체크 여부와 무관하게 항상 현재 결과를 텍스트로 명시한다(무음 처리 금지, 아이콘·
+          색상 단독 전달 아님 — AC-059③·AC-066③과 같은 원칙). */}
+      <div className={styles.concernIncludeRow}>
+        <label htmlFor="ticket-include-concern-level" className={styles.concernIncludeLabel}>
+          <input
+            id="ticket-include-concern-level"
+            type="checkbox"
+            checked={includeConcernLevel}
+            onChange={(event) => setIncludeConcernLevel(event.target.checked)}
+          />
+          발신 본문에 [우려 수준] 포함
+        </label>
+        <p className={styles.concernIncludeStatus}>
+          {includeConcernLevel
+            ? '[우려 수준]이 발신 본문에 포함됩니다'
+            : '[우려 수준]은 발신 본문에 포함되지 않습니다'}
+        </p>
+      </div>
 
       <div className={styles.actions}>
         <button type="button" className={styles.useButton} onClick={handleUseTicket}>
