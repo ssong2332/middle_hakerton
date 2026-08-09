@@ -314,15 +314,76 @@ describe('run() — T28 파이프라인 조립', () => {
     expect(result.source).toBe('fallback');
   });
 
-  it('AC-013/AC-032 — deps.data.learnedItems가 있어도 예외 없이 정상 완료된다(소비 로직은 미배정 — 계약 배선만 확인)', async () => {
-    const { llm } = fakeLlm();
+  // T79(Planning Decision #124) — T35 리허설 Scene 5a에서 드러난 gap의 수정. 학습값이
+  // 자기신고를 덮어써 C2 payload에 실제로 반영되는지를 검증한다(이전에는 "예외 없이 완료된다"만
+  // 확인했다 — 소비 로직이 없었기 때문).
+  it('AC-013/AC-032 — cushion_insert 학습값이 자기신고 directness를 덮어써 C2 payload에 실린다', async () => {
+    const { llm, payloads } = fakeLlm();
+    const learnedItems = [{ patternKey: 'cushion_insert', value: 'indirect' }];
+    const input = baseInput({
+      sender: {
+        language: 'ko',
+        profile: {
+          onboardingState: 'completed',
+          directness: 'direct',
+          emojiPreference: null,
+          formality: null,
+          honorificLevel: 'haeyo',
+        },
+      },
+    });
+
+    await run(input, baseDeps(llm, { data: { dictionary: [], learnedItems } }));
+
+    expect(payloads.c2).toMatchObject({ directness: 'indirect' });
+  });
+
+  it('AC-013/AC-032 — emoji_removed 학습값이 자기신고 emojiPreference를 덮어써 C2 payload에 실린다', async () => {
+    const { llm, payloads } = fakeLlm();
     const learnedItems = [{ patternKey: 'emoji_removed', value: 'avoids' }];
+    const input = baseInput({
+      sender: {
+        language: 'ko',
+        profile: {
+          onboardingState: 'completed',
+          directness: null,
+          emojiPreference: 'likes',
+          formality: null,
+          honorificLevel: 'haeyo',
+        },
+      },
+    });
 
-    const result = await run(
-      baseInput(),
-      baseDeps(llm, { data: { dictionary: [], learnedItems } }),
-    );
+    await run(input, baseDeps(llm, { data: { dictionary: [], learnedItems } }));
 
-    expect(result.transformed).toBe('Please confirm by Friday.');
+    expect(payloads.c2).toMatchObject({ emojiPreference: 'avoids' });
+  });
+
+  it('학습값이 없으면 자기신고 값을 그대로 C2 payload에 싣는다(덮어쓸 것이 없다)', async () => {
+    const { llm, payloads } = fakeLlm();
+    const input = baseInput({
+      sender: {
+        language: 'ko',
+        profile: {
+          onboardingState: 'completed',
+          directness: 'direct',
+          emojiPreference: 'neutral',
+          formality: null,
+          honorificLevel: 'haeyo',
+        },
+      },
+    });
+
+    await run(input, baseDeps(llm, { data: { dictionary: [], learnedItems: [] } }));
+
+    expect(payloads.c2).toMatchObject({ directness: 'direct', emojiPreference: 'neutral' });
+  });
+
+  it('자기신고도 학습값도 없으면 null을 그대로 싣는다(추측 기본값을 채우지 않는다)', async () => {
+    const { llm, payloads } = fakeLlm();
+
+    await run(baseInput(), baseDeps(llm));
+
+    expect(payloads.c2).toMatchObject({ directness: null, emojiPreference: null });
   });
 });

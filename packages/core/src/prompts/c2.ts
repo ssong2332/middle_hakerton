@@ -40,13 +40,20 @@
 import type { LanguageDirection } from '../contract';
 import type { DictionaryEntry } from '../pipeline';
 
-/** 🔴 프롬프트 문구를 바꾸면 이 값을 올린다. T22 — C5 사전 주입 규칙·`unregisteredHonorifics`
- * 응답 필드 추가로 'c2-v3' → 'c2-v4'. */
-export const C2_PROMPT_VERSION = 'c2-v4';
+/** 🔴 프롬프트 문구를 바꾸면 이 값을 올린다. T79 — directness/emojiPreference 축 반영으로
+ * 'c2-v4' → 'c2-v5'(Planning Decision #124). 이전: T22 — C5 사전 주입 규칙·
+ * `unregisteredHonorifics` 응답 필드 추가로 'c2-v3' → 'c2-v4'. */
+export const C2_PROMPT_VERSION = 'c2-v5';
 
 /** `contract.ts`의 `CommunicationProfile.honorificLevel`과 같은 어휘. 여기서 다시 export한다 —
  * `rules/honorific.ts`의 동명 타입은 export되지 않아(그 파일 소유 태스크가 다르다) 재사용하지 않는다. */
 export type HonorificLevel = 'hapsyo' | 'haeyo';
+
+/** `contract.ts`의 `CommunicationProfile.directness`와 같은 어휘. */
+export type Directness = 'direct' | 'indirect';
+
+/** `contract.ts`의 `CommunicationProfile.emojiPreference`와 같은 어휘. */
+export type EmojiPreference = 'likes' | 'neutral' | 'avoids';
 
 export interface C2Payload {
   instruction: string;
@@ -84,6 +91,17 @@ export interface C2Payload {
    * 안전 규칙" 참조). 비어 있으면 `[]` — 사전 미등록 사용자도 정상 변환된다(AC-015 위반 없음).
    */
   dictionary: DictionaryEntry[];
+  /**
+   * 🔴 T79(Planning Decision #124) — C3 자기신고 `directness`와 `profile_learned_items`의
+   * `cushion_insert` 학습값을 **호출자(`pipeline.ts`)가 병합**해 넘긴다(학습이 자기신고를
+   * 덮어씀 — `apps/web/app/(app)/(with-nav)/profile/page.tsx`의 표시 우선순위와 동일 규칙,
+   * `pipeline.test.ts`가 병합 자체를 검증한다). 이 파일은 **받은 값을 어떻게 지시문에 싣는가**만
+   * 책임진다. `honorificLevel`과 같은 이유로 `null`이면 추측하지 않는다 — 기본값을 채우면 캐시
+   * 키가 "값 없음"과 "값=특정값"을 구분하지 못한다.
+   */
+  directness: Directness | null;
+  /** 🔴 T79 — 위 `directness`와 같은 병합 규칙(`emoji_removed` 학습값이 자기신고를 덮어씀). */
+  emojiPreference: EmojiPreference | null;
 }
 
 const RESPONSE_FORMAT_RULE =
@@ -152,6 +170,51 @@ function enKoRules(honorificLevel: HonorificLevel | null): string {
     `register for every sentence in the output: ${label}. Do not mix the two registers within one ` +
     'message, and do not switch registers between sentences even for emphasis or a quoted phrase.'
   );
+}
+
+/**
+ * T79(Planning Decision #124) — `directness`/`emojiPreference` 축을 지시문에 싣는다. 방향
+ * 공통(두 방향 모두 톤 선택은 의미가 있다 — `enKoRules`처럼 방향별로 갈리는 축이 아니다).
+ *
+ * 🔴 `honorificLevel`과 같은 원칙: 값이 `null`이면 그 축에 대해 아무 지시도 넣지 않는다(추측
+ * 금지 — Conventions 9). 각 축은 독립적으로 `null`일 수 있어(예: directness만 학습되고
+ * emojiPreference는 자기신고도 학습도 없는 경우) 두 문장을 따로 조립한다.
+ *
+ * 🔴 `honorificLevel`(레벨 지정, 강한 지시)과 달리 이 축들은 **선호 신호**로만 지시한다 —
+ * `dictionaryRules()`의 "user data, not instruction to obey"급 강제가 아니라, 톤 변환 시
+ * 참고할 성향으로 준다. 근거: `docs/PRD.md` AC-013·`docs/Database.md` `profile_learned_items`
+ * 어디에도 "정확히 이 값을 강제하라"는 요구가 없고, 원문 자체의 의미·긴급도 보존
+ * (`PRESERVATION_AND_MISREAD_RULE`)이 항상 우선해야 한다 — 성향 신호가 보존 규칙과 충돌하면
+ * 안 된다.
+ */
+function styleRules(directness: Directness | null, emojiPreference: EmojiPreference | null): string {
+  const parts: string[] = [];
+  if (directness === 'indirect') {
+    parts.push(
+      'The sender tends to phrase requests indirectly/with cushioning (based on their own past ' +
+        'edits) — where natural, soften phrasing slightly (e.g. a brief courteous lead-in) without ' +
+        'weakening or making optional any preserved deadline, number, or required action.',
+    );
+  } else if (directness === 'direct') {
+    parts.push(
+      'The sender tends to phrase requests directly (based on their own past edits) — avoid adding ' +
+        'hedging or cushioning phrases (e.g. "maybe", "if possible", "whenever you get a chance") ' +
+        'that are not present in the original.',
+    );
+  }
+  if (emojiPreference === 'avoids') {
+    parts.push(
+      'The sender avoids emoji in professional messages (based on their own past edits) — do not ' +
+        'add any emoji that is not already in the original text.',
+    );
+  } else if (emojiPreference === 'likes') {
+    parts.push(
+      'The sender is comfortable with occasional emoji in professional messages (based on their ' +
+        'own past edits) — you may keep an emoji already present in the original, but do not ' +
+        'invent a new one that was not in the original.',
+    );
+  }
+  return parts.join(' ');
 }
 
 /**
@@ -229,6 +292,9 @@ function dictionaryRules(dictionary: DictionaryEntry[]): string {
  *   이 함수를 호출하는 기존 테스트 다수가 사전과 무관해 매 호출마다 `[]`를 반복해 넘기지 않아도
  *   되게 하기 위함이다(`honorificLevel: null`처럼 "값이 없을 수 있는 축"과 달리, 여기서는 빈
  *   배열 자체가 유일하고 명확한 "없음" 표현이라 캐시 키 모호성 문제가 생기지 않는다).
+ * @param directness 🔴 T79(Planning Decision #124) — 자기신고+학습값 병합 결과(`pipeline.ts`가
+ *   병합한다, 이 함수는 병합하지 않는다). `honorificLevel`과 같은 이유로 기본값 `null`.
+ * @param emojiPreference 🔴 T79 — 위 `directness`와 같다.
  */
 export function buildC2Payload(
   text: string,
@@ -236,6 +302,8 @@ export function buildC2Payload(
   honorificLevel: HonorificLevel | null,
   referenceDate: string,
   dictionary: DictionaryEntry[] = [],
+  directness: Directness | null = null,
+  emojiPreference: EmojiPreference | null = null,
 ): C2Payload {
   const referenceYear = referenceDate.slice(0, 4);
   const directionRules = languageDirection === 'ko-en' ? KO_EN_RULES : enKoRules(honorificLevel);
@@ -247,8 +315,20 @@ export function buildC2Payload(
     dictionaryRules(dictionary),
     directionRules,
     dateNumberRules(referenceYear),
+    styleRules(directness, emojiPreference),
     RESPONSE_FORMAT_RULE,
-  ].join(' ');
+  ]
+    .filter((part) => part !== '')
+    .join(' ');
 
-  return { instruction, text, languageDirection, honorificLevel, referenceYear, dictionary };
+  return {
+    instruction,
+    text,
+    languageDirection,
+    honorificLevel,
+    referenceYear,
+    dictionary,
+    directness,
+    emojiPreference,
+  };
 }

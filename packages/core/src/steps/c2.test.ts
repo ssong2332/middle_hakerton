@@ -101,6 +101,45 @@ describe('runToneTransform', () => {
     );
   });
 
+  // T79(Planning Decision #124) — 호출자가 넘긴 directness/emojiPreference를 payload에
+  // 그대로 싣는다(병합 로직은 이 함수 밖, pipeline.ts의 몫 — pipeline.test.ts 참조).
+  it('directness/emojiPreference를 넘기면 그대로 payload에 싣는다', async () => {
+    const llm = fakeLlm({ content: VALID_CONTENT, source: 'live' });
+
+    await runToneTransform(
+      {
+        text: 'hi',
+        languageDirection: 'ko-en',
+        honorificLevel: null,
+        referenceDate: '2026-08-05',
+        directness: 'indirect',
+        emojiPreference: 'avoids',
+      },
+      llm,
+    );
+
+    expect(llm.complete).toHaveBeenCalledWith(
+      'c2',
+      expect.any(String),
+      expect.objectContaining({ directness: 'indirect', emojiPreference: 'avoids' }),
+    );
+  });
+
+  it('directness/emojiPreference를 생략하면 null을 payload에 싣는다(기본값을 지어내지 않는다)', async () => {
+    const llm = fakeLlm({ content: VALID_CONTENT, source: 'live' });
+
+    await runToneTransform(
+      { text: 'hi', languageDirection: 'ko-en', honorificLevel: null, referenceDate: '2026-08-05' },
+      llm,
+    );
+
+    expect(llm.complete).toHaveBeenCalledWith(
+      'c2',
+      expect.any(String),
+      expect.objectContaining({ directness: null, emojiPreference: null }),
+    );
+  });
+
   it('cache/fallback source도 그대로 전달한다(AC-041)', async () => {
     const llm = fakeLlm({ content: VALID_CONTENT, source: 'fallback' });
 
