@@ -26,6 +26,12 @@
   margin-top: 2px;
 }
 
+.lengthCounter {
+  font: 400 11px var(--font-sans);
+  color: var(--text-muted-75);
+  margin-top: 2px;
+}
+
 .runButton {
   display: flex;
   align-items: center;

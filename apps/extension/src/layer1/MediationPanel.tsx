@@ -19,6 +19,7 @@
  * 그대로 읽는다.
  */
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { LENGTH_COUNTER_SHOW_AT, SOFT_LENGTH_CAP } from '@cross-border/core';
 import type { MediationResult } from '@cross-border/core';
 import { callMediationApi } from '../shared/api';
 import { getStoredToken } from '../shared/token-storage';
@@ -224,7 +225,15 @@ export function MediationPanel({
             value={text}
             onChange={(event) => setText(event.target.value)}
             disabled={status === 'loading'}
+            aria-describedby={text.length >= LENGTH_COUNTER_SHOW_AT ? 'cbm-panel-text-counter' : undefined}
           />
+          {/* AC-061 — 하드 차단 아님(②), 자문 전용. `docs/UX.md` v6.2 고정 문구·접근성(키
+              입력마다 announce하지 않고 aria-describedby로만 연결) — 웹앱 SenderPanel과 동일. */}
+          {text.length >= LENGTH_COUNTER_SHOW_AT && (
+            <p id="cbm-panel-text-counter" style={{ fontSize: '11px', opacity: 0.75 }}>
+              {text.length.toLocaleString('ko-KR')} / {SOFT_LENGTH_CAP.toLocaleString('ko-KR')}자
+            </p>
+          )}
           <button
             type="button"
             onClick={() => void runMediation()}
