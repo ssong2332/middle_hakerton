@@ -7,7 +7,7 @@ Flow IDs and Screen IDs are immutable once assigned — never renumber existing 
 ## Overview
 | Item | Value |
 |---|---|
-| Document Version | 6.3 |
+| Document Version | 6.4 |
 | Based on PRD Version | v3.0 (2026-08-04, incorporating Planning Decisions #101–#112) — unchanged this pass |
 | Last Updated | 2026-08-05 |
 
@@ -943,16 +943,45 @@ UF-011, UF-012, and UF-014 (the GitHub/Slack/Gmail flows) are **not** deprecated
 | Touch Target Size | Minimum 44×44 CSS px for all interactive controls on Tablet/Mobile breakpoints (WCAG 2.5.5). |
 | Error Messaging | Every error state across every screen in this document is conveyed by icon + text together, never by color/border alone. |
 
-## Responsive Behavior
-| Breakpoint | Layout Changes |
-|---|---|
-| Desktop | UX-004's Sender/Recipient panels render side by side (the "two-panel" concept). All other screens use a single-column layout with the persistent nav visible as a top bar or left rail (implementer's choice). |
-| Tablet | UX-004's two panels stack vertically (Sender panel above Recipient panel), preserving the reading order defined in Accessibility. All other screens remain single-column; the nav collapses to a top bar if it was a left rail on Desktop. |
-| Mobile | Same vertical stacking as Tablet for UX-004. Nav collapses to a menu (e.g., hamburger). Modals (UX-005/UX-006/UX-018) become full-screen rather than a centered dialog. Mobile is designed to not break rather than to be optimized — docs/PRD.md frames this as a desktop-primary demo tool, not a Mobile-first product. |
+## Design Tokens (v6.4, T76 routing)
+
+> **Scope note**: these are the token **names, current values, and purposes** already implemented in `apps/web/app/globals.css` — this table documents them as the canonical reference for T76's "apply existing tokens instead of hardcoded literals" work; it does not introduce new values. Exact color/contrast values remain implementer's scope per this document's own Accessibility row above ("color values are out of ux-design's scope") — ux-design's job here is naming/cataloging what exists and what it's *for*, not picking new hex values. **CSS mechanism (CSS Modules vs. a preprocessor vs. a utility framework) is architect's decision, not pinned here** — T76's routing chain is ux-design → architect → implementer, and this table is deliberately mechanism-neutral (a name→purpose mapping works under any of the three).
+
+| Token | Current Value | Purpose |
+|---|---|---|
+| `--color-bg` | `#f3f2f2` | Page background |
+| `--color-text` | `#201e1d` | Primary body text |
+| `--color-surface` | `#f8f4f4` | Panel/input background (raised surface) |
+| `--color-surface-alt` | `#eae9e9` | Secondary/alternate surface (e.g., notes, muted blocks) |
+| `--color-accent` | `#ae1800` | Primary action color (buttons, links) |
+| `--color-accent-hover` | `#8a1400` | Hover state for accent-colored controls |
+| `--color-focus` | `#ec3013` | `:focus-visible` outline only — never a fill color (kept distinct from `--color-accent` so focus and "is this the primary action" don't read as the same signal) |
+| `--color-danger-bg` | `#fff2ef` | Error/danger banner background |
+| `--color-danger-text` | `#7c1405` | Error/danger text |
+| `--border-thin` | `rgba(32,30,29,.25)` | Default hairline border |
+| `--border-thin-alt` | `rgba(32,30,29,.3)` | Slightly stronger hairline (e.g., adjacent to `--color-surface-alt`) |
+| `--border-strong` | `#201e1d` | High-contrast border (form fields, emphasized dividers) |
+| `--border-rule` | `rgba(32,30,29,.4)` | Section-dividing rule lines |
+| `--text-muted-75` | `rgba(32,30,29,.75)` | Secondary text (still clearly readable — status lines, captions) |
+| `--text-muted-60` | `rgba(32,30,29,.6)` | Tertiary text |
+| `--text-muted-55` | `rgba(32,30,29,.55)` | Tertiary text, slightly lighter |
+| `--text-muted-45` | `rgba(32,30,29,.45)` | Faintest muted tier — decorative borders (e.g., empty-state dashed border), not for text carrying meaning on its own (pair with an icon/text, per this document's Error Messaging/no-color-alone rules) |
+| `--font-sans` | `var(--font-archivo), system-ui, sans-serif` | Body/UI typeface |
+| `--font-mono` | `var(--font-plex-mono), ui-monospace, monospace` | Monospace typeface (labels, counters, technical values) |
+| `--label-letter-spacing` | `0.1em` | Shared tracking value for uppercase eyebrow/section labels |
+
+**Component style baseline**: every screen listed in this document's Screen Catalog is expected to consume these tokens (no new hardcoded color/font literals) once T76 applies them — this does not change any screen's Purpose/Steps/Business Rules, only its implementation. Which currently-unstyled pages are in scope for a given T76 pass is an implementer-time call (skip stub/no-content pages, per T76's own text) — this document does not enumerate that list, since it changes as other tasks fill those pages in.
+
+## Responsive Behavior (v6.4 — breakpoint pixel values pinned, T76/Open Question #16 routing)
+| Breakpoint | Pixel Range | Layout Changes |
+|---|---|---|
+| Desktop | `≥ 1024px` | UX-004's Sender/Recipient panels render side by side (the "two-panel" concept). All other screens use a single-column layout with the persistent nav visible as a top bar or left rail (implementer's choice). |
+| Tablet | `768px – 1023px` | UX-004's two panels stack vertically (Sender panel above Recipient panel), preserving the reading order defined in Accessibility. All other screens remain single-column; the nav collapses to a top bar if it was a left rail on Desktop. |
+| Mobile | `< 768px` | Same vertical stacking as Tablet for UX-004. Nav collapses to a menu (e.g., hamburger). Modals (UX-005/UX-006/UX-018) become full-screen rather than a centered dialog. Mobile is designed to not break rather than to be optimized — docs/PRD.md frames this as a desktop-primary demo tool, not a Mobile-first product. |
 
 Chrome extension (UX-016, UX-017): "No breakpoint-specific behavior" — the extension only runs inside a desktop browser by nature, so no separate responsive treatment applies.
 
-**Implementation status note (added this pass, 2026-08-05)**: quality-assurance measured that UX-004's Tablet/Mobile vertical-stacking requirement above is not yet implemented — `apps/web/components/MediationWorkspace.tsx` hardcodes `display:'flex'` inline with no `@media`/`matchMedia`/`flexWrap` anywhere in the repo (0 matches, QA-measured), so the two panels always render side by side regardless of viewport width. This drifted in during T13 (not a T15/T16 regression). The requirement itself is unchanged and still applies — **ux-design's judgment: this needs its own implementation task; none currently exists** (confirmed via a Tasks.md search for "responsive"/"Tablet"/"Mobile"/breakpoint terms — 0 matches). Creating that task is planner's decision, not ux-design's — see Open Questions.
+**Implementation status note (added 2026-08-05, breakpoint values pinned 2026-08-09)**: quality-assurance measured that UX-004's Tablet/Mobile vertical-stacking requirement above is not yet implemented — `apps/web/components/MediationWorkspace.tsx` hardcodes `display:'flex'` inline with no `@media`/`matchMedia`/`flexWrap` anywhere in the repo (0 matches, QA-measured), so the two panels always render side by side regardless of viewport width. This drifted in during T13 (not a T15/T16 regression). The requirement itself is unchanged and still applies, and now has concrete breakpoint pixel values above (previously qualitative-only, "Desktop"/"Tablet"/"Mobile" with no px thresholds — implementer would otherwise have had to invent them mid-T76) — **ux-design's judgment: this still needs its own implementation task; none currently exists** (confirmed via a Tasks.md search for "responsive"/"Tablet"/"Mobile"/breakpoint terms — 0 matches, unchanged since 2026-08-05). Creating that task is planner's decision, not ux-design's — see Open Questions (unchanged, still open).
 
 ## Claude Design Prompts
 One ready-to-paste prompt per screen or coherent screen group, for generating a visual UI mockup in Claude Design (claude.ai). Each prompt restates only what the Screen Catalog and Interaction Patterns already specify. Mockups are visual references only; this document remains the authoritative spec.
@@ -1564,6 +1593,17 @@ Append-only — never rewrite or delete a past entry. If docs/PRD.md changes mak
 | Alternatives Considered | (a) A one-shot "포함해서 사용" vs. "포함 안 하고 사용" **choice at the moment of clicking "Use this ticket"** (e.g., two exit buttons) instead of a persistent checkbox. (b) A settings-level default the user sets once, applied silently on every ticket thereafter. |
 | Rejected Because | (a) would work but duplicates the "Use this ticket" exit action into two buttons, which reads as two different features rather than one action with a toggle — the checkbox keeps Exit at one control, matching the existing Exit row's shape. (b) is the "무음 처리" AC-087③ exists to forbid — a silently-applied stored default is exactly the kind of automatic inclusion AC-087④ rules out, and the user would stop seeing the fact stated per-ticket. |
 | Impact | implementer (T78): can proceed without a further routing round. Target is exactly the 3 code points PRD Decision #120④ already scoped (`SECTION_LABELS`/`assembleTicketMessage`/`handleUseTicket` in `TicketWorkspace.tsx`) plus this new checkbox control and its status line. No AC text change (AC-087 already covers the behavior; this only pins the control's label/position/accessibility). AC-017/018/062 (screen's own 4-section render) untouched. |
+| Status | Active |
+
+### Design Tokens Cataloged and Responsive Breakpoints Pinned to Pixel Values (v6.4, T76 routing)
+
+| Item | Value |
+|---|---|
+| Decision | Added a **Design Tokens** section cataloging every CSS custom property already defined in `apps/web/app/globals.css` (name, current value, purpose) as the canonical reference for T76's "apply tokens instead of hardcoded literals" work. Separately, pinned the Responsive Behavior table's Desktop/Tablet/Mobile rows to concrete pixel ranges (`≥1024px` / `768–1023px` / `<768px`) — previously qualitative-only. |
+| Reason | T76 was blocked pending an ux-design decision on two fronts: (a) no formal token table existed for implementer to work from when replacing hardcoded color literals across the ~12 currently-unstyled pages, and (b) the Responsive Behavior table (Open Question #16) described "Desktop/Tablet/Mobile" layout changes with no pixel thresholds, leaving implementer to invent breakpoint values mid-task for the one screen (UX-004) whose stacking behavior is still unimplemented. |
+| Alternatives Considered | (a) Leave token cataloging to implementer's own code reading (no formal table). (b) Adopt a different breakpoint scheme (e.g., Bootstrap's 576/768/992/1200 four-tier system) instead of a 3-tier Desktop/Tablet/Mobile split. |
+| Rejected Because | (a) risks each implementer pass reading `globals.css` slightly differently and re-deriving "what a token is for" from scratch, the same drift this document exists to prevent elsewhere (e.g., the Interaction Patterns section exists for the identical reason). (b) this document's own Responsive Behavior table already commits to a 3-tier Desktop/Tablet/Mobile model (not 4), and this project has no evidence its target devices need a finer split — adding a 4th tier without a reason would be scope invention, not a routing fix. |
+| Impact | implementer (T76): can start applying tokens without inventing names/purposes, and a future responsive-stacking implementation task (still uncreated — Open Question #16's task-creation gap is unchanged, planner's to do) has concrete breakpoint values to build against rather than needing another ux-design round later. No AC/screen-behavior change — this only formalizes values already in effect (tokens) or already stated qualitatively (breakpoints). CSS mechanism (Modules vs. preprocessor vs. utility framework) remains architect's decision, not made here. |
 | Status | Active |
 
 ## Open Questions
