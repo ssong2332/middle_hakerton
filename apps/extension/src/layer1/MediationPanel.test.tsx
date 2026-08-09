@@ -59,6 +59,29 @@ describe('MediationPanel', () => {
     });
   });
 
+  // AC-061① — 4,500자 미만이면 길이 카운터가 뜨지 않는다.
+  it('does not show the length counter under 4,500 characters', async () => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    render(<MediationPanel initialText={'a'.repeat(4499)} onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('선택한 텍스트')).toBeTruthy();
+    });
+    expect(screen.queryByText(/\/ 5,000자/)).toBeNull();
+  });
+
+  // AC-061①②③ — 6,000자(캡 초과)에서도 실행이 막히지 않고 카운터가 뜬다(웹앱과 동일 규칙).
+  it('shows the length counter and keeps mediation enabled past the 5,000-char cap', async () => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    render(<MediationPanel initialText={'a'.repeat(6000)} onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('6,000 / 5,000자')).toBeTruthy();
+    });
+    const button = screen.getByRole('button', { name: '중재 실행' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+  });
+
   // NotLoggedIn — 토큰이 없으면 실행을 시도하지 않고 로그인 안내를 보여준다.
   it('shows the NotLoggedIn state when no token is stored', async () => {
     mockedGetStoredToken.mockResolvedValue(null);

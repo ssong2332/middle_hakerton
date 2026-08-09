@@ -1,5 +1,6 @@
 'use client';
 
+import { LENGTH_COUNTER_SHOW_AT, SOFT_LENGTH_CAP } from '@cross-border/core';
 import type { MediationResult, UrgencyLevel } from '@cross-border/core';
 import { isValidEmailFormat } from '../lib/validate-email';
 import { BackTranslationPreview } from './BackTranslationPreview';
@@ -94,7 +95,15 @@ export function SenderPanel({
           className={styles.message}
           value={text}
           onChange={(event) => onTextChange(event.target.value)}
+          aria-describedby={text.length >= LENGTH_COUNTER_SHOW_AT ? 'sender-text-counter' : undefined}
         />
+        {/* AC-061 — 하드 차단 아님(②), 자문 전용. `docs/UX.md` v6.2 고정 문구·접근성(키
+            입력마다 announce하지 않고 aria-describedby로만 연결). */}
+        {text.length >= LENGTH_COUNTER_SHOW_AT && (
+          <p id="sender-text-counter" className={styles.lengthCounter}>
+            {text.length.toLocaleString('ko-KR')} / {SOFT_LENGTH_CAP.toLocaleString('ko-KR')}자
+          </p>
+        )}
       </div>
 
       {/* T16(AC-029, docs/UX.md:1015) — 실패 상태에서는 같은 버튼이 "다시 시도"로 바뀐다. 별도

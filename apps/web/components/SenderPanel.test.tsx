@@ -34,6 +34,23 @@ describe('SenderPanel', () => {
     expect(button.disabled).toBe(true);
   });
 
+  it('AC-061① — 4,500자 미만이면 길이 카운터가 뜨지 않는다', () => {
+    render(<SenderPanel {...baseProps()} text={'a'.repeat(4499)} />);
+    expect(screen.queryByText(/\/ 5,000자/)).toBeNull();
+  });
+
+  it('AC-061① — 4,500자 이상(5,000자 도달 전)이면 길이 카운터가 뜬다', () => {
+    render(<SenderPanel {...baseProps()} text={'a'.repeat(4500)} />);
+    expect(screen.getByText('4,500 / 5,000자')).toBeTruthy();
+  });
+
+  it('AC-061②③ — 6,000자(캡 초과)를 입력해도 실행 버튼이 비활성화되지 않고 카운터만 갱신된다', () => {
+    render(<SenderPanel {...baseProps()} text={'a'.repeat(6000)} recipient="a@example.com" />);
+    const button = screen.getByRole('button', { name: '실행' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    expect(screen.getByText('6,000 / 5,000자')).toBeTruthy();
+  });
+
   it('수신자 형식이 잘못되면 인라인 오류를 보여주고 실행 버튼이 비활성화된다', () => {
     render(<SenderPanel {...baseProps()} text="내용" recipient="not-an-email" />);
 

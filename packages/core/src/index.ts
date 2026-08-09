@@ -6,6 +6,7 @@
  * 패키지 경계 하나로 만족시키려면 npm workspace 패키지가 진입점을 가져야 한다.
  */
 export * from './contract';
+export * from './limits';
 export * from './pipeline';
 export * from './llm/client';
 export * from './errors';
