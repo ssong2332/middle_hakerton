@@ -11,6 +11,7 @@
  */
 import { useEffect, useState } from 'react';
 import { createClient } from '../../../lib/supabase/browser';
+import styles from './ExtensionConnect.module.css';
 
 type Status = 'checking' | 'notLoggedIn' | 'sending' | 'connected' | 'failed';
 
@@ -90,16 +91,28 @@ export function ExtensionConnect() {
   }, []);
 
   return (
-    <main>
-      <h1>확장 연결</h1>
-      {status === 'checking' && <p role="status">확인 중…</p>}
-      {status === 'notLoggedIn' && <p role="alert">로그인이 필요합니다. 먼저 로그인해 주세요.</p>}
-      {status === 'sending' && <p role="status">확장에 연결하는 중…</p>}
+    <main className={styles.page}>
+      <h1 className={styles.title}>확장 연결</h1>
+      {status === 'checking' && <p role="status" className={styles.statusText}>확인 중…</p>}
+      {status === 'notLoggedIn' && (
+        <p role="alert" className={styles.alertText}>
+          로그인이 필요합니다. 먼저 로그인해 주세요.
+        </p>
+      )}
+      {status === 'sending' && (
+        <p role="status" className={styles.statusText}>
+          확장에 연결하는 중…
+        </p>
+      )}
       {status === 'connected' && (
-        <p role="status">확장이 연결되었습니다. 이 탭을 닫고 확장을 사용해 주세요.</p>
+        <p role="status" className={styles.statusText}>
+          확장이 연결되었습니다. 이 탭을 닫고 확장을 사용해 주세요.
+        </p>
       )}
       {status === 'failed' && (
-        <p role="alert">연결 실패{failureReason ? `: ${failureReason}` : ''}</p>
+        <p role="alert" className={styles.alertText}>
+          연결 실패{failureReason ? `: ${failureReason}` : ''}
+        </p>
       )}
     </main>
   );

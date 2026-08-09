@@ -73,7 +73,6 @@ export function UrgencyPanel({
       </label>
       <select
         id="urgency-override"
-        className={styles.overrideSelect}
         value={urgency}
         onChange={(event) => onOverride(event.target.value as UrgencyLevel)}
       >
