@@ -8,6 +8,11 @@
 // `docs/API.md` "POST /api/meeting-times" Request 계약이 이미 답한다 — `sender`/`recipient`
 // 둘 다 요청 body로 직접 받는다(수동 입력, DB 조회 없음). 이 파일은 그 계약대로 값을 받기만
 // 하고 프로필·규약 테이블을 읽지 않는다.
+//
+// 🔴 `zonedTimeToUtc`/`formatLocal`/`addDaysToDateString`는 T39(`rules/deadline-negotiation.ts`)가
+// 그대로 재사용한다 — 같은 타임존 변환 알고리즘(과 위에서 문서화한 DST 경계 한계)을 두 파일이
+// 따로 구현하면 한쪽만 고쳐지는 드리프트가 생긴다. `findMeetingCandidates`와 무관해 보여도
+// 여기 남겨 둔 이유가 이것이다 — 옮기지 않는다.
 export interface WorkWindow {
   /** IANA 타임존 문자열(예: `Asia/Seoul`). */
   timezone: string;
@@ -72,7 +77,7 @@ function timezoneOffsetMinutes(utcInstant: Date, timeZone: string): number {
  * DST 전환 당일 그 시각대에 정확히 걸릴 확률은 낮고, 새 의존성 없이 완전히 고치려면
  * 반복 로직이 필요해 이번 라운드 범위를 벗어난다고 판단했다.
  */
-function zonedTimeToUtc(dateStr: string, timeStr: string, timeZone: string): Date {
+export function zonedTimeToUtc(dateStr: string, timeStr: string, timeZone: string): Date {
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hour, minute] = timeStr.split(':').map(Number);
   const guess = new Date(Date.UTC(year, month - 1, day, hour, minute));
@@ -81,7 +86,7 @@ function zonedTimeToUtc(dateStr: string, timeStr: string, timeZone: string): Dat
 }
 
 /** `date`(UTC 시각)를 `timeZone` 로컬 `YYYY-MM-DD HH:mm`로 표기한다. */
-function formatLocal(date: Date, timeZone: string): string {
+export function formatLocal(date: Date, timeZone: string): string {
   const dtf = new Intl.DateTimeFormat('en-US', {
     timeZone,
     hourCycle: 'h23',
@@ -97,7 +102,7 @@ function formatLocal(date: Date, timeZone: string): string {
   return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}`;
 }
 
-function addDaysToDateString(dateStr: string, days: number): string {
+export function addDaysToDateString(dateStr: string, days: number): string {
   const [year, month, day] = dateStr.split('-').map(Number);
   const d = new Date(Date.UTC(year, month - 1, day + days));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
