@@ -65,6 +65,12 @@ function findCounterOffers(
  * 실현 가능한지 판정한다(AC-036 a). 불가능하면 대체 기한을 최소 1개(최대 3개) 역제안한다
  * (AC-036 b) — **자동으로 기한을 바꾸지 않는다**, 역제안만 반환하고 선택은 호출부(사용자)가
  * 한다(AC-036 c, `docs/API.md:276`).
+ *
+ * 🔴 **판정 기준(2026-08-10 reviewer 재검토로 확정, 사용자 결정)**: 마감이 **근무 시작 시각
+ * 이후**이고 **공휴일이 아니면** 실현 가능하다 — 근무 종료 이후 마감은 오히려 하루 전체를 쓸
+ * 수 있으므로 문제가 되지 않는다(회의 시간 추천의 "그 순간에 응답해야 한다"는 해석과 다르다,
+ * `docs/Tasks.md` T39 각주 참조). 불가능한 두 경우만 있다: ① 근무 시작 **전**(아직 근무가
+ * 시작되지 않아 그 시각까지 처리할 시간이 없다) ② 공휴일(그날 근무 자체가 없다).
  */
 export function checkDeadlineFeasibility(
   neededBy: string,
@@ -73,22 +79,23 @@ export function checkDeadlineFeasibility(
   const instant = new Date(neededBy);
   const { date: localDate, time: localTime } = splitLocal(instant, recipient.timezone);
 
-  const inWorkWindow = localTime >= recipient.workStart && localTime <= recipient.workEnd;
+  const beforeWorkStarts = localTime < recipient.workStart;
   const onHoliday = isHolidayDate(localDate, recipient.country);
 
-  if (inWorkWindow && !onHoliday) {
+  if (!beforeWorkStarts && !onHoliday) {
     return {
       feasible: true,
-      reason: `${localDate} ${localTime}(수신자 현지 시각)은 수신자 근무시간(${recipient.workStart}~${recipient.workEnd}) 내이며 공휴일과 겹치지 않습니다`,
+      reason: `${localDate} ${localTime}(수신자 현지 시각)은 수신자 근무 시작(${recipient.workStart}) 이후이며 공휴일과 겹치지 않습니다`,
       counterOffers: [],
     };
   }
 
   const reason = onHoliday
     ? `${localDate}은 수신자 국가의 공휴일과 겹칩니다`
-    : `${localDate} ${localTime}(수신자 현지 시각)은 수신자 근무시간(${recipient.workStart}~${recipient.workEnd}) 밖입니다`;
+    : `${localDate} ${localTime}(수신자 현지 시각)은 수신자 근무 시작(${recipient.workStart}) 이전입니다`;
 
-  // 같은 날이 근무시간 위반으로만 불가능하면(공휴일 아님) 그날부터, 공휴일이면 다음날부터 스캔한다.
+  // 같은 날이 근무시작 전이라서만 불가능하면(공휴일 아님) 그날 근무시작 시각을 첫 대안으로 쓸 수
+  // 있어 그날부터, 공휴일이면 그날 자체가 근무일이 아니므로 다음날부터 스캔한다.
   const scanFrom = onHoliday ? addDaysToDateString(localDate, 1) : localDate;
 
   return {
