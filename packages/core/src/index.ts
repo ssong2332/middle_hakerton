@@ -18,6 +18,7 @@ export * from './rules/urgency-routing';
 export * from './rules/preservation';
 export * from './rules/misread-risk';
 export * from './rules/response-source';
+export * from './rules/meeting-times';
 export * from './data/fallback-responses';
 export * from './data/emoji-risk';
 export * from './steps/c1';
