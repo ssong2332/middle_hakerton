@@ -9,7 +9,7 @@
  * records.sql`을 작성한다(파일만, 실제 적용은 오케스트레이터 판단 — `docs/Tasks.md` T14 원문).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { classifyDiffPattern } from '@cross-border/core';
+import { NotFoundError, ValidationError, classifyDiffPattern } from '@cross-border/core';
 
 export type SentMessageChannel = 'web_mock' | 'extension_insert' | 'extension_clipboard';
 
@@ -156,4 +156,97 @@ export async function insertSentMessageAndDiffRecord(
     }
     throw diffError;
   }
+}
+
+/**
+ * T50 — `PATCH /api/messages/{id}`. `docs/API.md` "PATCH /api/messages/{id}" 서버 규칙
+ * "`replied`를 바꾸는 경로는 이 라우트 하나뿐이며 사용자의 명시적 요청으로만 호출된다"(AC-044⑤,
+ * 자동 응답 감지 코드 경로 부재) — 이 함수가 그 유일한 통로다.
+ */
+export interface UpdateSentMessageInput {
+  /** `true`만 허용 — "답장 받음"을 다시 되돌리는 경로는 없다(수동 마킹, AC-044①). */
+  replied?: true;
+  /** 생략하면 변경하지 않는다. `null`은 예약 취소(명시적 값). */
+  scheduledFor?: string | null;
+}
+
+export interface UpdatedSentMessage {
+  id: string;
+  replied: boolean;
+  repliedMarkedAt: string | null;
+  scheduledFor: string | null;
+}
+
+interface SentMessageUrgencyRow {
+  urgency: string;
+}
+
+interface UpdatedSentMessageRow {
+  id: string;
+  replied: boolean;
+  replied_marked_at: string | null;
+  scheduled_for: string | null;
+}
+
+/**
+ * `id`·`user_id` 둘 다로 스코프해 갱신한다(`updateDictionaryEntry`/`deleteDictionaryEntry`와
+ * 같은 패턴 — 존재하지 않거나 타인 소유면 `NotFoundError`, 404, 소유 여부를 구분해 노출하지
+ * 않는다).
+ *
+ * 🔴 AC-005 — `scheduledFor`를 바꾸려는 요청인데 대상 메시지의 `urgency`가 `CRITICAL`이면
+ * **거부한다**(`docs/API.md` "PATCH /api/messages/{id}" 서버 규칙). `POST /api/messages`(T32)의
+ * "무시하고 NULL로 저장"과 다른 처리다 — 그쪽은 발송 시점의 자기 배제(사용자가 그 컨트롤 자체를
+ * 보지 못한다, UX-006 AC-005 게이팅)라 조용히 무시해도 되지만, 이 라우트는 **이미 발송된 특정
+ * 메시지**를 사용자가 나중에 지목해 예약을 걸려는 명시적 시도라 조용히 무시하면 "성공한 것처럼
+ * 보이는데 아무 일도 안 일어나는" 혼란을 만든다 — `ValidationError`(400)로 명시적으로 막는다.
+ */
+export async function updateSentMessage(
+  client: SupabaseClient,
+  userId: string,
+  id: string,
+  input: UpdateSentMessageInput,
+): Promise<UpdatedSentMessage> {
+  const { data: existingRows, error: fetchError } = await client
+    .from('sent_messages')
+    .select('urgency')
+    .eq('id', id)
+    .eq('user_id', userId);
+  if (fetchError) throw fetchError;
+
+  const existing = (existingRows ?? []) as SentMessageUrgencyRow[];
+  if (existing.length === 0) {
+    throw new NotFoundError('발송 기록을 찾을 수 없습니다');
+  }
+  if ('scheduledFor' in input && existing[0].urgency === 'CRITICAL') {
+    throw new ValidationError('CRITICAL 메시지는 예약 발송을 설정할 수 없습니다');
+  }
+
+  const patch: Record<string, unknown> = {};
+  if (input.replied === true) {
+    patch.replied = true;
+    patch.replied_marked_at = new Date().toISOString();
+  }
+  if ('scheduledFor' in input) {
+    patch.scheduled_for = input.scheduledFor;
+  }
+
+  const { data, error } = await client
+    .from('sent_messages')
+    .update(patch)
+    .eq('id', id)
+    .eq('user_id', userId)
+    .select('id, replied, replied_marked_at, scheduled_for');
+  if (error) throw error;
+
+  const rows = (data ?? []) as UpdatedSentMessageRow[];
+  if (rows.length === 0) {
+    throw new NotFoundError('발송 기록을 찾을 수 없습니다');
+  }
+  const row = rows[0];
+  return {
+    id: row.id,
+    replied: row.replied,
+    repliedMarkedAt: row.replied_marked_at,
+    scheduledFor: row.scheduled_for,
+  };
 }
