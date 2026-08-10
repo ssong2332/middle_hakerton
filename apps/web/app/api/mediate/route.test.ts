@@ -139,17 +139,36 @@ function fakeSupabase(
     dictionaryRows?: unknown[];
     profileRow?: unknown | null;
     learnedItemRows?: unknown[];
+    // 🔴 T41/T42 — recipient 배선 검증용. `authEmail`이 없으면(대부분의 기존 테스트) 이
+    // 파일의 `auth.getUser()` 목은 email 없는 응답을 돌려주고, `route.ts`는 그 경우 규약 조회
+    // 자체를 건너뛴다(파일 헤더 주석의 "이메일 확인 실패" 분기와 같은 방어).
+    authEmail?: string;
+    protocolRow?: unknown | null;
   } = {},
 ): {
   client: SupabaseClient;
-  eqCalls: { dictionary_terms: Array<[string, unknown]>; profiles: Array<[string, unknown]>; profile_learned_items: Array<[string, unknown]> };
+  eqCalls: {
+    dictionary_terms: Array<[string, unknown]>;
+    profiles: Array<[string, unknown]>;
+    profile_learned_items: Array<[string, unknown]>;
+    pair_protocols: Array<[string, unknown]>;
+  };
 } {
   const eqCalls = {
     dictionary_terms: [] as Array<[string, unknown]>,
     profiles: [] as Array<[string, unknown]>,
     profile_learned_items: [] as Array<[string, unknown]>,
+    pair_protocols: [] as Array<[string, unknown]>,
   };
   const client = {
+    auth: {
+      getUser: () =>
+        Promise.resolve(
+          options.authEmail
+            ? { data: { user: { email: options.authEmail } }, error: null }
+            : { data: { user: null }, error: null },
+        ),
+    },
     from(table: string) {
       if (table === 'dictionary_terms') {
         return {
@@ -180,6 +199,19 @@ function fakeSupabase(
             eq: (column: string, value: unknown) => {
               eqCalls.profile_learned_items.push([column, value]);
               return Promise.resolve({ data: options.learnedItemRows ?? [], error: null });
+            },
+          }),
+        };
+      }
+      if (table === 'pair_protocols') {
+        return {
+          select: () => ({
+            eq: (column: string, value: unknown) => {
+              eqCalls.pair_protocols.push([column, value]);
+              return {
+                maybeSingle: () =>
+                  Promise.resolve({ data: options.protocolRow ?? null, error: null }),
+              };
             },
           }),
         };
@@ -728,10 +760,10 @@ describe('POST /api/mediate', () => {
     expect(eqCalls.profile_learned_items).toEqual([['user_id', 'user-1']]);
   });
 
-  // 🔴 T28 — recipient는 아직 배선하지 않는다(T41, route.ts 헤더 주석 참조). 프로필이 완료
-  // 상태여도 personalizationApplied는 항상 false다 — placeholder가 아니라 현재 상태의 정확한 값
+  // 🔴 T41/T42 — recipient가 요청에 없으면(미지정, AC-066①) 프로필이 완료 상태여도
+  // personalizationApplied는 여전히 false다 — placeholder가 아니라 현재 상태의 정확한 값
   // (AC-066③, `MediationResult.personalizationApplied` 계약 주석).
-  it('T28 — 프로필이 완료 상태여도 recipient가 배선되지 않아 personalizationApplied는 여전히 false다', async () => {
+  it('recipient가 요청에 없으면 프로필이 완료 상태여도 personalizationApplied는 false다', async () => {
     const { client } = fakeSupabase({
       profileRow: {
         onboarding_state: 'completed',
@@ -746,6 +778,93 @@ describe('POST /api/mediate', () => {
 
     const response = await POST(
       postRequest({ text: 'hello', context: { languageDirection: 'en-ko', channel: 'web' } }),
+    );
+    const body = await response.json();
+
+    expect(body.personalizationApplied).toBe(false);
+  });
+
+  // T41/T42(AC-037/AC-066③) — recipient가 지정되고 프로필이 완료 상태면 personalizationApplied가
+  // true가 된다(더 이상 항상 false가 아니다 — 위 테스트와 대조).
+  it('AC-066③ — recipient가 지정되고 프로필이 완료 상태면 personalizationApplied는 true다', async () => {
+    const { client } = fakeSupabase({
+      authEmail: 'me@example.com',
+      profileRow: {
+        onboarding_state: 'completed',
+        directness: 'direct',
+        emoji_preference: 'avoids',
+        formality: 'high',
+        honorific_level: 'hapsyo',
+      },
+      protocolRow: null,
+    });
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client });
+    mockCreateClient(fakeLlm());
+
+    const response = await POST(
+      postRequest({
+        text: 'hello',
+        recipient: 'tanaka@sakuradigital.example',
+        context: { languageDirection: 'en-ko', channel: 'web' },
+      }),
+    );
+    const body = await response.json();
+
+    expect(body.personalizationApplied).toBe(true);
+  });
+
+  // T42(AC-037, `docs/PRD.md:675` 명시 예시) — 규약 조회를 실제로 수행하고, 규약이 프로필과
+  // 충돌하면 규약 값이 C2 payload에 실린다.
+  it('AC-037 — recipient의 쌍방 규약이 있으면 프로필과 충돌 시 규약이 이겨 C2 payload에 실린다', async () => {
+    const { client, eqCalls } = fakeSupabase({
+      authEmail: 'me@example.com',
+      profileRow: {
+        onboarding_state: 'completed',
+        directness: null,
+        emoji_preference: 'likes',
+        formality: null,
+        honorific_level: 'haeyo',
+      },
+      protocolRow: {
+        pair_key: 'k',
+        party_a: 'me@example.com',
+        party_b: 'tanaka@sakuradigital.example',
+        directness_allowed: null,
+        emoji_policy: 'avoid',
+        address_form: null,
+        deadline_style: null,
+        authorship_state: 'sender_confirmed',
+        updated_at: '2026-08-10T00:00:00.000Z',
+      },
+    });
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client });
+    const llm = fakeLlm();
+    mockCreateClient(llm);
+
+    await POST(
+      postRequest({
+        text: 'hello',
+        recipient: 'tanaka@sakuradigital.example',
+        context: { languageDirection: 'ko-en', channel: 'web' },
+      }),
+    );
+
+    expect(eqCalls.pair_protocols).toEqual([['pair_key', 'me@example.comtanaka@sakuradigital.example']]);
+    const c2Payload = llm.complete.mock.calls.find((call) => call[0] === 'c2')?.[2];
+    expect(c2Payload).toMatchObject({ emojiPreference: 'avoids' });
+  });
+
+  it('recipient가 있어도 session.client가 없으면(테스트 목) 규약 조회를 건너뛰고 recipient는 null로 흐른다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+    const llm = fakeLlm();
+    mockCreateClient(llm);
+
+    const response = await POST(
+      postRequest({
+        text: 'hello',
+        recipient: 'tanaka@sakuradigital.example',
+        context: { languageDirection: 'ko-en', channel: 'web' },
+      }),
     );
     const body = await response.json();
 
