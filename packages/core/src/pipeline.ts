@@ -54,6 +54,7 @@ import { assessEmotionalSignal } from './steps/c6';
 import { resolveDeliveryPath, resolveEffectiveUrgency } from './rules/urgency-routing';
 import { combineSource } from './rules/response-source';
 import { honorificMixedWarning, honorificNotRegisteredWarnings } from './rules/honorific';
+import { emojiRiskWarnings } from './rules/emoji-risk';
 import { ticketOptionFrom } from './rules/ticket-gate';
 import type { Directness, EmojiPreference } from './prompts/c2';
 
@@ -315,6 +316,11 @@ export const run: MediationPipeline = async (input, deps) => {
   // AC-047② — C2가 원문과 교차 검증까지 마치고 넘긴 미등록 호칭 목록을 `Warning[]`으로 조립한다.
   // 방향과 무관하게 항상 검사한다.
   warnings.push(...honorificNotRegisteredWarnings(tone.unregisteredHonorifics));
+
+  // T30(AC-022/AC-056) — 변환 결과에 위험도 높음/중간 이모지가 있고, 병합된 이모지 선호가
+  // 'avoids' 또는 미합의(null)일 때만 경고한다(`rules/emoji-risk.ts` 주석 참조 — 위에서 이미
+  // AC-037 우선순위로 병합한 `emojiPreference`를 그대로 재사용한다).
+  warnings.push(...emojiRiskWarnings(tone.transformed, emojiPreference));
 
   // ⑦ (감정형이면 C6) — AC-058 게이트. `assessEmotionalSignal`은 추가 LLM 호출 없이 원문에서
   // 감정 신호 유무를 판정하는 순수 함수이고, `ticketOptionFrom`이 그 결과를 판별 유니온으로만
