@@ -9,15 +9,17 @@ vi.mock('../shared/token-storage', () => ({
 }));
 vi.mock('../shared/api', () => ({
   callMediationApi: vi.fn(),
+  fetchKnownCounterparts: vi.fn(),
 }));
 
 import { getStoredToken } from '../shared/token-storage';
-import { callMediationApi } from '../shared/api';
+import { callMediationApi, fetchKnownCounterparts } from '../shared/api';
 import { MediationPanel } from './MediationPanel';
 import type { Layer2Adapter } from './registry';
 
 const mockedGetStoredToken = vi.mocked(getStoredToken);
 const mockedCallMediationApi = vi.mocked(callMediationApi);
+const mockedFetchKnownCounterparts = vi.mocked(fetchKnownCounterparts);
 
 function successResult(overrides: Partial<MediationResult> = {}): MediationResult {
   return {
@@ -41,6 +43,9 @@ function successResult(overrides: Partial<MediationResult> = {}): MediationResul
 describe('MediationPanel', () => {
   beforeEach(() => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    // T66 — 대부분의 기존 테스트는 수신자 후보와 무관하다. 기본값을 "규약 0건"으로 둬서
+    // 각 테스트가 매번 이 목을 채우지 않아도 되게 한다(AC-067④와 같은 이유 — 빈 배열이 정상).
+    mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
   });
 
   afterEach(() => {
@@ -80,6 +85,86 @@ describe('MediationPanel', () => {
     });
     const button = screen.getByRole('button', { name: '중재 실행' }) as HTMLButtonElement;
     expect(button.disabled).toBe(false);
+  });
+
+  // T66(AC-067④) — 규약이 0건이면 목록 컨트롤 자체가 없다(비활성 아님).
+  it('does not render a recipient control when there are no known counterparts', async () => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
+    render(<MediationPanel initialText="hello" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('선택한 텍스트')).toBeTruthy();
+    });
+    expect(screen.queryByLabelText('받는 사람 (선택)')).toBeNull();
+  });
+
+  // T66(AC-067①) — 규약이 있으면 상대 목록이 select 옵션으로 뜬다.
+  it('renders known counterparts as select options', async () => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    mockedFetchKnownCounterparts.mockResolvedValue({
+      ok: true,
+      counterparts: ['tanaka@sakuradigital.example', 'michael@vertexlabs.example'],
+    });
+    render(<MediationPanel initialText="hello" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('받는 사람 (선택)')).toBeTruthy();
+    });
+    const select = screen.getByLabelText('받는 사람 (선택)') as HTMLSelectElement;
+    const optionValues = [...select.options].map((option) => option.value);
+    expect(optionValues).toEqual(['', 'tanaka@sakuradigital.example', 'michael@vertexlabs.example']);
+    expect(select.value).toBe(''); // 기본값 미지정 — 자동 선택하지 않는다.
+  });
+
+  // T66(AC-067①) — 상대를 고르고 실행하면 그 값이 recipient로 전달된다.
+  it('sends the selected counterpart as recipient when running mediation', async () => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    mockedFetchKnownCounterparts.mockResolvedValue({
+      ok: true,
+      counterparts: ['tanaka@sakuradigital.example'],
+    });
+    mockedCallMediationApi.mockResolvedValue({ ok: true, data: successResult() });
+    render(<MediationPanel initialText="hello" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('받는 사람 (선택)')).toBeTruthy();
+    });
+    fireEvent.change(screen.getByLabelText('받는 사람 (선택)'), {
+      target: { value: 'tanaka@sakuradigital.example' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '중재 실행' }));
+
+    await waitFor(() => {
+      expect(mockedCallMediationApi).toHaveBeenCalledWith(
+        expect.objectContaining({ recipient: 'tanaka@sakuradigital.example' }),
+      );
+    });
+  });
+
+  // T66(AC-067④) — 조회가 실패해도(로그인 문제 등) 기존 미지정 경로가 그대로 동작한다.
+  it('still runs mediation with recipient null when the counterparts fetch fails', async () => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    mockedFetchKnownCounterparts.mockResolvedValue({
+      ok: false,
+      reason: 'request-failed',
+      error: { code: 'INTERNAL', message: 'boom', retryable: true },
+    });
+    mockedCallMediationApi.mockResolvedValue({ ok: true, data: successResult() });
+    render(<MediationPanel initialText="hello" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('선택한 텍스트')).toBeTruthy();
+    });
+    expect(screen.queryByLabelText('받는 사람 (선택)')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '중재 실행' }));
+
+    await waitFor(() => {
+      expect(mockedCallMediationApi).toHaveBeenCalledWith(
+        expect.objectContaining({ recipient: null }),
+      );
+    });
   });
 
   // NotLoggedIn — 토큰이 없으면 실행을 시도하지 않고 로그인 안내를 보여준다.

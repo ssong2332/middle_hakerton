@@ -21,7 +21,9 @@
  */
 import { clearStoredToken, getStoredToken, setStoredToken } from './shared/token-storage';
 import {
+  COUNTERPARTS_REQUEST_MESSAGE_TYPE,
   MEDIATE_REQUEST_MESSAGE_TYPE,
+  type CounterpartsApiResult,
   type MediateApiErrorEnvelope,
   type MediateApiRequest,
   type MediateApiResult,
@@ -138,16 +140,104 @@ async function handleMediateRequest(body: MediateApiRequest): Promise<MediateApi
   return { ok: true, data };
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (!isMediateRequestMessage(message)) return false;
-  handleMediateRequest(message.body)
-    .then(sendResponse)
-    .catch((error: unknown) => {
-      sendResponse({
-        ok: false,
-        reason: 'request-failed',
-        error: genericError(error instanceof Error ? error.message : String(error)),
-      });
+function isCounterpartsRequestMessage(message: unknown): message is { type: string } {
+  if (typeof message !== 'object' || message === null) return false;
+  const candidate = message as { type?: unknown };
+  return candidate.type === COUNTERPARTS_REQUEST_MESSAGE_TYPE;
+}
+
+/**
+ * T66(AC-067①) — `GET /api/pair-protocols` fetch. `handleMediateRequest`와 같은 이유로
+ * 서비스 워커에서 수행한다(CORS, `shared/api.ts` 헤더 주석). 401/`AUTH_REQUIRED`를
+ * not-logged-in으로 매핑하고 토큰을 지우는 것도 동일하다.
+ */
+async function handleCounterpartsRequest(): Promise<CounterpartsApiResult> {
+  const token = await getStoredToken();
+  if (!token) {
+    return { ok: false, reason: 'not-logged-in' };
+  }
+
+  const APP_ORIGIN = (import.meta.env.VITE_APP_ORIGIN as string | undefined) ?? '';
+  if (!APP_ORIGIN) {
+    return {
+      ok: false,
+      reason: 'request-failed',
+      error: genericError('확장 설정 오류: VITE_APP_ORIGIN이 설정되지 않았습니다.'),
+    };
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${APP_ORIGIN}/api/pair-protocols`, {
+      headers: { authorization: `Bearer ${token}` },
     });
-  return true; // sendResponse는 비동기로 호출된다 — 리스너가 살아있게 true를 반환한다.
+  } catch {
+    return {
+      ok: false,
+      reason: 'request-failed',
+      error: genericError('네트워크 오류가 발생했습니다.'),
+    };
+  }
+
+  if (!response.ok) {
+    const parsed = (await response.json().catch(() => null)) as {
+      error?: MediateApiErrorEnvelope;
+    } | null;
+
+    if (response.status === 401 || parsed?.error?.code === 'AUTH_REQUIRED') {
+      await clearStoredToken();
+      return { ok: false, reason: 'not-logged-in' };
+    }
+
+    return {
+      ok: false,
+      reason: 'request-failed',
+      error: parsed?.error ?? genericError('처리에 실패했습니다.'),
+    };
+  }
+
+  const data = (await response.json().catch(() => null)) as { counterparts: string[] } | null;
+  if (data === null) {
+    return {
+      ok: false,
+      reason: 'request-failed',
+      error: genericError('응답을 해석할 수 없습니다.'),
+    };
+  }
+  return { ok: true, counterparts: data.counterparts };
+}
+
+// 🔴 T66 — `chrome.runtime.onMessage.addListener`를 내부 메시지 타입당 하나씩 여러 번 등록하지
+// 않는다. 실 Chrome은 여러 리스너를 다 부르지만, 테스트 하네스(`background.test.ts`)의 페이크
+// `addListener`는 마지막 등록만 남기는 단순 구현이라 여러 개를 등록하면 앞선 리스너가 실질적으로
+// 죽는다 — 그 사실을 여기서 우회하지 않고, 타입으로 분기하는 디스패처 하나로 합쳐 실 Chrome과
+// 테스트 하네스 양쪽에서 동일하게 동작하게 한다.
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (isMediateRequestMessage(message)) {
+    handleMediateRequest(message.body)
+      .then(sendResponse)
+      .catch((error: unknown) => {
+        sendResponse({
+          ok: false,
+          reason: 'request-failed',
+          error: genericError(error instanceof Error ? error.message : String(error)),
+        });
+      });
+    return true; // sendResponse는 비동기로 호출된다 — 리스너가 살아있게 true를 반환한다.
+  }
+
+  if (isCounterpartsRequestMessage(message)) {
+    handleCounterpartsRequest()
+      .then(sendResponse)
+      .catch((error: unknown) => {
+        sendResponse({
+          ok: false,
+          reason: 'request-failed',
+          error: genericError(error instanceof Error ? error.message : String(error)),
+        });
+      });
+    return true;
+  }
+
+  return false;
 });

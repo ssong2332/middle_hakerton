@@ -52,6 +52,10 @@ describe('T73① 라우트 이름 정정 — AC-084①②③', () => {
     expect(existsSync(join(apiDir, 'dictionary'))).toBe(true);
     expect(existsSync(join(apiDir, 'terminology'))).toBe(false);
     expect(existsSync(join(apiDir, 'protocol'))).toBe(false);
-    expect(existsSync(join(apiDir, 'pair-protocols'))).toBe(false);
+    // 🔴 T66 — `GET /api/pair-protocols`는 `docs/API.md` "GET /api/pair-protocols"가 처음부터
+    // 명시한 신규 계약이다(AC-067①, T23의 `/api/dictionary` 선례와 같은 처리 — 정당하게 새로
+    // 만드는 라우트는 이 줄만 갱신하고 나머지 단언은 그대로 둔다). T41/T42(개별 규약 CRUD,
+    // `/api/protocol`)의 영역이 아니다 — 그 라우트는 여전히 `false`(위 줄, 미구현).
+    expect(existsSync(join(apiDir, 'pair-protocols'))).toBe(true);
   });
 });

@@ -52,6 +52,67 @@ export interface MediateRequestMessage {
   body: MediateApiRequest;
 }
 
+/**
+ * T66(AC-067①) — `GET /api/pair-protocols` 호출. `callMediationApi`와 같은 이유로 콘텐츠
+ * 스크립트에서 직접 fetch하지 않고 `background.ts`에 위임한다(CORS — 파일 헤더 주석 참조).
+ */
+export const COUNTERPARTS_REQUEST_MESSAGE_TYPE = 'cbm:counterparts-request' as const;
+
+export interface CounterpartsRequestMessage {
+  type: typeof COUNTERPARTS_REQUEST_MESSAGE_TYPE;
+}
+
+export type CounterpartsApiResult =
+  | { ok: true; counterparts: string[] }
+  | { ok: false; reason: 'not-logged-in' }
+  | { ok: false; reason: 'request-failed'; error: MediateApiErrorEnvelope };
+
+function isCounterpartsApiResult(value: unknown): value is CounterpartsApiResult {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as { ok?: unknown };
+  return candidate.ok === true || candidate.ok === false;
+}
+
+/**
+ * AC-067④ — 이 호출이 실패하거나 빈 배열을 반환해도 패널은 기존 미지정 경로로 정상 동작해야
+ * 한다. 실패를 예외로 던지지 않고 항상 `CounterpartsApiResult`로 돌려주는 이유는 그 요구를
+ * 호출부(`MediationPanel.tsx`)가 `try/catch` 없이 분기만으로 처리하게 하기 위해서다.
+ */
+export async function fetchKnownCounterparts(): Promise<CounterpartsApiResult> {
+  let token: string | null;
+  try {
+    token = await getStoredToken();
+  } catch {
+    return { ok: false, reason: 'not-logged-in' };
+  }
+  if (!token) {
+    return { ok: false, reason: 'not-logged-in' };
+  }
+
+  const message: CounterpartsRequestMessage = { type: COUNTERPARTS_REQUEST_MESSAGE_TYPE };
+
+  let response: unknown;
+  try {
+    response = await chrome.runtime.sendMessage(message);
+  } catch {
+    return {
+      ok: false,
+      reason: 'request-failed',
+      error: genericError('확장 내부 통신 오류가 발생했습니다.'),
+    };
+  }
+
+  if (!isCounterpartsApiResult(response)) {
+    return {
+      ok: false,
+      reason: 'request-failed',
+      error: genericError('확장 내부 통신 오류가 발생했습니다.'),
+    };
+  }
+
+  return response;
+}
+
 function genericError(message: string): MediateApiErrorEnvelope {
   return { code: 'INTERNAL', message, retryable: true };
 }

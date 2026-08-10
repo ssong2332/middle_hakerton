@@ -39,6 +39,9 @@ vi.mock('./shared/token-storage', () => ({
 }));
 vi.mock('./shared/api', () => ({
   callMediationApi: vi.fn(),
+  // T66 — MediationPanel이 idle 진입 시 이 함수를 호출한다. 이 파일은 그 기능과 무관하므로
+  // 규약 0건(빈 배열)으로 고정해 기존 시나리오에 영향을 주지 않는다.
+  fetchKnownCounterparts: vi.fn().mockResolvedValue({ ok: true, counterparts: [] }),
 }));
 
 import { getStoredToken } from './shared/token-storage';
