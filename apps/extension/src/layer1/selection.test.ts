@@ -398,6 +398,73 @@ describe('initSelectionOverlay — button preserves native selection on mousedow
   });
 });
 
+// M-8 (2026-08-10, 사용자 라이브 재현 — 네이버 뉴스, unpacked 확장) — 실브라우저에서 플로팅
+// 버튼 자신을 클릭하면 그 mouseup이 document까지 버블돼 `handleMouseUp`이 버튼을 지우고 새로
+// 만들었다. Chrome은 mousedown~click 사이에 대상 노드가 제거되면 click을 아예 내보내지
+// 않으므로 `onSelect`가 절대 호출되지 않았다 — 패널이 영영 열리지 않는 완전한 회귀였다.
+// 🔴 기존 "clicking the floating button invokes..." 테스트(위)는 `click`을 곧바로
+// dispatch해 이 경합을 재현하지 못한다(실브라우저는 mousedown→mouseup→click 순서로 낸다) —
+// 그래서 이 회귀가 그 테스트를 통과시키면서도 실제로는 깨져 있었다. 이 테스트는 mouseup을
+// 버튼 자신에 대해 먼저 dispatch해 그 경합을 그대로 재현한다.
+describe('initSelectionOverlay — floating button survives its own mouseup (M-8)', () => {
+  let cleanup: () => void;
+  let originalGetBoundingClientRect: typeof Range.prototype.getBoundingClientRect | undefined;
+
+  beforeEach(() => {
+    originalGetBoundingClientRect = Range.prototype.getBoundingClientRect;
+    Range.prototype.getBoundingClientRect = vi.fn(() => FAKE_RECT);
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    if (originalGetBoundingClientRect) {
+      Range.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    } else {
+      delete (Range.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+    }
+    document.body.innerHTML = '';
+    window.getSelection()?.removeAllRanges();
+  });
+
+  it('a mouseup targeting the button itself does not remove/replace it', () => {
+    const content = renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+
+    selectTextIn(content);
+    fireMouseUp();
+    const button = getButton();
+    expect(button).not.toBeNull();
+
+    button!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    button!.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+    expect(getButton()).toBe(button);
+  });
+
+  // 🔴 red 확인 결과(측정): 이 테스트 하나만 놓고 보면 수정 전 코드에서도 통과한다 — jsdom의
+  // `dispatchEvent('click')`는 수동 호출이라 노드가 DOM에서 detach돼도 그 노드 자신의
+  // 리스너를 그대로 실행한다(Chrome이 mousedown~click 사이 노드 제거 시 click 합성 자체를
+  // 건너뛰는 것과 다른 동작 — jsdom이 재현하지 못하는 부분). 그래서 이 회귀의 실제 red
+  // 증거는 위 "does not remove/replace it" 테스트(버튼 재생성 여부)이고, 이 테스트는 수정
+  // 후 "버튼이 중복 생성되지 않는다"는 보조 확인일 뿐이다 — 단독으로 red→green을 주장하지 않는다.
+  it('the full mousedown→mouseup→click sequence on the button still invokes onSelect (실브라우저 이벤트 순서 재현)', () => {
+    const content = renderGenericSiteA();
+    const onSelect = vi.fn();
+    cleanup = initSelectionOverlay({ onSelect });
+
+    selectTextIn(content);
+    fireMouseUp();
+    const button = getButton()!;
+
+    button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    button.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(document.querySelectorAll(`#${BUTTON_ID}`).length).toBe(1);
+  });
+});
+
 // M-2 (reviewer, Major) — 실브라우저에서 `<textarea>`/`<input>` 안의 선택은
 // `window.getSelection().toString()`이 빈 문자열을 반환해 버튼이 뜨지 않는 문제
 // (`docs/UX.md:187` UF-005 1단계). `document.activeElement`가 폼 컨트롤이고 선택이

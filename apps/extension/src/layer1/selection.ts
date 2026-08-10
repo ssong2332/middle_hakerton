@@ -243,7 +243,21 @@ export function initSelectionOverlay(options: SelectionOverlayOptions = {}): () 
   // `stopPropagation`을 호출하지 않는다 — 대상 사이트의 클릭·스크롤·단축키 동작은 이 코드가
   // 없는 것처럼 그대로 흘러간다. (유일한 예외는 우리가 만든 버튼 **자신의** mousedown
   // 리스너다 — `createFloatingButton`의 M-1 주석 참조. 그건 host 페이지 이벤트가 아니다.)
-  const handleMouseUp = (): void => {
+  //
+  // 🔴 M-8(2026-08-10, 라이브 재현 후 수정) 사용자가 플로팅 버튼 자신을 클릭하면 그 mouseup도
+  // 이 document 리스너까지 버블된다 — 버튼의 mousedown이 preventDefault로 selection을
+  // 유지시켜 두었으므로 `getSelectionPayload()`가 여전히 값을 반환하고, 이 핸들러가
+  // `createFloatingButton()`을 다시 호출해 **방금 클릭된 그 버튼 노드를 지우고 새 버튼으로
+  // 교체**했다. Chrome은 mousedown~click 사이에 대상 노드가 DOM에서 제거되면 뒤이은 `click`
+  // 이벤트를 아예 내보내지 않는다 — 그 결과 `onSelect()`가 절대 호출되지 않고 패널이 열리지
+  // 않았다(실사용자 재현: 네이버 뉴스 페이지, unpacked 확장). mouseup의 target이 기존 버튼
+  // 자신(또는 그 자손)이면 재생성을 건너뛴다 — 그 버튼 자신의 click 리스너가 `onSelect`를
+  // 이미 처리한다(`createFloatingButton`의 `button.addEventListener('click', ...)`).
+  const handleMouseUp = (event: MouseEvent): void => {
+    const existing = getExistingButton();
+    if (existing && event.target instanceof Node && existing.contains(event.target)) {
+      return;
+    }
     const payload = getSelectionPayload();
     if (!payload) {
       removeFloatingButton();
