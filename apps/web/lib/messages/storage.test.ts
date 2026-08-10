@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { NotFoundError, ValidationError } from '@cross-border/core';
 import {
+  fetchRepliedMessages,
   insertDiffRecord,
   insertSentMessage,
   insertSentMessageAndDiffRecord,
@@ -447,5 +448,69 @@ describe('updateSentMessage — AC-044①, AC-024, AC-005', () => {
     await updateSentMessage(client, 'user-1', 'msg-3', { replied: true });
 
     expect(updatedPayloads[0]).toMatchObject({ replied: true });
+  });
+});
+
+// T33 — `GET /api/feedback`이 쓰는 조회 함수.
+describe('fetchRepliedMessages — T33', () => {
+  function createFakeFetchRepliedSupabase(
+    rows: Array<{ id: string; sent_at: string; replied_marked_at: string | null; mediation_applied: boolean }>,
+  ): { client: SupabaseClient; eqCalls: Array<[string, unknown]> } {
+    const eqCalls: Array<[string, unknown]> = [];
+    const client = {
+      from(table: string) {
+        if (table !== 'sent_messages') throw new Error(`unexpected table: ${table}`);
+        return {
+          select: () => ({
+            eq: (col1: string, val1: unknown) => {
+              eqCalls.push([col1, val1]);
+              return {
+                eq: (col2: string, val2: unknown) => {
+                  eqCalls.push([col2, val2]);
+                  return Promise.resolve({ data: rows, error: null });
+                },
+              };
+            },
+          }),
+        };
+      },
+    } as unknown as SupabaseClient;
+    return { client, eqCalls };
+  }
+
+  it('user_id·replied=true로 스코프해 camelCase로 변환해 반환한다', async () => {
+    const { client, eqCalls } = createFakeFetchRepliedSupabase([
+      { id: 'm1', sent_at: '2026-08-10T00:00:00Z', replied_marked_at: '2026-08-10T02:00:00Z', mediation_applied: true },
+    ]);
+
+    const result = await fetchRepliedMessages(client, 'user-1');
+
+    expect(eqCalls).toEqual([
+      ['user_id', 'user-1'],
+      ['replied', true],
+    ]);
+    expect(result).toEqual([
+      { id: 'm1', sentAt: '2026-08-10T00:00:00Z', repliedMarkedAt: '2026-08-10T02:00:00Z', mediationApplied: true },
+    ]);
+  });
+
+  it('replied_marked_at이 null인 행은(불변식 위반 방어) 제외한다', async () => {
+    const { client } = createFakeFetchRepliedSupabase([
+      { id: 'm1', sent_at: '2026-08-10T00:00:00Z', replied_marked_at: null, mediation_applied: true },
+      { id: 'm2', sent_at: '2026-08-10T00:00:00Z', replied_marked_at: '2026-08-10T02:00:00Z', mediation_applied: false },
+    ]);
+
+    const result = await fetchRepliedMessages(client, 'user-1');
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('m2');
+  });
+
+  it('결과가 없으면 빈 배열을 반환한다', async () => {
+    const { client } = createFakeFetchRepliedSupabase([]);
+
+    const result = await fetchRepliedMessages(client, 'user-1');
+
+    expect(result).toEqual([]);
   });
 });
