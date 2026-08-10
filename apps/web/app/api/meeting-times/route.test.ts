@@ -68,6 +68,21 @@ describe('POST /api/meeting-times — AC-023', () => {
     expect(body.candidates).toEqual([]);
   });
 
+  // reviewer 발견(2026-08-10) — 수정 전에는 `Intl.DateTimeFormat`의 RangeError가
+  // `withApi()`의 일반 catch까지 올라가 500 INTERNAL이 났다(계약 위반, Errors는 400·401뿐).
+  it('타임존이 알 수 없는 IANA 값이면 500이 아니라 400을 반환한다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1' });
+
+    const response = await POST(
+      postRequest({
+        ...VALID_BODY,
+        sender: { ...VALID_BODY.sender, timezone: 'Not/AZone' },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+  });
+
   it('시각 형식이 HH:mm이 아니면 400을 반환한다', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1' });
 
