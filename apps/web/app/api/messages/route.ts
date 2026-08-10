@@ -24,7 +24,7 @@
  * false`로 안전하게 응답한다 — 아래 본문 주석 및 `applyPatternLearningSafe` 헤더 주석 참조.
  */
 import { z } from 'zod';
-import type { CountryCode, UrgencyLevel } from '@cross-border/core';
+import { resolveDeliveryPath, type CountryCode, type UrgencyLevel } from '@cross-border/core';
 import { withApi } from '../../../lib/http';
 import {
   insertSentMessageAndDiffRecord,
@@ -81,6 +81,14 @@ export const POST = withApi<MessagesRequest, MessagesResponse>(
     }
 
     const channel = input.channel as SentMessageChannel;
+    const urgency = input.urgency as UrgencyLevel;
+
+    // 🔴 T32(reviewer 재검토, 2026-08-10 발견·수정) — `docs/API.md:122` 서버 규칙 "urgency ===
+    // 'CRITICAL'이면 scheduledFor를 무시하고 NULL로 저장한다(AC-005). 클라이언트를 믿지 않는다"가
+    // 계약에는 있었지만 실제로 집행되지 않고 있었다 — 클라이언트가 보낸 scheduledFor를 그대로
+    // 저장했다. `resolveDeliveryPath()`(T39·T31에서도 재사용한 그 함수) 하나로만 판정하고
+    // 긴급도 분기 로직을 여기서 다시 만들지 않는다.
+    const scheduledFor = resolveDeliveryPath(urgency) === 'immediate' ? null : (input.scheduledFor ?? null);
 
     // 🔴 Major 2(reviewer REJECTED → 수정) — 두 insert(`sent_messages`/`diff_records`)를
     // 원자적으로 묶은 단일 함수를 쓴다(`lib/messages/storage.ts` 참조). 두 번째 insert가
@@ -94,9 +102,9 @@ export const POST = withApi<MessagesRequest, MessagesResponse>(
         recipientTimezone: input.recipientTimezone ?? null,
         originalText: input.originalText,
         finalText: input.finalText,
-        urgency: input.urgency as UrgencyLevel,
+        urgency,
         channel,
-        scheduledFor: input.scheduledFor ?? null,
+        scheduledFor,
         mediationApplied: input.mediationApplied,
         isReminder: input.isReminder ?? false,
         parentMessageId: input.parentMessageId ?? null,

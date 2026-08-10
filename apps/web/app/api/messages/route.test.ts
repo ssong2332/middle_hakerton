@@ -174,6 +174,45 @@ describe('POST /api/messages', () => {
     expect(secondBody).toEqual(firstBody);
   });
 
+  // 🔴 T32(reviewer 재검토, 2026-08-10 발견·수정) — `docs/API.md:122` 서버 규칙 "CRITICAL이면
+  // scheduledFor를 무시하고 NULL로 저장한다(AC-005)"가 계약에는 있었지만 실제로는 클라이언트가
+  // 보낸 값을 그대로 저장하고 있었다(T14 구현 당시부터의 회귀 — 그때는 아직 T32가 검증하기 전).
+  it('AC-005 — CRITICAL이면 클라이언트가 scheduledFor를 보내도 무시하고 NULL로 저장한다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
+    mockInsertSentMessageAndDiffRecord.mockResolvedValue({
+      sentMessage: { id: 'msg-critical', sentAt: '2026-08-10T10:00:00Z' },
+      diffRecord: { id: 'diff-critical', patternKey: null },
+    });
+
+    await POST(
+      jsonRequest({ ...validBody, urgency: 'CRITICAL', scheduledFor: '2026-08-11T00:00:00Z' }),
+    );
+
+    expect(mockInsertSentMessageAndDiffRecord).toHaveBeenCalledWith(
+      fakeClient,
+      expect.objectContaining({ urgency: 'CRITICAL', scheduledFor: null }),
+      expect.any(Function),
+    );
+  });
+
+  it('NORMAL/LOW이면 클라이언트가 보낸 scheduledFor를 그대로 저장한다(대조군)', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
+    mockInsertSentMessageAndDiffRecord.mockResolvedValue({
+      sentMessage: { id: 'msg-normal', sentAt: '2026-08-10T10:00:00Z' },
+      diffRecord: { id: 'diff-normal', patternKey: null },
+    });
+
+    await POST(
+      jsonRequest({ ...validBody, urgency: 'NORMAL', scheduledFor: '2026-08-11T00:00:00Z' }),
+    );
+
+    expect(mockInsertSentMessageAndDiffRecord).toHaveBeenCalledWith(
+      fakeClient,
+      expect.objectContaining({ urgency: 'NORMAL', scheduledFor: '2026-08-11T00:00:00Z' }),
+      expect.any(Function),
+    );
+  });
+
   it('Idempotency-Key 헤더가 없으면 매번 저장소를 새로 호출한다(기본 동작 불변)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
     mockInsertSentMessageAndDiffRecord
