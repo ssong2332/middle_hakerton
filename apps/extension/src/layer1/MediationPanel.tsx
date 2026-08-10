@@ -12,16 +12,17 @@
  * `adapter`가 `null`이면(층 2 미등록 사이트 — 일상 케이스, `docs/UX.md:763`) "입력창에 삽입"은
  * 아예 렌더되지 않는다(비활성 버튼 금지 — AC-053②).
  *
- * 수신자 필드를 두지 않는다 — 수신자 후보 탐지(AC-067/068, T66)가 아직 없는 상태에서 수동 입력
- * 필드만 먼저 만들면 다음 라운드에 다시 손대야 한다. 필드가 아예 없으면 recipient는 항상
- * `null`이고, "수신자는 절대 필수가 아니다"(AC-066①)·"수신자를 지어내지 않는다"(AC-066④) 둘 다
- * 자동으로 성립한다 — PersonalizationOff 표시(AC-066③)는 `result.personalizationApplied`를
- * 그대로 읽는다.
+ * 🔴 T66(AC-067①, PRD Planning Decision #128) — 자유 입력 필드는 여전히 두지 않는다(페이지
+ * 맥락 자동 감지는 스파이크에서 불가 판정, 스트레치로 이월 — `docs/UX.md` v6.7). 대신 기존
+ * 쌍방 규약(`pair_protocols`) 상대 목록에서 고르는 `RecipientKnownCounterparts` 컨트롤만
+ * 추가한다. 목록이 비어 있으면(규약 0건) 컨트롤 자체를 렌더하지 않는다(비활성 아님 —
+ * "Absent-not-disabled controls" 패턴, `docs/UX.md:929`) — 그 경우 이전과 동일하게 recipient는
+ * `null`로 남아 AC-066①④가 그대로 성립한다.
  */
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { LENGTH_COUNTER_SHOW_AT, SOFT_LENGTH_CAP } from '@cross-border/core';
 import type { MediationResult } from '@cross-border/core';
-import { callMediationApi } from '../shared/api';
+import { callMediationApi, fetchKnownCounterparts } from '../shared/api';
 import { getStoredToken } from '../shared/token-storage';
 import { NON_LIVE_NOTICE } from '../shared/non-live-notice';
 import type { Layer2Adapter } from './registry';
@@ -78,6 +79,8 @@ export function MediationPanel({
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const [insertStatus, setInsertStatus] = useState<InsertStatus>('idle');
+  const [counterparts, setCounterparts] = useState<string[]>([]);
+  const [recipient, setRecipient] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   // 🔴 M-4(reviewer) — `getStoredToken()`이 reject해도(예: `chrome.storage.session`의 access
@@ -96,6 +99,21 @@ export function MediationPanel({
     };
   }, []);
 
+  // 🔴 T66(AC-067①④) — 로그인 확인 뒤 1회 조회한다. 실패하거나 규약이 0건이면 `counterparts`가
+  // 빈 배열로 남고, 그 경우 컨트롤 자체를 렌더하지 않는다(아래 JSX) — 기존 미지정 경로가 그대로
+  // 동작해야 한다는 요구를 실패 시에도 깨지 않는다(try/catch 없이 항상 `CounterpartsApiResult`를
+  // 반환하는 `fetchKnownCounterparts()` 계약, `shared/api.ts` 참조).
+  useEffect(() => {
+    if (status !== 'idle') return;
+    let cancelled = false;
+    fetchKnownCounterparts().then((result) => {
+      if (!cancelled && result.ok) setCounterparts(result.counterparts);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
   useEffect(() => {
     panelRef.current?.focus();
   }, []);
@@ -111,7 +129,7 @@ export function MediationPanel({
     setCopyError(null);
     const response = await callMediationApi({
       text,
-      recipient: null,
+      recipient,
       context: { languageDirection: 'ko-en', channel: 'extension' },
     });
     if (!response.ok) {
@@ -233,6 +251,26 @@ export function MediationPanel({
             <p id="cbm-panel-text-counter" style={{ fontSize: '11px', opacity: 0.75 }}>
               {text.length.toLocaleString('ko-KR')} / {SOFT_LENGTH_CAP.toLocaleString('ko-KR')}자
             </p>
+          )}
+          {/* T66(AC-067①, docs/UX.md v6.7 RecipientKnownCounterparts) — 규약이 0건이면 아예
+              렌더하지 않는다(비활성 아님). 페이지 맥락 자동 감지는 스트레치로 이월됐으므로
+              여기서는 목록 선택만 한다. */}
+          {counterparts.length > 0 && (
+            <div>
+              <label htmlFor="cbm-panel-recipient">받는 사람 (선택)</label>
+              <select
+                id="cbm-panel-recipient"
+                value={recipient ?? ''}
+                onChange={(event) => setRecipient(event.target.value === '' ? null : event.target.value)}
+              >
+                <option value="">미지정</option>
+                {counterparts.map((counterpart) => (
+                  <option key={counterpart} value={counterpart}>
+                    {counterpart}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
           <button
             type="button"

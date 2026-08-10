@@ -7,7 +7,7 @@
 //    서비스 워커(background)는 면제된다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getStoredToken, setStoredToken } from './shared/token-storage';
-import { MEDIATE_REQUEST_MESSAGE_TYPE } from './shared/api';
+import { COUNTERPARTS_REQUEST_MESSAGE_TYPE, MEDIATE_REQUEST_MESSAGE_TYPE } from './shared/api';
 
 type Listener<Args extends unknown[]> = (...args: Args) => unknown;
 
@@ -221,6 +221,66 @@ describe('background', () => {
       await import('./background');
       const sendResponse = vi.fn();
       fake.fireMessage({ type: MEDIATE_REQUEST_MESSAGE_TYPE, body: requestBody }, {}, sendResponse);
+      await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+      expect(sendResponse).toHaveBeenCalledWith({ ok: false, reason: 'not-logged-in' });
+      expect(await getStoredToken()).toBeNull();
+    });
+  });
+
+  // T66(AC-067①) — 같은 디스패처(단일 onMessage 리스너)가 두 메시지 타입을 모두 처리한다.
+  describe('cbm:counterparts-request internal message (T66)', () => {
+    it('fetches GET /api/pair-protocols with a Bearer header and returns the counterparts list', async () => {
+      await setStoredToken('tok-abc');
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ counterparts: ['tanaka@sakuradigital.example'] }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      await import('./background');
+      const sendResponse = vi.fn();
+      fake.fireMessage({ type: COUNTERPARTS_REQUEST_MESSAGE_TYPE }, {}, sendResponse);
+      await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://app.example.com/api/pair-protocols');
+      expect(init.headers.authorization).toBe('Bearer tok-abc');
+      expect(sendResponse).toHaveBeenCalledWith({
+        ok: true,
+        counterparts: ['tanaka@sakuradigital.example'],
+      });
+    });
+
+    it('returns not-logged-in without fetching when no token is stored', async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+
+      await import('./background');
+      const sendResponse = vi.fn();
+      fake.fireMessage({ type: COUNTERPARTS_REQUEST_MESSAGE_TYPE }, {}, sendResponse);
+      await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(sendResponse).toHaveBeenCalledWith({ ok: false, reason: 'not-logged-in' });
+    });
+
+    it('maps a 401 AUTH_REQUIRED response to not-logged-in and clears the stored token', async () => {
+      await setStoredToken('tok-expired');
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          error: { code: 'AUTH_REQUIRED', message: '인증이 필요합니다', retryable: false },
+        }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      await import('./background');
+      const sendResponse = vi.fn();
+      fake.fireMessage({ type: COUNTERPARTS_REQUEST_MESSAGE_TYPE }, {}, sendResponse);
       await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
 
       expect(sendResponse).toHaveBeenCalledWith({ ok: false, reason: 'not-logged-in' });
