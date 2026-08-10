@@ -250,3 +250,40 @@ export async function updateSentMessage(
     scheduledFor: row.scheduled_for,
   };
 }
+
+/**
+ * T33 — `GET /api/feedback`. 답장 받음으로 마킹된(`replied = true`) 건만 가져온다 — 답장이
+ * 아직 없는 건은 소요 시간을 계산할 대상이 아니다(`replied_marked_at`이 `null`). 계산 자체는
+ * `@cross-border/core`의 `summarizeFeedback()`(순수 함수)에 위임한다 — 이 함수는 조회만 한다.
+ */
+interface RepliedMessageRow {
+  id: string;
+  sent_at: string;
+  replied_marked_at: string | null;
+  mediation_applied: boolean;
+}
+
+export async function fetchRepliedMessages(
+  client: SupabaseClient,
+  userId: string,
+): Promise<Array<{ id: string; sentAt: string; repliedMarkedAt: string; mediationApplied: boolean }>> {
+  const { data, error } = await client
+    .from('sent_messages')
+    .select('id, sent_at, replied_marked_at, mediation_applied')
+    .eq('user_id', userId)
+    .eq('replied', true);
+  if (error) throw error;
+
+  const rows = (data ?? []) as RepliedMessageRow[];
+  // 🔴 방어적 필터 — `replied_marked_at`은 `updateSentMessage()`가 `replied: true`와 항상 함께
+  // 채우는 불변식이라 이론상 null일 수 없지만(코드 검색으로 확인 가능), null이면 elapsedHours가
+  // NaN이 되는 걸 여기서 조용히 막는다(지어내지 않는다 — 이런 행이 있으면 그냥 제외한다).
+  return rows
+    .filter((row): row is RepliedMessageRow & { replied_marked_at: string } => row.replied_marked_at !== null)
+    .map((row) => ({
+      id: row.id,
+      sentAt: row.sent_at,
+      repliedMarkedAt: row.replied_marked_at,
+      mediationApplied: row.mediation_applied,
+    }));
+}
