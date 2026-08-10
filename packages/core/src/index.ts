@@ -21,6 +21,7 @@ export * from './rules/response-source';
 export * from './rules/meeting-times';
 export * from './rules/holiday-conflict';
 export * from './rules/deadline-negotiation';
+export * from './rules/scheduled-send';
 export * from './data/fallback-responses';
 export * from './data/emoji-risk';
 export * from './data/holidays-2026';
