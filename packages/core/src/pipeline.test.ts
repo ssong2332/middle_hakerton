@@ -222,6 +222,43 @@ describe('run() — T28 파이프라인 조립', () => {
     );
   });
 
+  // T30(AC-022/AC-056②) — `docs/Tasks.md` T30이 요구하는 "충돌 케이스 1건 이상 실제 확인"
+  // (발생 1 / 억제 1)을 파이프라인 통합 레벨에서 재현한다(단위 테스트는
+  // `rules/emoji-risk.test.ts`).
+  it('AC-056② 발생 — 위험도 높은 이모지 + 이모지 선호 미합의면 emojiRisk 경고가 담긴다', async () => {
+    const { llm } = fakeLlm({ toneTransformed: '확인 부탁드립니다 🙏' });
+    const input = baseInput({
+      recipient: {
+        identifier: 'counterpart@example.com',
+        protocol: null,
+        country: null,
+        timezone: null,
+      },
+    });
+
+    const result = await run(input, baseDeps(llm));
+
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({ type: 'emojiRisk', subject: '🙏' }),
+    );
+  });
+
+  it('AC-056② 억제 — 규약 emojiPolicy가 ok면(Michael 사례, docs/TestCases.md:232) emojiRisk 경고가 없다', async () => {
+    const { llm } = fakeLlm({ toneTransformed: '확인 부탁드립니다 🙏' });
+    const input = baseInput({
+      recipient: {
+        identifier: 'counterpart@example.com',
+        protocol: { directnessAllowed: null, emojiPolicy: 'ok', addressForm: null, deadlineStyle: null },
+        country: null,
+        timezone: null,
+      },
+    });
+
+    const result = await run(input, baseDeps(llm));
+
+    expect(result.warnings).not.toContainEqual(expect.objectContaining({ type: 'emojiRisk' }));
+  });
+
   it('AC-058① — 감정 신호가 없는 원문이면 ticketOption이 signal_absent로 미제시다', async () => {
     const { llm } = fakeLlm();
     const input = baseInput({ text: '확인 부탁드립니다' });
