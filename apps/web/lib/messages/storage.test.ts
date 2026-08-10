@@ -10,10 +10,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { NotFoundError, ValidationError } from '@cross-border/core';
 import {
   insertDiffRecord,
   insertSentMessage,
   insertSentMessageAndDiffRecord,
+  updateSentMessage,
   type CreateDiffRecordInput,
   type CreateSentMessageInput,
 } from './storage';
@@ -302,5 +304,148 @@ describe('insertSentMessageAndDiffRecord', () => {
         messageId,
       })),
     ).rejects.toMatchObject({ message: 'diff insert failed' });
+  });
+});
+
+// T50 — `PATCH /api/messages/{id}`(AC-044①, AC-024). `updateDictionaryEntry`(T23)의
+// `select().eq().eq()` → `update().eq().eq().select()` 2단계 조회/갱신 패턴과 같은 이유(존재·소유
+// 확인을 갱신과 분리해 NotFoundError를 명확히 구분한다).
+interface FakeUpdateHandle {
+  client: SupabaseClient;
+  selectEqCalls: Array<[string, unknown]>;
+  updateEqCalls: Array<[string, unknown]>;
+  updatedPayloads: unknown[];
+}
+
+function createFakeUpdateSentMessageSupabase(
+  options: {
+    existingRows?: Array<{ urgency: string }>;
+    existingError?: { message: string } | null;
+    updatedRows?: Array<{ id: string; replied: boolean; replied_marked_at: string | null; scheduled_for: string | null }>;
+    updateError?: { message: string } | null;
+  } = {},
+): FakeUpdateHandle {
+  const selectEqCalls: Array<[string, unknown]> = [];
+  const updateEqCalls: Array<[string, unknown]> = [];
+  const updatedPayloads: unknown[] = [];
+  const existingRows = options.existingRows ?? [{ urgency: 'NORMAL' }];
+
+  const client = {
+    from(table: string) {
+      if (table !== 'sent_messages') throw new Error(`unexpected table: ${table}`);
+      return {
+        select: () => ({
+          eq: (col1: string, val1: unknown) => {
+            selectEqCalls.push([col1, val1]);
+            return {
+              eq: (col2: string, val2: unknown) => {
+                selectEqCalls.push([col2, val2]);
+                return Promise.resolve({
+                  data: options.existingError ? null : existingRows,
+                  error: options.existingError ?? null,
+                });
+              },
+            };
+          },
+        }),
+        update: (row: unknown) => {
+          updatedPayloads.push(row);
+          return {
+            eq: (col1: string, val1: unknown) => {
+              updateEqCalls.push([col1, val1]);
+              return {
+                eq: (col2: string, val2: unknown) => {
+                  updateEqCalls.push([col2, val2]);
+                  return {
+                    select: () =>
+                      Promise.resolve({
+                        data: options.updateError ? null : (options.updatedRows ?? []),
+                        error: options.updateError ?? null,
+                      }),
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  } as unknown as SupabaseClient;
+
+  return { client, selectEqCalls, updateEqCalls, updatedPayloads };
+}
+
+describe('updateSentMessage — AC-044①, AC-024, AC-005', () => {
+  it('replied:true를 보내면 replied·replied_marked_at을 함께 갱신하고 id·user_id로 스코프한다', async () => {
+    const { client, selectEqCalls, updateEqCalls, updatedPayloads } =
+      createFakeUpdateSentMessageSupabase({
+        updatedRows: [
+          { id: 'msg-1', replied: true, replied_marked_at: '2026-08-10T10:00:00Z', scheduled_for: null },
+        ],
+      });
+
+    const result = await updateSentMessage(client, 'user-1', 'msg-1', { replied: true });
+
+    expect(result).toEqual({
+      id: 'msg-1',
+      replied: true,
+      repliedMarkedAt: '2026-08-10T10:00:00Z',
+      scheduledFor: null,
+    });
+    expect(selectEqCalls).toEqual([
+      ['id', 'msg-1'],
+      ['user_id', 'user-1'],
+    ]);
+    expect(updateEqCalls).toEqual([
+      ['id', 'msg-1'],
+      ['user_id', 'user-1'],
+    ]);
+    expect(updatedPayloads[0]).toMatchObject({ replied: true });
+    expect((updatedPayloads[0] as { replied_marked_at: string }).replied_marked_at).toBeTruthy();
+  });
+
+  it('scheduledFor만 보내면 replied는 건드리지 않는다', async () => {
+    const { client, updatedPayloads } = createFakeUpdateSentMessageSupabase({
+      existingRows: [{ urgency: 'NORMAL' }],
+      updatedRows: [
+        { id: 'msg-2', replied: false, replied_marked_at: null, scheduled_for: '2026-08-11T00:00:00Z' },
+      ],
+    });
+
+    await updateSentMessage(client, 'user-1', 'msg-2', { scheduledFor: '2026-08-11T00:00:00Z' });
+
+    expect(updatedPayloads[0]).toEqual({ scheduled_for: '2026-08-11T00:00:00Z' });
+  });
+
+  it('대상이 없으면(다른 사람 소유 포함) NotFoundError를 던진다', async () => {
+    const { client } = createFakeUpdateSentMessageSupabase({ existingRows: [] });
+
+    await expect(
+      updateSentMessage(client, 'user-1', 'missing-id', { replied: true }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('AC-005 — CRITICAL 메시지의 scheduledFor 변경은 ValidationError로 거부하고 update를 호출하지 않는다', async () => {
+    const { client, updatedPayloads } = createFakeUpdateSentMessageSupabase({
+      existingRows: [{ urgency: 'CRITICAL' }],
+    });
+
+    await expect(
+      updateSentMessage(client, 'user-1', 'msg-critical', { scheduledFor: '2026-08-11T00:00:00Z' }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(updatedPayloads).toEqual([]);
+  });
+
+  it('CRITICAL 메시지라도 replied 마킹은(scheduledFor 아니므로) 그대로 허용한다', async () => {
+    const { client, updatedPayloads } = createFakeUpdateSentMessageSupabase({
+      existingRows: [{ urgency: 'CRITICAL' }],
+      updatedRows: [
+        { id: 'msg-3', replied: true, replied_marked_at: '2026-08-10T10:00:00Z', scheduled_for: null },
+      ],
+    });
+
+    await updateSentMessage(client, 'user-1', 'msg-3', { replied: true });
+
+    expect(updatedPayloads[0]).toMatchObject({ replied: true });
   });
 });
