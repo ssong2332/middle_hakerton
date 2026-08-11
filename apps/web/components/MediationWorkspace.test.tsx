@@ -1609,3 +1609,94 @@ describe('MediationWorkspace', () => {
     );
   });
 });
+
+// T40/AC-005 — "Set response deadline" 진입 버튼은 CRITICAL 메시지에서는 렌더되지 않고
+// (비활성이 아니라 미렌더, ticketOffered와 같은 원칙), NORMAL/LOW에서는 렌더된다. 문서가
+// 요구하는 대조 확인(둘 다 실행 출력으로 확인) 그대로 두 케이스를 각각 검증한다.
+describe('MediationWorkspace — T40 응답 기한 협상 진입 (AC-005)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('① CRITICAL 판정 메시지에서는 "Set response deadline" 진입 수단이 렌더되지 않는다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mediateSuccessResponse({ urgency: 'CRITICAL' }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    expect(within(recipientPanel).queryByRole('button', { name: 'Set response deadline' })).toBeNull();
+  });
+
+  it('② NORMAL/LOW 판정 메시지에서는 "Set response deadline" 진입 수단이 렌더된다(항상 미노출이 아님을 대조 확인)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mediateSuccessResponse({ urgency: 'NORMAL' }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    expect(
+      within(recipientPanel).getByRole('button', { name: 'Set response deadline' }),
+    ).toBeTruthy();
+  });
+
+  it('진입 버튼을 클릭하면 UX-005 모달이 열린다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mediateSuccessResponse({ urgency: 'NORMAL' }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Set response deadline' }));
+
+    expect(screen.getByRole('dialog', { name: '응답 기한 협상' })).toBeTruthy();
+  });
+
+  it('모달에서 기한을 확정(Use this deadline)하면 수신자 패널에 참고용으로 표시된다', async () => {
+    const futureLocal = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') return Promise.resolve(mediateSuccessResponse({ urgency: 'NORMAL' }));
+      if (url === '/api/deadline/check') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ feasible: true, reason: '근무 시간 내입니다', counterOffers: [] }),
+        });
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Set response deadline' }));
+
+    fireEvent.change(screen.getByLabelText('희망 응답 기한'), { target: { value: futureLocal } });
+    fireEvent.change(screen.getByLabelText('수신자 타임존(IANA, 예: Asia/Tokyo)'), {
+      target: { value: 'Asia/Tokyo' },
+    });
+    fireEvent.change(screen.getByLabelText('근무 시작'), { target: { value: '09:00' } });
+    fireEvent.change(screen.getByLabelText('근무 종료'), { target: { value: '18:00' } });
+    fireEvent.click(screen.getByRole('button', { name: '실현 가능성 확인' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '이 기한 사용' })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole('button', { name: '이 기한 사용' }));
+
+    expect(screen.queryByRole('dialog', { name: '응답 기한 협상' })).toBeNull();
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    expect(within(recipientPanel).getByText(/참고 응답 기한/)).toBeTruthy();
+  });
+});
