@@ -1,9 +1,11 @@
 /**
  * T73③ 상시 내비게이션 바 — `docs/UX.md:893` 목록 그대로, 목록 밖 추가 0건(AC-084⑤).
- * T73④ AC-084⑥ — 아직 구현되지 않은 화면(Mediate/Profile/Terminology/Decisions/발송 내역 외
- * 전부, `docs/Tasks.md` T31/T41/T42/T72/Feedback 담당 태스크가 모두 `todo`)의 항목은 렌더하지
- * 않는다(비활성/빈/404 링크 금지 — disabled 속성이 아니라 미렌더).
+ * T73④ AC-084⑥ — 아직 구현되지 않은 화면(Pair Protocols/Meeting Times/Feedback, `docs/Tasks.md`
+ * T31/Feedback 담당 태스크 미완료 — Pair Protocols는 T41/T42가 `done`인데도 이 파일이 여전히
+ * `implemented: false`로 두고 있다는 stale 발견이 `PrimaryNav.tsx` 헤더 주석에 남아 있다,
+ * T72 각주)의 항목은 렌더하지 않는다(비활성/빈/404 링크 금지 — disabled 속성이 아니라 미렌더).
  * T52(2026-08-11) — 발송 내역(UX-015)이 구현 완료돼 이 목록으로 옮겨졌다.
+ * T72(2026-08-11) — 관측 표본(UX-019)이 구현 완료돼 이 목록으로 옮겨졌다.
  */
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -30,7 +32,7 @@ const ALLOWED_ITEMS: Record<string, string> = {
 };
 
 describe('PrimaryNav — T73③/④', () => {
-  it('구현된 화면(Mediate/Profile/Terminology/Decisions/발송 내역)은 렌더된다', () => {
+  it('구현된 화면(Mediate/Profile/Terminology/Decisions/발송 내역/관측 표본)은 렌더된다', () => {
     render(<PrimaryNav />);
     expect(screen.getByRole('link', { name: 'Mediate' }).getAttribute('href')).toBe('/mediate');
     expect(screen.getByRole('link', { name: 'Profile' }).getAttribute('href')).toBe('/profile');
@@ -43,11 +45,14 @@ describe('PrimaryNav — T73③/④', () => {
     expect(screen.getByRole('link', { name: '발송 내역' }).getAttribute('href')).toBe(
       '/sent-messages',
     );
+    expect(screen.getByRole('link', { name: '관측 표본' }).getAttribute('href')).toBe(
+      '/observation-samples',
+    );
   });
 
-  it('아직 구현되지 않은 화면(Pair Protocols/Meeting Times/Feedback/관측 표본)은 렌더되지 않는다 — AC-084⑥', () => {
+  it('아직 구현되지 않은 화면(Pair Protocols/Meeting Times/Feedback)은 렌더되지 않는다 — AC-084⑥', () => {
     render(<PrimaryNav />);
-    for (const label of ['Pair Protocols', 'Meeting Times', 'Feedback', '관측 표본']) {
+    for (const label of ['Pair Protocols', 'Meeting Times', 'Feedback']) {
       expect(screen.queryByRole('link', { name: label })).toBeNull();
     }
   });

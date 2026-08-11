@@ -1,7 +1,8 @@
 /**
- * `POST /api/samples` — `docs/API.md:335` (UX-016 Mark 모드, UF-020) / AC-080, AC-081.
- * `docs/Tasks.md` T71. `insertSample()`은 모킹한다 — 쿼리 구성 검증은
- * `apps/web/lib/samples/storage.test.ts`의 몫. 여기서는 라우트 배선 + 검증만 본다.
+ * `GET / POST /api/samples` — `docs/API.md:335` (UX-016 Mark 모드/UX-019, UF-020/UF-021) /
+ * AC-080, AC-081. `docs/Tasks.md` T71(POST)/T72(GET). `insertSample()`/`listSamples()`는
+ * 모킹한다 — 쿼리 구성 검증은 `apps/web/lib/samples/storage.test.ts`의 몫. 여기서는 라우트
+ * 배선 + 검증만 본다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,14 +11,16 @@ vi.mock('../../../lib/auth', () => ({
 }));
 vi.mock('../../../lib/samples/storage', () => ({
   insertSample: vi.fn(),
+  listSamples: vi.fn(),
 }));
 
 import { resolveSession } from '../../../lib/auth';
-import { insertSample } from '../../../lib/samples/storage';
-import { POST } from './route';
+import { insertSample, listSamples } from '../../../lib/samples/storage';
+import { GET, POST } from './route';
 
 const mockResolveSession = vi.mocked(resolveSession);
 const mockInsertSample = vi.mocked(insertSample);
+const mockListSamples = vi.mocked(listSamples);
 
 function fakeClient() {
   return {} as never;
@@ -29,6 +32,10 @@ function postRequest(body: unknown): Request {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+function getRequest(): Request {
+  return new Request('http://localhost/api/samples', { method: 'GET' });
 }
 
 const VALID_DELTAS = {
@@ -131,5 +138,47 @@ describe('POST /api/samples — AC-080/AC-081', () => {
 
     expect(response.status).toBe(401);
     expect(mockInsertSample).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/samples — AC-081④, T72', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const OVERVIEW = {
+    counterparts: [
+      { counterpart: 'tanaka@example.com', total: 2, bySource: { manual: 2, github: 0 } },
+    ],
+    samples: [
+      {
+        id: 's1',
+        counterpart: 'tanaka@example.com',
+        source: 'manual' as const,
+        collectedAt: '2026-08-11T00:00:00Z',
+        indicatorContribution: VALID_DELTAS,
+      },
+    ],
+  };
+
+  it('세션 사용자로 listSamples에 위임하고 200으로 응답한다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient() });
+    mockListSamples.mockResolvedValue(OVERVIEW);
+
+    const response = await GET(getRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockListSamples).toHaveBeenCalledWith(expect.anything(), 'user-1');
+    expect(body).toEqual(OVERVIEW);
+  });
+
+  it('인증되지 않은 요청은 401을 반환한다', async () => {
+    mockResolveSession.mockResolvedValue(null);
+
+    const response = await GET(getRequest());
+
+    expect(response.status).toBe(401);
+    expect(mockListSamples).not.toHaveBeenCalled();
   });
 });

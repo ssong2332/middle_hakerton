@@ -1,19 +1,17 @@
 /**
- * `POST /api/samples` — `docs/API.md:335` "GET / POST /api/samples · DELETE /api/samples/{id}"
- * (UX-016 Mark 모드, UF-020) / AC-080, AC-081. `docs/Tasks.md` T71.
+ * `GET / POST /api/samples` — `docs/API.md:335` "GET / POST /api/samples · DELETE
+ * /api/samples/{id}" (UX-016 Mark 모드/UX-019, UF-020/UF-021) / AC-080, AC-081. `docs/Tasks.md`
+ * T71(POST)/T72(GET). `DELETE`는 경로가 `/api/samples/{id}`라 별도 파일(`[id]/route.ts`, T72)에
+ * 있다 — `docs/API.md:384` Screen↔Endpoint 매핑이 GET/POST/DELETE를 나눈 것은 API 경로 소유
+ * 구분일 뿐, 이 파일이 GET+POST를 함께 갖는 것은 `protocol/route.ts`(GET+PUT)와 같은 관례다.
  *
- * 🔴 이 파일은 **POST만** 구현한다 — `docs/API.md:382,385` Screen↔Endpoint 매핑이 이미
- * `GET`/`DELETE`를 UX-019(T72)로 나눠 놓았다. T72가 이 파일에 `GET`/`DELETE`를 추가한다
- * (`apps/web/app/api/protocol/route.ts`처럼 한 파일에 메서드별로 export하는 이 리포의 관례).
- *
- * 🔴 **요청 스키마에 원문 텍스트 필드가 없다**(`docs/API.md:339` "원문은 확장 콘텐츠 스크립트에서
- * 집계 후 폐기되며 어떤 payload에도 실리지 않는다", AC-081①③) — 이 라우트가 받는 것은
- * `indicatorDeltas`(집계값)뿐이다. 원문이 이 라우트까지 도달하는 코드 경로 자체가 존재하지
- * 않는다(타입에서부터 배제).
+ * 🔴 **요청/응답 어디에도 원문 텍스트 필드가 없다**(`docs/API.md:339,341` — POST는 집계값만
+ * 받고, GET은 `indicatorContribution`(집계값)만 돌려준다, AC-081①②③). 원문이 이 파일의 어떤
+ * 경로로도 도달하지 않는다(타입에서부터 배제).
  */
 import { z } from 'zod';
 import { withApi } from '../../../lib/http';
-import { insertSample } from '../../../lib/samples/storage';
+import { insertSample, listSamples, type SamplesOverview } from '../../../lib/samples/storage';
 
 const indicatorDeltasSchema = z.object({
   sentenceCount: z.number(),
@@ -71,3 +69,15 @@ export const POST = withApi<SamplesPostRequest, SamplesPostResponse>(
     };
   },
 );
+
+/** T72 — `docs/API.md:341` Response 200. 쿼리 파라미터 없이 이 사용자의 상대별 롤업 전체 +
+ * 표본 목록 전체를 반환한다(계약에 `?counterpart=` 같은 필터가 없다) — CounterpartList
+ * (`/observation-samples`)와 SampleList(`/observation-samples/:counterpart`) 두 화면 모두
+ * 같은 응답을 재사용하고, 상세 화면은 클라이언트에서 `samples`를 그 상대로 필터링한다. */
+export const GET = withApi<undefined, SamplesOverview>({ requireAuth: true }, async ({ session }) => {
+  const client = session?.client;
+  if (!client) {
+    throw new Error('세션에 인증된 Supabase 클라이언트가 없습니다');
+  }
+  return listSamples(client, session.userId);
+});
