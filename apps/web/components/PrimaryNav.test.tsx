@@ -8,7 +8,7 @@
  * T72(2026-08-11) — 관측 표본(UX-019)이 구현 완료돼 이 목록으로 옮겨졌다.
  */
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('../lib/supabase/browser', () => ({
@@ -68,6 +68,76 @@ describe('PrimaryNav — T73③/④', () => {
     for (const link of links) {
       const label = link.textContent;
       expect(label).not.toBeNull();
+      expect(ALLOWED_ITEMS[label as string]).toBe(link.getAttribute('href'));
+    }
+  });
+});
+
+describe('PrimaryNav — T77 모바일 내비 접기 (docs/UX.md v6.8)', () => {
+  it('트리거는 접힌 상태(aria-expanded=false)로 시작한다', () => {
+    render(<PrimaryNav />);
+    const trigger = screen.getByRole('button', { name: /메뉴/ });
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('트리거를 누르면 aria-expanded가 true가 되고, 다시 누르면 false로 돌아간다', () => {
+    render(<PrimaryNav />);
+    const trigger = screen.getByRole('button', { name: /메뉴/ });
+
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('열리면 목록의 첫 링크로 포커스가 이동한다', () => {
+    render(<PrimaryNav />);
+    fireEvent.click(screen.getByRole('button', { name: /메뉴/ }));
+
+    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Mediate' }));
+  });
+
+  it('Escape를 누르면 닫히고 트리거로 포커스가 복귀한다 — UX.md v6.8 close/focus-return 관례', () => {
+    render(<PrimaryNav />);
+    const trigger = screen.getByRole('button', { name: /메뉴/ });
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.keyDown(screen.getByRole('navigation'), { key: 'Escape' });
+
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('항목을 클릭하면 메뉴가 닫힌다', () => {
+    render(<PrimaryNav />);
+    const trigger = screen.getByRole('button', { name: /메뉴/ });
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.click(screen.getByRole('link', { name: 'Mediate' }));
+
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('메뉴 바깥을 클릭하면 닫힌다', () => {
+    render(<PrimaryNav />);
+    fireEvent.click(screen.getByRole('button', { name: /메뉴/ }));
+    const trigger = screen.getByRole('button', { name: /메뉴/ });
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.mouseDown(document.body);
+
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('접기 대상은 docs/UX.md:893 목록과 동일하다 — 죽은 링크·새 항목을 추가하지 않는다', () => {
+    render(<PrimaryNav />);
+    fireEvent.click(screen.getByRole('button', { name: /메뉴/ }));
+    const links = screen.getAllByRole('link');
+    for (const link of links) {
+      const label = link.textContent;
       expect(ALLOWED_ITEMS[label as string]).toBe(link.getAttribute('href'));
     }
   });

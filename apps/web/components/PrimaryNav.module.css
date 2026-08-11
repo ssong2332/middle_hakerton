@@ -33,3 +33,63 @@
 .list a:hover {
   text-decoration: underline;
 }
+
+/* T77/UX.md v6.8 — 트리거는 Desktop/Tablet(≥768px)에서 숨긴다(가로 목록을 그대로 쓴다). */
+.menuTrigger {
+  display: none;
+}
+
+/* 터치 타깃 44×44 CSS px — Tablet/Mobile 대상(UX.md Accessibility). Desktop 폭에는 영향 없음. */
+@media (max-width: 1023px) {
+  .list a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+@media (max-width: 767px) {
+  .nav {
+    flex-wrap: wrap;
+  }
+
+  /* T77/UX.md v6.8 — 목록을 숨기고 트리거(☰+"메뉴")로 대체한다. 항상 목록 다음 줄에
+     전체 폭으로 펼쳐지도록 order를 명시한다: brand(기본 0) → 트리거(1) → 로그아웃(2) →
+     목록(3, flex-basis 100%로 다음 줄 강제). */
+  .list {
+    display: none;
+    flex-basis: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    order: 3;
+  }
+
+  .listOpen {
+    display: flex;
+  }
+
+  .list a {
+    width: 100%;
+    padding: 10px 4px;
+  }
+
+  .menuTrigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 6px 10px;
+    background: transparent;
+    color: var(--color-text);
+    border: 1px solid var(--border-strong);
+    font: 700 12px var(--font-sans);
+    order: 1;
+  }
+
+  .logoutSlot {
+    order: 2;
+  }
+}
