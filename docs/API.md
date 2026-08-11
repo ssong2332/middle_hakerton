@@ -203,6 +203,17 @@ UX-010(UF-007) / AC-015, AC-016, AC-047
 | Errors | 400 · 401 · 404 · 409(중복 `sourceText`) |
 | 서버 규칙 | 🔴 `enHonorific` 이 없으면 **직역해 위계를 덧붙이지 않는다**("Manager Kim" 자동 생성 금지 — AC-047③). 미등록 인물은 원문 형태 유지 + `warnings[]` 에 "호칭 미등록"(AC-047②) |
 
+#### GET /api/pair-protocols
+UX-016(T66, UF-019 대체 — AC-067①, PRD Planning Decision #128) — **T41/T42(개별 규약 편집)의 영역이 아니다. 목록 조회뿐.**
+
+| Item | Value |
+|---|---|
+| Purpose | 현재 사용자가 기존 쌍방 규약(`pair_protocols`)을 맺은 **상대 식별자 목록**만 반환한다 — 개별 규약의 4항목 값은 반환하지 않는다(그건 `GET /api/protocol?counterpart=`의 몫, T41 범위) |
+| Auth | required |
+| Response 200 | `{ counterparts: string[] }` — 규약이 0건이면 `[]`(정상 상태, AC-067④) |
+| Errors | 401 |
+| 서버 규칙 | RLS(`docs/Database.md` "Row Level Security" — `auth.jwt()->>'email' IN (party_a, party_b)`)가 본인 관련 행만 반환하므로 애플리케이션 레벨 필터를 추가로 걸지 않는다. `party_a`/`party_b` 중 세션 이메일과 다른 쪽을 상대방으로 판정한다 |
+
 #### GET / PUT /api/protocol
 UX-011(UF-008) / AC-037, AC-075
 

@@ -45,6 +45,20 @@ export interface RecipientPanelProps {
    * (`MediationWorkspace`, `apps/web/lib/ticket-draft.ts`)의 책임이다. `ticketOffered=true`일
    * 때만 실제로 렌더·호출된다. */
   onConvertToTicket?: () => void;
+  /**
+   * 🔴 T40/AC-005 — "Set response deadline" 진입 버튼이 렌더 가능한가. **CRITICAL 메시지에서는
+   * 반드시 `false`여야 한다**(부모가 `displayedUrgency !== 'CRITICAL'`로 판정, `docs/UX.md`
+   * UX-004 Secondary Actions). `ticketOffered`와 같은 원칙 — 비활성이 아니라 **미렌더**
+   * (AC-058②와 같은 "Absent-not-disabled controls" 패턴). 기본값 `false`.
+   */
+  deadlineNegotiationAvailable?: boolean;
+  /** 버튼 클릭 시 호출된다 — 모달을 여는 것은 부모(`MediationWorkspace`)의 책임이다.
+   * `deadlineNegotiationAvailable=true`일 때만 실제로 렌더·호출된다. */
+  onOpenDeadlineNegotiation?: () => void;
+  /** 🔴 T40 — 사용자가 `ResponseDeadlineModal`에서 확정한 기한(UTC ISO), 참고 표시 전용
+   * (`MediationWorkspace.tsx`의 스코프 결정 주석 참조 — 저장·전송되지 않는다). `null`이면
+   * 아직 확정한 기한이 없다는 뜻이며 아무것도 렌더하지 않는다. */
+  confirmedDeadline?: string | null;
 }
 
 /**
@@ -71,6 +85,9 @@ export function RecipientPanel({
   sentAt,
   ticketOffered = false,
   onConvertToTicket,
+  deadlineNegotiationAvailable = false,
+  onOpenDeadlineNegotiation,
+  confirmedDeadline = null,
 }: RecipientPanelProps) {
   const isDelivered = approveStatus === 'sent';
   // MJ-3(사용자 지시 유지보수 라운드) — 최종 발송문이 비어 있으면(공백만 있는 경우 포함) 승인
@@ -114,6 +131,22 @@ export function RecipientPanel({
             >
               Convert to Task Ticket
             </button>
+          )}
+          {/* T40/AC-005 — CRITICAL이면 `deadlineNegotiationAvailable`이 false라 이 블록 자체가
+              렌더되지 않는다(ticketOffered와 같은 미렌더 원칙). */}
+          {!isDelivered && deadlineNegotiationAvailable && (
+            <button
+              type="button"
+              className={styles.deadlineLink}
+              onClick={() => onOpenDeadlineNegotiation?.()}
+            >
+              Set response deadline
+            </button>
+          )}
+          {!isDelivered && confirmedDeadline && (
+            <p role="status" className={styles.statusText}>
+              참고 응답 기한: {new Date(confirmedDeadline).toLocaleString()}(자동 반영되지 않음)
+            </p>
           )}
           {approveStatus === 'error' && (
             <p role="alert" className={styles.errorText}>

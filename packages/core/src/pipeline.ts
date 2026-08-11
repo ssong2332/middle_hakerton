@@ -54,6 +54,7 @@ import { assessEmotionalSignal } from './steps/c6';
 import { resolveDeliveryPath, resolveEffectiveUrgency } from './rules/urgency-routing';
 import { combineSource } from './rules/response-source';
 import { honorificMixedWarning, honorificNotRegisteredWarnings } from './rules/honorific';
+import { emojiRiskWarnings } from './rules/emoji-risk';
 import { ticketOptionFrom } from './rules/ticket-gate';
 import type { Directness, EmojiPreference } from './prompts/c2';
 
@@ -196,6 +197,35 @@ const PATTERN_TO_STYLE_FIELD: Record<string, 'directness' | 'emojiPreference'> =
  * `string`이다(`LearnedItem` 인터페이스 주석) — 여기서 매핑에 없는 값은 그냥 무시한다(어느
  * 축에도 속하지 않는 패턴을 지어내 반영하지 않는다).
  */
+/**
+ * T41/T42(AC-037) — 쌍방 규약 축 → C2 스타일 축 어휘 변환. `docs/PRD.md:675`의 유일한 명시
+ * 예시("프로필 '이모지 선호' + 규약 '이모지 미사용' → 결과에 이모지 없음")를 그대로 구현한다.
+ * 프로필 어휘(3단계: `likes`/`neutral`/`avoids`)와 규약 어휘(2단계: `ok`/`avoid`)가 서로 달라
+ * 매핑이 필요하다 — `'ok'`는 "명시적으로 좋아한다"가 아니라 "금지하지 않는다"는 뜻이라
+ * `'likes'`가 아니라 `'neutral'`로 옮긴다(규약에 없는 정보를 지어내지 않는다, Conventions 9와
+ * 같은 원칙).
+ *
+ * 🔴 **`addressForm`/`deadlineStyle`은 이 변환 대상이 아니다** — `honorificLevel`이 규약
+ * 축에 자리가 없는 것(`steps/c2.ts` 헤더 주석)과 대칭인 반대 방향 갭이다: `prompts/c2.ts`의
+ * `C2Payload`에 이 두 값을 실을 자리가 아직 없다(`directness`/`emojiPreference`/
+ * `honorificLevel` 세 필드뿐). 두 축을 프롬프트에 실으려면 `C2Payload` 확장이 필요한데, 그건
+ * 스키마 변경이라 architect 소관이다(T42의 권한 밖) — 지금은 `docs/API.md`/UX-011 화면에
+ * 저장·표시만 되고 변환 결과에는 반영되지 않는다. AC-037이 요구하는 "4항목 전부 반영"의
+ * 절반(2/4축)은 이 갭이 해소되기 전까지 미충족 상태로 남는다.
+ */
+function directnessFromProtocol(value: 'yes' | 'no' | null): Directness | null {
+  if (value === 'yes') return 'direct';
+  if (value === 'no') return 'indirect';
+  return null;
+}
+
+/** 위 `directnessFromProtocol`과 같은 근거(AC-037, `docs/PRD.md:675`). */
+function emojiPreferenceFromProtocol(value: 'ok' | 'avoid' | null): EmojiPreference | null {
+  if (value === 'avoid') return 'avoids';
+  if (value === 'ok') return 'neutral';
+  return null;
+}
+
 function resolveMergedStyle<T extends string>(
   field: 'directness' | 'emojiPreference',
   selfReported: T | null,
@@ -233,16 +263,19 @@ export const run: MediationPipeline = async (input, deps) => {
   // (`docs/Architecture.md` Data Flow 1-a, DECISIONS #40). `directness`/`emojiPreference`는
   // T79(위 `resolveMergedStyle` 주석) — `deps.data.learnedItems`에 해당 축의 학습값이 있으면
   // 그 값이 자기신고를 덮어쓴다.
-  const directness = resolveMergedStyle<Directness>(
-    'directness',
-    input.sender.profile.directness,
-    deps.data.learnedItems,
-  );
-  const emojiPreference = resolveMergedStyle<EmojiPreference>(
-    'emojiPreference',
-    input.sender.profile.emojiPreference,
-    deps.data.learnedItems,
-  );
+  // 🔴 T41/T42(AC-037) — 규약이 C3(자기신고+학습값 병합 결과)보다 우선한다(`docs/PRD.md:675`
+  // "동일 항목이 C3 전역 프로필과 충돌하는 경우 규약 값이 우선 적용된다"). 규약 값이 있으면
+  // 그 값을 쓰고, 없으면(`input.recipient`가 null이거나 그 축이 미합의) C3 병합 결과로 되돌아간다.
+  const directness =
+    directnessFromProtocol(input.recipient?.protocol?.directnessAllowed ?? null) ??
+    resolveMergedStyle<Directness>('directness', input.sender.profile.directness, deps.data.learnedItems);
+  const emojiPreference =
+    emojiPreferenceFromProtocol(input.recipient?.protocol?.emojiPolicy ?? null) ??
+    resolveMergedStyle<EmojiPreference>(
+      'emojiPreference',
+      input.sender.profile.emojiPreference,
+      deps.data.learnedItems,
+    );
 
   // ④ C5 — 용어사전. `deps.data.dictionary`도 Route Handler가 이미 조회를 마친 값이다(AC-028).
   // 별도 LLM 호출이 아니라 아래 C2 프롬프트에 구조화된 데이터로 주입된다(T22).
@@ -284,6 +317,11 @@ export const run: MediationPipeline = async (input, deps) => {
   // 방향과 무관하게 항상 검사한다.
   warnings.push(...honorificNotRegisteredWarnings(tone.unregisteredHonorifics));
 
+  // T30(AC-022/AC-056) — 변환 결과에 위험도 높음/중간 이모지가 있고, 병합된 이모지 선호가
+  // 'avoids' 또는 미합의(null)일 때만 경고한다(`rules/emoji-risk.ts` 주석 참조 — 위에서 이미
+  // AC-037 우선순위로 병합한 `emojiPreference`를 그대로 재사용한다).
+  warnings.push(...emojiRiskWarnings(tone.transformed, emojiPreference));
+
   // ⑦ (감정형이면 C6) — AC-058 게이트. `assessEmotionalSignal`은 추가 LLM 호출 없이 원문에서
   // 감정 신호 유무를 판정하는 순수 함수이고, `ticketOptionFrom`이 그 결과를 판별 유니온으로만
   // 조립하는 유일한 통로다(F1-c). "제시만" 한다 — 항상 제시/항상 미제시가 아니다.
@@ -308,7 +346,10 @@ export const run: MediationPipeline = async (input, deps) => {
     backTranslation: backTranslation.backTranslation,
     warnings,
     misreadRisks: tone.misreadRisks,
-    // 🔴 수신자 국가 연동(T22/T41)이 아직 없어 항상 빈 배열이다 — 현재 상태의 정확한 값(AC-063①).
+    // 🔴 T41이 `input.recipient`를 채우지만 `country`는 수신자 보강(T64/T65, recipient_enrichments)이
+    // 아직 없어 항상 `null`이다 — 그래서 이 배열도 여전히 항상 빈 배열이다(현재 상태의 정확한
+    // 값, AC-063①). T64/T65가 채워지면 이 자리가 자동으로 채워진다(RecipientContext.country
+    // 주석 참조, 이 파일은 그 값을 읽기만 한다).
     holidayConflicts: [],
     personalizationApplied,
     source,

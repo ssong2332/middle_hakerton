@@ -1,7 +1,22 @@
 /**
  * UX-016 Universal Selection Mediation Panel — T56 서브셋(AC-052②, AC-053, AC-010, AC-066,
- * AC-028 + NotLoggedIn) + T57("입력창에 삽입" 실제 동작, AC-053②①④·AC-040). 이 태스크 범위 밖
- * (다른 태스크 소관): Interpret 모드(T59) · 수신자 후보 탐지(T66) · Mark 모드(T71).
+ * AC-028 + NotLoggedIn) + T57("입력창에 삽입" 실제 동작, AC-053②①④·AC-040) + T71(Mark 모드,
+ * AC-080/AC-081). 이 태스크 범위 밖(다른 태스크 소관): Interpret 모드(T59) · 수신자 후보 탐지(T66).
+ *
+ * 🔴 **T71 — "ux-design 라우팅 필요"는 stale로 판단하고 직접 구현했다(Duty to Refute)** —
+ * `docs/UX.md:763`(States) · `:773`(Business Rules) · `:1561`(Decision Log "새 화면이 아니라
+ * 기존 패널 안의 세 번째 모드")가 Mark 모드를 이미 완결적으로 스펙해 두었다(T65/T66과 같은
+ * 패턴, `docs/Tasks.md` T65 각주가 이미 이름 붙인 stale 반복).
+ *
+ * 🔴 **T71 스코프를 UX.md 원안보다 좁혔다(2가지) — 존재하지 않는 화면·데이터에 의존하지 않기
+ * 위해서다:**
+ * ① MarkModeSuccess의 "카운터파트의 갱신된 총 표본 수"는 표시하지 않는다 — `POST /api/samples`
+ *    응답(`docs/API.md:342`)에 총 건수 필드가 없다(그 값은 `GET /api/samples`의 몫, T72 범위).
+ *    지어낸 숫자를 보여주지 않고 "표본에 추가됨"만 표시한다.
+ * ② "표본 관리 보기"(UX-019) 링크를 렌더하지 않는다 — UX-019 화면 자체가 아직 없다(T72 `todo`).
+ *    없는 화면으로 가는 링크를 두면 클릭 시 404다(`docs/PRD.md` AC-084⑥ "구현되지 않았거나
+ *    컷된 화면의 내비 항목은 렌더되지 않는다"와 같은 원칙을 여기도 적용). T72가 UX-019를 만들
+ *    때 이 링크를 추가한다.
  *
  * 🔴 파일명(PascalCase) — `docs/CodingRules.md` Naming "컴포넌트를 export하는 .tsx는
  * PascalCase" 규칙에 맞춰 T2 스캐폴드의 `panel.tsx`에서 이 이름으로 옮겼다(`git mv`, T56).
@@ -12,15 +27,17 @@
  * `adapter`가 `null`이면(층 2 미등록 사이트 — 일상 케이스, `docs/UX.md:763`) "입력창에 삽입"은
  * 아예 렌더되지 않는다(비활성 버튼 금지 — AC-053②).
  *
- * 수신자 필드를 두지 않는다 — 수신자 후보 탐지(AC-067/068, T66)가 아직 없는 상태에서 수동 입력
- * 필드만 먼저 만들면 다음 라운드에 다시 손대야 한다. 필드가 아예 없으면 recipient는 항상
- * `null`이고, "수신자는 절대 필수가 아니다"(AC-066①)·"수신자를 지어내지 않는다"(AC-066④) 둘 다
- * 자동으로 성립한다 — PersonalizationOff 표시(AC-066③)는 `result.personalizationApplied`를
- * 그대로 읽는다.
+ * 🔴 T66(AC-067①, PRD Planning Decision #128) — 자유 입력 필드는 여전히 두지 않는다(페이지
+ * 맥락 자동 감지는 스파이크에서 불가 판정, 스트레치로 이월 — `docs/UX.md` v6.7). 대신 기존
+ * 쌍방 규약(`pair_protocols`) 상대 목록에서 고르는 `RecipientKnownCounterparts` 컨트롤만
+ * 추가한다. 목록이 비어 있으면(규약 0건) 컨트롤 자체를 렌더하지 않는다(비활성 아님 —
+ * "Absent-not-disabled controls" 패턴, `docs/UX.md:929`) — 그 경우 이전과 동일하게 recipient는
+ * `null`로 남아 AC-066①④가 그대로 성립한다.
  */
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { computeIndicatorDeltas, LENGTH_COUNTER_SHOW_AT, SOFT_LENGTH_CAP } from '@cross-border/core';
 import type { MediationResult } from '@cross-border/core';
-import { callMediationApi } from '../shared/api';
+import { addSample, callMediationApi, fetchKnownCounterparts } from '../shared/api';
 import { getStoredToken } from '../shared/token-storage';
 import { NON_LIVE_NOTICE } from '../shared/non-live-notice';
 import type { Layer2Adapter } from './registry';
@@ -40,6 +57,10 @@ export interface MediationPanelProps {
 
 type Status = 'checkingAuth' | 'notLoggedIn' | 'idle' | 'loading' | 'success' | 'error';
 type InsertStatus = 'idle' | 'inserted' | 'failed';
+// T71 — `docs/UX.md:763` States. "mediate"가 기존 경로(이 파일의 나머지 status 값들), "mark"가
+// 새 모드다. Interpret(T59)은 아직 없어 두 값뿐이다.
+type PanelMode = 'mediate' | 'mark';
+type MarkStatus = 'idle' | 'confirming' | 'success' | 'error';
 
 const APP_ORIGIN = (import.meta.env.VITE_APP_ORIGIN as string | undefined) ?? '';
 
@@ -77,6 +98,14 @@ export function MediationPanel({
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const [insertStatus, setInsertStatus] = useState<InsertStatus>('idle');
+  const [counterparts, setCounterparts] = useState<string[]>([]);
+  const [recipient, setRecipient] = useState<string | null>(null);
+  // T71 — Mark 모드 상태. `markCounterpart`/`markStatus`는 모드를 벗어나도 초기화하지 않는다
+  // (실패 시 "선택 텍스트와 입력한 카운터파트 식별자 모두 유지" — `docs/UX.md:763`
+  // MarkModeError, 사용자가 재시도 버튼만 다시 누르면 되게 한다).
+  const [mode, setMode] = useState<PanelMode>('mediate');
+  const [markCounterpart, setMarkCounterpart] = useState('');
+  const [markStatus, setMarkStatus] = useState<MarkStatus>('idle');
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   // 🔴 M-4(reviewer) — `getStoredToken()`이 reject해도(예: `chrome.storage.session`의 access
@@ -95,6 +124,21 @@ export function MediationPanel({
     };
   }, []);
 
+  // 🔴 T66(AC-067①④) — 로그인 확인 뒤 1회 조회한다. 실패하거나 규약이 0건이면 `counterparts`가
+  // 빈 배열로 남고, 그 경우 컨트롤 자체를 렌더하지 않는다(아래 JSX) — 기존 미지정 경로가 그대로
+  // 동작해야 한다는 요구를 실패 시에도 깨지 않는다(try/catch 없이 항상 `CounterpartsApiResult`를
+  // 반환하는 `fetchKnownCounterparts()` 계약, `shared/api.ts` 참조).
+  useEffect(() => {
+    if (status !== 'idle') return;
+    let cancelled = false;
+    fetchKnownCounterparts().then((result) => {
+      if (!cancelled && result.ok) setCounterparts(result.counterparts);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
   useEffect(() => {
     panelRef.current?.focus();
   }, []);
@@ -110,7 +154,7 @@ export function MediationPanel({
     setCopyError(null);
     const response = await callMediationApi({
       text,
-      recipient: null,
+      recipient,
       context: { languageDirection: 'ko-en', channel: 'extension' },
     });
     if (!response.ok) {
@@ -127,6 +171,33 @@ export function MediationPanel({
     setCopied(false);
     setInsertStatus('idle');
     setStatus('success');
+  }
+
+  // 🔴 T71/AC-080②/AC-081①③ — "표본에 추가" 클릭 하나만 이 경로를 부른다. 발신자 판별 코드가
+  // 없다 — `markCounterpart`는 사용자가 직접 타이핑한 값이며, DOM에서 추론하지 않는다.
+  // `computeIndicatorDeltas(text)`가 집계값만 뽑고, 이 함수는 그 뒤로 `text`(원문)를 참조하지
+  // 않는다 — `addSample()`에 넘기는 것은 집계값·카운터파트·타임스탬프뿐이다.
+  async function handleAddSample() {
+    if (markCounterpart.trim() === '') return;
+    setMarkStatus('confirming');
+    const indicatorDeltas = computeIndicatorDeltas(text);
+    const response = await addSample({
+      counterpart: markCounterpart.trim(),
+      source: 'manual',
+      indicatorDeltas,
+      collectedAt: new Date().toISOString(),
+    });
+    if (!response.ok) {
+      if (response.reason === 'not-logged-in') {
+        setStatus('notLoggedIn');
+        return;
+      }
+      setMarkStatus('error');
+      return;
+    }
+    // 🔴 `docs/UX.md:763` MarkModeSuccess — "패널은 열린 채로 유지된다(같은 세션에서 다른 선택을
+    // 또 표시할 수 있도록)". Insert 성공 시(onClose) 닫는 것과 달리 여기서는 닫지 않는다.
+    setMarkStatus('success');
   }
 
   // 🔴 AC-010/AC-053 — 클립보드 복사는 이 명시적 클릭 핸들러 하나에서만 일어난다.
@@ -224,47 +295,105 @@ export function MediationPanel({
             value={text}
             onChange={(event) => setText(event.target.value)}
             disabled={status === 'loading'}
+            aria-describedby={text.length >= LENGTH_COUNTER_SHOW_AT ? 'cbm-panel-text-counter' : undefined}
           />
-          <button
-            type="button"
-            onClick={() => void runMediation()}
-            disabled={text.trim() === '' || status === 'loading'}
-          >
-            {status === 'error' ? '다시 시도' : '중재 실행'}
-          </button>
-
-          {status === 'loading' && <p role="status">분류 중 → 변환 중 → 역번역 중</p>}
-          {status === 'error' && errorMessage && <p role="alert">{errorMessage}</p>}
-
-          {status === 'success' && result && (
-            <div>
-              <p role="status">긴급도: {result.urgency}</p>
-              {result.personalizationApplied === false && (
-                <p role="status">개인화 미적용 — 기본 변환만 적용되었습니다</p>
-              )}
-              {showFallbackNotice && <p role="status">{NON_LIVE_NOTICE}</p>}
-
-              <label htmlFor="cbm-panel-final-text">변환된 메시지</label>
-              <textarea
-                id="cbm-panel-final-text"
-                value={finalText}
-                onChange={(event) => {
-                  setFinalText(event.target.value);
-                  setCopied(false);
-                  setCopyError(null);
-                  setInsertStatus('idle');
-                }}
+          {/* AC-061 — 하드 차단 아님(②), 자문 전용. `docs/UX.md` v6.2 고정 문구·접근성(키
+              입력마다 announce하지 않고 aria-describedby로만 연결) — 웹앱 SenderPanel과 동일. */}
+          {text.length >= LENGTH_COUNTER_SHOW_AT && (
+            <p id="cbm-panel-text-counter" style={{ fontSize: '11px', opacity: 0.75 }}>
+              {text.length.toLocaleString('ko-KR')} / {SOFT_LENGTH_CAP.toLocaleString('ko-KR')}자
+            </p>
+          )}
+          {/* 🔴 T71/`docs/UX.md:766` Accessibility — "The mode selector (mediate / Interpret /
+              Mark-as-counterpart's) is a keyboard-operable choice control, and the active mode
+              is exposed as text". 네이티브 radio 2개(키보드 조작 가능) + `aria-current`로 활성
+              모드를 텍스트로도 노출한다. Interpret(T59)은 아직 없어 두 값뿐이다. */}
+          <fieldset style={{ border: 'none', padding: 0, margin: '4px 0' }}>
+            <legend style={{ fontSize: '11px', fontWeight: 700 }}>모드</legend>
+            <label style={{ marginRight: '12px' }}>
+              <input
+                type="radio"
+                name="cbm-panel-mode"
+                checked={mode === 'mediate'}
+                onChange={() => setMode('mediate')}
+                aria-current={mode === 'mediate' ? 'true' : undefined}
               />
+              중재
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="cbm-panel-mode"
+                checked={mode === 'mark'}
+                onChange={() => setMode('mark')}
+                aria-current={mode === 'mark' ? 'true' : undefined}
+              />
+              상대가 쓴 것으로 표시
+            </label>
+          </fieldset>
 
-              <p>역번역: {result.backTranslation}</p>
-              <p style={{ fontSize: '11px' }}>
-                완전한 검증이 아니라 큰 오역을 걸러내는 1차 안전장치입니다.
-              </p>
+          {mode === 'mediate' && (
+            <>
+              {/* T66(AC-067①, docs/UX.md v6.7 RecipientKnownCounterparts) — 규약이 0건이면 아예
+                  렌더하지 않는다(비활성 아님). 페이지 맥락 자동 감지는 스트레치로 이월됐으므로
+                  여기서는 목록 선택만 한다. */}
+              {counterparts.length > 0 && (
+                <div>
+                  <label htmlFor="cbm-panel-recipient">받는 사람 (선택)</label>
+                  <select
+                    id="cbm-panel-recipient"
+                    value={recipient ?? ''}
+                    onChange={(event) => setRecipient(event.target.value === '' ? null : event.target.value)}
+                  >
+                    <option value="">미지정</option>
+                    {counterparts.map((counterpart) => (
+                      <option key={counterpart} value={counterpart}>
+                        {counterpart}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => void runMediation()}
+                disabled={text.trim() === '' || status === 'loading'}
+              >
+                {status === 'error' ? '다시 시도' : '중재 실행'}
+              </button>
 
-              <div>
-                {/* AC-053①②③④ — Copy는 결과가 있을 때만 활성화된다. Insert는 `adapter`가
-                    `null`인 한(현재 사이트에 매칭되는 층 2 모듈이 없음) 아예 렌더되지 않는다 —
-                    회색 비활성 버튼을 두지 않는다(`docs/UX.md:929` Absent-not-disabled
+              {status === 'loading' && <p role="status">분류 중 → 변환 중 → 역번역 중</p>}
+              {status === 'error' && errorMessage && <p role="alert">{errorMessage}</p>}
+
+              {status === 'success' && result && (
+                <div>
+                  <p role="status">긴급도: {result.urgency}</p>
+                  {result.personalizationApplied === false && (
+                    <p role="status">개인화 미적용 — 기본 변환만 적용되었습니다</p>
+                  )}
+                  {showFallbackNotice && <p role="status">{NON_LIVE_NOTICE}</p>}
+
+                  <label htmlFor="cbm-panel-final-text">변환된 메시지</label>
+                  <textarea
+                    id="cbm-panel-final-text"
+                    value={finalText}
+                    onChange={(event) => {
+                      setFinalText(event.target.value);
+                      setCopied(false);
+                      setCopyError(null);
+                      setInsertStatus('idle');
+                    }}
+                  />
+
+                  <p>역번역: {result.backTranslation}</p>
+                  <p style={{ fontSize: '11px' }}>
+                    완전한 검증이 아니라 큰 오역을 걸러내는 1차 안전장치입니다.
+                  </p>
+
+                  <div>
+                    {/* AC-053①②③④ — Copy는 결과가 있을 때만 활성화된다. Insert는 `adapter`가
+                        `null`인 한(현재 사이트에 매칭되는 층 2 모듈이 없음) 아예 렌더되지 않는다 —
+                        회색 비활성 버튼을 두지 않는다(`docs/UX.md:929` Absent-not-disabled
                     controls). `adapter`가 있으면 실제로 클릭 가능한 버튼으로 렌더된다. */}
                 <button
                   type="button"
@@ -293,6 +422,37 @@ export function MediationPanel({
                 </p>
               )}
             </div>
+          )}
+            </>
+          )}
+
+          {/* T71 — Mark 모드(`docs/UX.md:763` MarkMode/…Confirming/…Success/…Error). 중재
+              파이프라인·LLM 호출 없이 로컬 집계 → 표본 저장만 한다. */}
+          {mode === 'mark' && (
+            <>
+              <label htmlFor="cbm-panel-mark-counterpart">상대 식별자</label>
+              <input
+                id="cbm-panel-mark-counterpart"
+                type="text"
+                value={markCounterpart}
+                onChange={(event) => {
+                  setMarkCounterpart(event.target.value);
+                  setMarkStatus('idle');
+                }}
+                placeholder="상대의 이메일 등 식별자"
+              />
+              <button
+                type="button"
+                onClick={() => void handleAddSample()}
+                disabled={markCounterpart.trim() === '' || markStatus === 'confirming'}
+              >
+                표본에 추가
+              </button>
+              {markStatus === 'success' && <p role="status">표본에 추가됨</p>}
+              {markStatus === 'error' && (
+                <p role="alert">저장에 실패했습니다. 다시 시도해 주세요.</p>
+              )}
+            </>
           )}
         </>
       )}

@@ -107,3 +107,14 @@ export class DuplicateEntryError extends CoreError {
   readonly code = 'CONFLICT_DUPLICATE_ENTRY' as const;
   readonly retryable = false as const;
 }
+
+/**
+ * `docs/API.md` `EXTERNAL_FETCH_FAILED`(502) — T64가 처음 던진다(`POST /api/enrichment/fetch`,
+ * AC-065). GitHub 공개 프로필/활동 조회가 네트워크 오류·5xx·rate limit 등으로 실패했을 때.
+ * `retryable: true` — 일시적 실패일 수 있어 재시도가 의미 있다(LLM 쪽 `LLMUnavailableError`와
+ * 같은 판단 — 외부 서비스 호출 실패는 대체로 재시도 가능하다고 본다).
+ */
+export class ExternalFetchFailedError extends CoreError {
+  readonly code = 'EXTERNAL_FETCH_FAILED' as const;
+  readonly retryable = true as const;
+}

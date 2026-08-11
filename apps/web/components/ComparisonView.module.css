@@ -3,13 +3,23 @@
   gap: 16px;
 }
 
+/* T76(리뷰어 Minor) — 좁은 폭에서 3열이 안 접혀 가독성이 무너지던 것을 수정. `docs/UX.md`
+   v6.4 Responsive Behavior의 Tablet 상한(1023px)을 그대로 따른다 — UX-004 화면 자체(Sender/
+   Recipient 2패널)의 Tablet/Mobile 세로 스택은 별도 미구현 항목(Open Question #16)이지만,
+   이 컴포넌트(3열 비교) 내부의 줄바꿈은 그 항목에 의존하지 않는 독립적인 회귀 수정이다. */
+@media (max-width: 1023px) {
+  .columns {
+    flex-direction: column;
+  }
+}
+
 .column {
   flex: 1 1 0%;
   min-width: 0;
 }
 
 .column h3 {
-  font: 800 9px var(--font-mono);
+  font: 800 10px var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   margin-bottom: 6px;
@@ -32,7 +42,7 @@
 }
 
 .preserved h4 {
-  font: 800 9px var(--font-mono);
+  font: 800 10px var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-bottom: 4px;
@@ -47,7 +57,7 @@
 
 .notice {
   margin-top: 8px;
-  font: 600 9px var(--font-mono);
+  font: 600 10px var(--font-mono);
   letter-spacing: 0.06em;
   color: var(--color-accent);
 }

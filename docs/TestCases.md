@@ -576,6 +576,23 @@ union all select 'profile_learned_items', count(*) from profile_learned_items wh
 
 **"학습 전" 상태 재현 방법(참고)**: 이 실행 직후 상태는 **"학습 후"**(diff 10건 + 반영 1건)다. `resetJihoonToPreLearningState()`(`apps/web/lib/demo/seed.ts`)를 호출하면 diff_records·profile_learned_items만 삭제되어 "학습 전"(자기신고는 유지, diff 0건)으로 전환된다 — 별도 계정을 만들지 않는다(TestCases.md "같은 발신자" 요구 충족).
 
+**표 D — T62 COMPARE-01 실행 기록 (신규, 2026-08-11, implementer)**
+
+🔴 **Critical 버그 발견 + 수정**: `apps/web/lib/demo/seed-data.ts`의 `buildPairKey()`가 T41 착수 전 임시로 고른 `::` 구분자를 그대로 쓰고 있었다 — 실제 조회 경로(`apps/web/lib/protocol/storage.ts`의 `computePairKey()`, T41)는 U+0001(SOH) 구분자를 쓴다. 두 계산이 갈라져 있어 **시드한 타나카·Michael 규약 행을 실제 앱(`fetchProtocol()`)이 영원히 찾지 못했다** — COMPARE-01 장면 전체가 조용히 깨지는 원인. `buildPairKey()`가 실제 `computePairKey()`를 그대로 재사용하도록 수정(`apps/web/lib/demo/seed-data.ts`).
+
+⚠️ **실 Supabase 데이터베이스(project `aranhwommpaphkxdfjuf`)에도 이 버그로 시딩된 행이 남아 있음을 read-only 쿼리로 확인**(2026-08-11): `select pair_key, party_a, party_b from pair_protocols` → 두 행 모두 `pair_key`가 여전히 `::` 구분자(예: `jihoon.park+arasoft@example.com::michael.chen+vertexlabs@example.com`)였다.
+
+✅ **(2026-08-11 사용자 승인 후 수정 완료)** `update pair_protocols set pair_key = lower(party_a) || chr(1) || lower(party_b) where pair_key like '%::%'`를 Supabase `execute_sql`로 실행 — 2행 갱신. 재조회로 확인: 두 행 모두 `pair_key`가 U+0001 구분자 형태(`jihoon.park+arasoft@example.commichael.chen+vertexlabs@example.com` 등)로 바뀌어, 실제 조회 경로(`computePairKey()`)가 계산하는 값과 정확히 일치함을 확인했다. 실제 데모에서 타나카·Michael 규약이 정상 조회된다.
+
+| 검증 항목 | 결과 | 근거 |
+|---|---|---|
+| pair_key 계산 일치(코드) | ✅ 수정 완료 | `apps/web/lib/demo/seed-data.test.ts` "실제 조회 경로와 동일한 값을 만든다" |
+| 실 DB pair_key 일치 | ✅ 수정 완료(2026-08-11) | Supabase `execute_sql` UPDATE + 재조회 확인, 2/2행 |
+| 타나카/Michael/Sarah 3인 C2 payload가 실제로 갈리는가 | ✅ 확인 | `apps/web/lib/demo/compare-01.test.ts` — 타나카=indirect/avoids, Michael=direct/neutral, Sarah=indirect/neutral(학습값 폴백) |
+| "Michael vs Sarah는 #24 없이는 안 갈린다"는 반박 대비 핵심 주장(TestCases.md:336-342) | ✅ 확인(단, 학습 상태 의존적) | 같은 테스트 — `directness`가 다름(direct≠indirect). **주의**: 이 차이는 박지훈의 `cushion_insert` 학습(3회 도달, indirect)에 의존한다 — 만약 박지훈의 학습 상태가 초기화되면(예: `resetJihoonToPreLearningState()` 이후, 학습 전 데모 상태) 자기신고 기본값(direct/neutral)이 Michael 규약과 우연히 같아져 **이 반박 대비 주장이 무너진다.** "학습 전" 상태로 COMPARE-01을 시연하지 않는다 — 발표 순서 주의사항으로 DemoScript.md에 반영할지는 planner 판단. |
+| `addressForm`/`deadlineStyle`(호칭·마감 표현) 규약 축이 실제 변환 출력에 영향을 주는가 | ❌ 미반영(기존 gap 재확인) | `packages/core/src/pipeline.ts:208` 자체 주석 — `C2Payload`에 이 두 필드를 실을 자리가 아직 없다. TestCases.md의 "완곡·격식 높은 형태"(타나카)·"직설·결론 우선"(Michael) 기대 출력 중 **격식(honorificLevel)과 호칭은 협업 규약이 아니라 발신자 C3 축이라 수신자별로 갈리지 않는다** — 발표에서 이 두 표현을 "규약 덕분에 갈린다"고 말하면 부정확하다. 실제로 규약이 만드는 차이는 **직설성·이모지 두 축뿐**이다. |
+| Sarah 화면에 "아직 학습된 내용이 없습니다" 안내가 실제로 뜨는가 | ❌ 해당 UI 없음 | 컴포넌트 전체 검색(`apps/web/components/`) — 규약 부재 상태를 알리는 문구·배지가 어디에도 렌더되지 않는다. 발표 멘트(구두 설명)로 대체 가능하나, 화면에 뜨는 "안내"를 요구한다면 신규 UI가 필요하다(TestCases.md v1.5 자체가 이 역할을 T68/T69의 "추론 초안" 표시로 재설계했고, 그 두 태스크는 아직 `todo`라 신규 UI를 지금 만드는 것은 낭비일 수 있음 — planner 판단 필요). |
+
 ## 미확정 항목
 
 | 항목 | 왜 미확정인가 | 언제 정해지는가 |

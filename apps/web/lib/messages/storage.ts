@@ -9,7 +9,12 @@
  * records.sql`을 작성한다(파일만, 실제 적용은 오케스트레이터 판단 — `docs/Tasks.md` T14 원문).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { classifyDiffPattern } from '@cross-border/core';
+import {
+  NotFoundError,
+  ValidationError,
+  classifyDiffPattern,
+  type CountryCode,
+} from '@cross-border/core';
 
 export type SentMessageChannel = 'web_mock' | 'extension_insert' | 'extension_clipboard';
 
@@ -156,4 +161,242 @@ export async function insertSentMessageAndDiffRecord(
     }
     throw diffError;
   }
+}
+
+/**
+ * T50 — `PATCH /api/messages/{id}`. `docs/API.md` "PATCH /api/messages/{id}" 서버 규칙
+ * "`replied`를 바꾸는 경로는 이 라우트 하나뿐이며 사용자의 명시적 요청으로만 호출된다"(AC-044⑤,
+ * 자동 응답 감지 코드 경로 부재) — 이 함수가 그 유일한 통로다.
+ */
+export interface UpdateSentMessageInput {
+  /** `true`만 허용 — "답장 받음"을 다시 되돌리는 경로는 없다(수동 마킹, AC-044①). */
+  replied?: true;
+  /** 생략하면 변경하지 않는다. `null`은 예약 취소(명시적 값). */
+  scheduledFor?: string | null;
+}
+
+export interface UpdatedSentMessage {
+  id: string;
+  replied: boolean;
+  repliedMarkedAt: string | null;
+  scheduledFor: string | null;
+}
+
+interface SentMessageUrgencyRow {
+  urgency: string;
+}
+
+interface UpdatedSentMessageRow {
+  id: string;
+  replied: boolean;
+  replied_marked_at: string | null;
+  scheduled_for: string | null;
+}
+
+/**
+ * `id`·`user_id` 둘 다로 스코프해 갱신한다(`updateDictionaryEntry`/`deleteDictionaryEntry`와
+ * 같은 패턴 — 존재하지 않거나 타인 소유면 `NotFoundError`, 404, 소유 여부를 구분해 노출하지
+ * 않는다).
+ *
+ * 🔴 AC-005 — `scheduledFor`를 바꾸려는 요청인데 대상 메시지의 `urgency`가 `CRITICAL`이면
+ * **거부한다**(`docs/API.md` "PATCH /api/messages/{id}" 서버 규칙). `POST /api/messages`(T32)의
+ * "무시하고 NULL로 저장"과 다른 처리다 — 그쪽은 발송 시점의 자기 배제(사용자가 그 컨트롤 자체를
+ * 보지 못한다, UX-006 AC-005 게이팅)라 조용히 무시해도 되지만, 이 라우트는 **이미 발송된 특정
+ * 메시지**를 사용자가 나중에 지목해 예약을 걸려는 명시적 시도라 조용히 무시하면 "성공한 것처럼
+ * 보이는데 아무 일도 안 일어나는" 혼란을 만든다 — `ValidationError`(400)로 명시적으로 막는다.
+ */
+export async function updateSentMessage(
+  client: SupabaseClient,
+  userId: string,
+  id: string,
+  input: UpdateSentMessageInput,
+): Promise<UpdatedSentMessage> {
+  const { data: existingRows, error: fetchError } = await client
+    .from('sent_messages')
+    .select('urgency')
+    .eq('id', id)
+    .eq('user_id', userId);
+  if (fetchError) throw fetchError;
+
+  const existing = (existingRows ?? []) as SentMessageUrgencyRow[];
+  if (existing.length === 0) {
+    throw new NotFoundError('발송 기록을 찾을 수 없습니다');
+  }
+  if ('scheduledFor' in input && existing[0].urgency === 'CRITICAL') {
+    throw new ValidationError('CRITICAL 메시지는 예약 발송을 설정할 수 없습니다');
+  }
+
+  const patch: Record<string, unknown> = {};
+  if (input.replied === true) {
+    patch.replied = true;
+    patch.replied_marked_at = new Date().toISOString();
+  }
+  if ('scheduledFor' in input) {
+    patch.scheduled_for = input.scheduledFor;
+  }
+
+  const { data, error } = await client
+    .from('sent_messages')
+    .update(patch)
+    .eq('id', id)
+    .eq('user_id', userId)
+    .select('id, replied, replied_marked_at, scheduled_for');
+  if (error) throw error;
+
+  const rows = (data ?? []) as UpdatedSentMessageRow[];
+  if (rows.length === 0) {
+    throw new NotFoundError('발송 기록을 찾을 수 없습니다');
+  }
+  const row = rows[0];
+  return {
+    id: row.id,
+    replied: row.replied,
+    repliedMarkedAt: row.replied_marked_at,
+    scheduledFor: row.scheduled_for,
+  };
+}
+
+/**
+ * T33 — `GET /api/feedback`. 답장 받음으로 마킹된(`replied = true`) 건만 가져온다 — 답장이
+ * 아직 없는 건은 소요 시간을 계산할 대상이 아니다(`replied_marked_at`이 `null`). 계산 자체는
+ * `@cross-border/core`의 `summarizeFeedback()`(순수 함수)에 위임한다 — 이 함수는 조회만 한다.
+ */
+interface RepliedMessageRow {
+  id: string;
+  sent_at: string;
+  replied_marked_at: string | null;
+  mediation_applied: boolean;
+}
+
+export async function fetchRepliedMessages(
+  client: SupabaseClient,
+  userId: string,
+): Promise<Array<{ id: string; sentAt: string; repliedMarkedAt: string; mediationApplied: boolean }>> {
+  const { data, error } = await client
+    .from('sent_messages')
+    .select('id, sent_at, replied_marked_at, mediation_applied')
+    .eq('user_id', userId)
+    .eq('replied', true);
+  if (error) throw error;
+
+  const rows = (data ?? []) as RepliedMessageRow[];
+  // 🔴 방어적 필터 — `replied_marked_at`은 `updateSentMessage()`가 `replied: true`와 항상 함께
+  // 채우는 불변식이라 이론상 null일 수 없지만(코드 검색으로 확인 가능), null이면 elapsedHours가
+  // NaN이 되는 걸 여기서 조용히 막는다(지어내지 않는다 — 이런 행이 있으면 그냥 제외한다).
+  return rows
+    .filter((row): row is RepliedMessageRow & { replied_marked_at: string } => row.replied_marked_at !== null)
+    .map((row) => ({
+      id: row.id,
+      sentAt: row.sent_at,
+      repliedMarkedAt: row.replied_marked_at,
+      mediationApplied: row.mediation_applied,
+    }));
+}
+
+/**
+ * T52 — `GET /api/messages`(UX-015 목록). `docs/API.md` "GET /api/messages" Response 200이
+ * 요구하는 원시 컬럼만 가져온다 — 업무일 경과·`reminderSuggested` 계산은 이 함수의 책임이
+ * 아니다(순수 계산은 `@cross-border/core`의 `businessDaysElapsed`/`isReminderSuggested`, T51).
+ * `recipientTimezone`은 응답 필드에는 없지만 호출부가 그 계산에 쓴다(`docs/API.md:132`).
+ */
+export interface SentMessageListRowResult {
+  id: string;
+  recipient: string;
+  recipientCountry: CountryCode | null;
+  recipientTimezone: string | null;
+  finalText: string;
+  urgency: string;
+  sentAt: string;
+  replied: boolean;
+  repliedMarkedAt: string | null;
+  isReminder: boolean;
+  mediationApplied: boolean;
+}
+
+interface SentMessageListRow {
+  id: string;
+  recipient_identifier: string;
+  recipient_country: string | null;
+  recipient_timezone: string | null;
+  final_text: string;
+  urgency: string;
+  sent_at: string;
+  replied: boolean;
+  replied_marked_at: string | null;
+  is_reminder: boolean;
+  mediation_applied: boolean;
+}
+
+/**
+ * `repliedFilter`가 `'all'`이 아니면 `replied` 컬럼으로 스코프한다(`docs/API.md`
+ * `?replied=all|true|false`). 최신 발송 건이 먼저 오도록 `sent_at DESC` — `docs/Database.md:356`
+ * 인덱스 `(user_id, replied, sent_at DESC)`와 같은 정렬 방향이라 그 인덱스를 그대로 쓴다.
+ */
+export async function fetchSentMessages(
+  client: SupabaseClient,
+  userId: string,
+  repliedFilter: 'all' | 'true' | 'false',
+  limit: number,
+): Promise<SentMessageListRowResult[]> {
+  let query = client
+    .from('sent_messages')
+    .select(
+      'id, recipient_identifier, recipient_country, recipient_timezone, final_text, urgency, sent_at, replied, replied_marked_at, is_reminder, mediation_applied',
+    )
+    .eq('user_id', userId)
+    .order('sent_at', { ascending: false })
+    .limit(limit);
+  if (repliedFilter !== 'all') {
+    query = query.eq('replied', repliedFilter === 'true');
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const rows = (data ?? []) as SentMessageListRow[];
+  return rows.map((row) => ({
+    id: row.id,
+    recipient: row.recipient_identifier,
+    recipientCountry: row.recipient_country as CountryCode | null,
+    recipientTimezone: row.recipient_timezone,
+    finalText: row.final_text,
+    urgency: row.urgency,
+    sentAt: row.sent_at,
+    replied: row.replied,
+    repliedMarkedAt: row.replied_marked_at,
+    isReminder: row.is_reminder,
+    mediationApplied: row.mediation_applied,
+  }));
+}
+
+/**
+ * T52 — `POST /api/messages/{id}/reminder` 라우트가 리마인드 초안을 생성하기 전에 대상 메시지를
+ * `id`·`user_id`로 스코프해 조회한다(`updateSentMessage`와 같은 소유권 패턴 — 존재하지 않거나
+ * 타인 소유면 `NotFoundError`).
+ */
+export interface SentMessageForReminder {
+  finalText: string;
+}
+
+interface SentMessageForReminderRow {
+  final_text: string;
+}
+
+export async function fetchSentMessageForReminder(
+  client: SupabaseClient,
+  userId: string,
+  id: string,
+): Promise<SentMessageForReminder> {
+  const { data, error } = await client
+    .from('sent_messages')
+    .select('final_text')
+    .eq('id', id)
+    .eq('user_id', userId);
+  if (error) throw error;
+
+  const rows = (data ?? []) as SentMessageForReminderRow[];
+  if (rows.length === 0) {
+    throw new NotFoundError('발송 기록을 찾을 수 없습니다');
+  }
+  return { finalText: rows[0].final_text };
 }

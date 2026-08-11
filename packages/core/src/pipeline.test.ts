@@ -222,6 +222,43 @@ describe('run() — T28 파이프라인 조립', () => {
     );
   });
 
+  // T30(AC-022/AC-056②) — `docs/Tasks.md` T30이 요구하는 "충돌 케이스 1건 이상 실제 확인"
+  // (발생 1 / 억제 1)을 파이프라인 통합 레벨에서 재현한다(단위 테스트는
+  // `rules/emoji-risk.test.ts`).
+  it('AC-056② 발생 — 위험도 높은 이모지 + 이모지 선호 미합의면 emojiRisk 경고가 담긴다', async () => {
+    const { llm } = fakeLlm({ toneTransformed: '확인 부탁드립니다 🙏' });
+    const input = baseInput({
+      recipient: {
+        identifier: 'counterpart@example.com',
+        protocol: null,
+        country: null,
+        timezone: null,
+      },
+    });
+
+    const result = await run(input, baseDeps(llm));
+
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({ type: 'emojiRisk', subject: '🙏' }),
+    );
+  });
+
+  it('AC-056② 억제 — 규약 emojiPolicy가 ok면(Michael 사례, docs/TestCases.md:232) emojiRisk 경고가 없다', async () => {
+    const { llm } = fakeLlm({ toneTransformed: '확인 부탁드립니다 🙏' });
+    const input = baseInput({
+      recipient: {
+        identifier: 'counterpart@example.com',
+        protocol: { directnessAllowed: null, emojiPolicy: 'ok', addressForm: null, deadlineStyle: null },
+        country: null,
+        timezone: null,
+      },
+    });
+
+    const result = await run(input, baseDeps(llm));
+
+    expect(result.warnings).not.toContainEqual(expect.objectContaining({ type: 'emojiRisk' }));
+  });
+
   it('AC-058① — 감정 신호가 없는 원문이면 ticketOption이 signal_absent로 미제시다', async () => {
     const { llm } = fakeLlm();
     const input = baseInput({ text: '확인 부탁드립니다' });
@@ -385,5 +422,118 @@ describe('run() — T28 파이프라인 조립', () => {
     await run(baseInput(), baseDeps(llm));
 
     expect(payloads.c2).toMatchObject({ directness: null, emojiPreference: null });
+  });
+
+  // T41/T42(AC-037) — `docs/PRD.md:675`의 명시 예시("프로필 '이모지 선호' + 규약 '이모지
+  // 미사용' → 결과에 이모지 없음")를 그대로 재현한다. `docs/Tasks.md` T42 행이 요구하는
+  // "충돌 케이스 1건 이상 실제 확인"이 이 테스트다.
+  it('AC-037 — 규약 emojiPolicy가 자기신고 emojiPreference와 충돌하면 규약이 이긴다(PRD:675 예시)', async () => {
+    const { llm, payloads } = fakeLlm();
+    const input = baseInput({
+      sender: {
+        language: 'ko',
+        profile: {
+          onboardingState: 'completed',
+          directness: null,
+          emojiPreference: 'likes',
+          formality: null,
+          honorificLevel: 'haeyo',
+        },
+      },
+      recipient: {
+        identifier: 'counterpart@example.com',
+        protocol: { directnessAllowed: null, emojiPolicy: 'avoid', addressForm: null, deadlineStyle: null },
+        country: null,
+        timezone: null,
+      },
+    });
+
+    await run(input, baseDeps(llm, { data: { dictionary: [], learnedItems: [] } }));
+
+    expect(payloads.c2).toMatchObject({ emojiPreference: 'avoids' });
+  });
+
+  it('AC-037 — 규약 directnessAllowed가 자기신고 directness와 충돌하면 규약이 이긴다', async () => {
+    const { llm, payloads } = fakeLlm();
+    const input = baseInput({
+      sender: {
+        language: 'ko',
+        profile: {
+          onboardingState: 'completed',
+          directness: 'indirect',
+          emojiPreference: null,
+          formality: null,
+          honorificLevel: 'haeyo',
+        },
+      },
+      recipient: {
+        identifier: 'counterpart@example.com',
+        protocol: { directnessAllowed: 'yes', emojiPolicy: null, addressForm: null, deadlineStyle: null },
+        country: null,
+        timezone: null,
+      },
+    });
+
+    await run(input, baseDeps(llm, { data: { dictionary: [], learnedItems: [] } }));
+
+    expect(payloads.c2).toMatchObject({ directness: 'direct' });
+  });
+
+  it('AC-037 — 규약이 학습값보다도 우선한다(규약이 C3 병합 결과 전체를 덮는다)', async () => {
+    const { llm, payloads } = fakeLlm();
+    const learnedItems = [{ patternKey: 'emoji_removed', value: 'avoids' }];
+    const input = baseInput({
+      recipient: {
+        identifier: 'counterpart@example.com',
+        protocol: { directnessAllowed: null, emojiPolicy: 'ok', addressForm: null, deadlineStyle: null },
+        country: null,
+        timezone: null,
+      },
+    });
+
+    await run(input, baseDeps(llm, { data: { dictionary: [], learnedItems } }));
+
+    // 'ok'는 "명시적으로 좋아한다"가 아니라 "금지하지 않는다"는 뜻이라 'neutral'로 옮긴다
+    // (directnessFromProtocol/emojiPreferenceFromProtocol 주석 참조) — 학습값 'avoids'는
+    // 규약이 있으므로 쓰이지 않는다.
+    expect(payloads.c2).toMatchObject({ emojiPreference: 'neutral' });
+  });
+
+  it('규약의 해당 축이 미합의(null)면 C3 병합 결과로 되돌아간다', async () => {
+    const { llm, payloads } = fakeLlm();
+    const learnedItems = [{ patternKey: 'emoji_removed', value: 'avoids' }];
+    const input = baseInput({
+      recipient: {
+        identifier: 'counterpart@example.com',
+        protocol: { directnessAllowed: null, emojiPolicy: null, addressForm: null, deadlineStyle: null },
+        country: null,
+        timezone: null,
+      },
+    });
+
+    await run(input, baseDeps(llm, { data: { dictionary: [], learnedItems } }));
+
+    expect(payloads.c2).toMatchObject({ emojiPreference: 'avoids' });
+  });
+
+  it('recipient가 null이면(AC-066 미지정 경로) 규약 병합 자체가 없다 — C3 병합 결과 그대로', async () => {
+    const { llm, payloads } = fakeLlm();
+    const input = baseInput({
+      sender: {
+        language: 'ko',
+        profile: {
+          onboardingState: 'completed',
+          directness: 'direct',
+          emojiPreference: null,
+          formality: null,
+          honorificLevel: 'haeyo',
+        },
+      },
+      recipient: null,
+    });
+
+    await run(input, baseDeps(llm));
+
+    expect(payloads.c2).toMatchObject({ directness: 'direct' });
   });
 });

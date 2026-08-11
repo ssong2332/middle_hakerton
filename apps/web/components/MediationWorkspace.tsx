@@ -8,7 +8,10 @@ import {
   TICKET_DRAFT_SESSION_KEY,
   TICKET_RESTORE_SESSION_KEY,
 } from '../lib/ticket-draft';
+import { isValidEmailFormat } from '../lib/validate-email';
+import { RecipientEnrichmentModal } from './RecipientEnrichmentModal';
 import { RecipientPanel } from './RecipientPanel';
+import { ResponseDeadlineModal } from './ResponseDeadlineModal';
 import { SenderPanel } from './SenderPanel';
 import styles from './MediationWorkspace.module.css';
 
@@ -119,6 +122,20 @@ export function MediationWorkspace() {
   const [approvalSnapshot, setApprovalSnapshot] = useState<ApprovalSnapshot | null>(null);
   const [approveStatus, setApproveStatus] = useState<ApproveStatus>('idle');
   const [sentAt, setSentAt] = useState<string | null>(null);
+  // T40/UX-005 — 협상 모달 open 여부 + 확정된 기한(참고 표시용, `docs/UX.md:464` "chosen deadline
+  // attached to the message" — 이 리포에 그 값을 실을 스키마 필드가 없어(AC-005/AC-036의 요구는
+  // "표시 + 자동 변경 금지"뿐, 저장·전송 필드는 명시돼 있지 않다) 클라이언트 로컬 표시로 범위를
+  // 좁혔다, `ResponseDeadlineModal.tsx` 헤더 주석과 같은 스코프 결정).
+  const [deadlineModalOpen, setDeadlineModalOpen] = useState(false);
+  const [confirmedDeadline, setConfirmedDeadline] = useState<string | null>(null);
+  // T54 — "기한 재협상" 링크(HolidayConflictWarning)로 열렸을 때만 채워지는 값. "Set response
+  // deadline" 버튼으로 여는 일반 경로는 `null`을 넘겨(prefill 없음) 빈 필드로 시작한다.
+  const [deadlinePrefill, setDeadlinePrefill] = useState<string | null>(null);
+  // T65/AC-078 — "상대방 정보 보강" 링크 표시 여부. `recipient`가 유효한 이메일로 바뀔 때마다
+  // `GET /api/enrichment`(AC-078 판정)를 다시 물어 갱신한다 — 링크는 서버가 계산한 이 값이
+  // true일 때만 렌더된다(`SenderPanel`은 판정하지 않는다, 부재-비활성 원칙).
+  const [enrichmentLinkVisible, setEnrichmentLinkVisible] = useState(false);
+  const [enrichmentModalOpen, setEnrichmentModalOpen] = useState(false);
   // MJ-4(reviewer 재검토, Major 1 → 수정) — Idempotency-Key는 "승인 시도 하나"의 정체성(스냅샷 +
   // 최종문)에 묶여 한 번만 생성돼야 한다. `handleApprove` 안에서 매번 `crypto.randomUUID()`를
   // 부르면 응답 유실 후 재시도마다 새 키가 나가 서버의 멱등성 백스톱이 아무것도 막지 못하고
@@ -176,6 +193,11 @@ export function MediationWorkspace() {
   // 재실행이 실패해도(status가 'error'로 바뀌어도) 직전 성공 결과의 스냅샷은 남아 있으므로
   // 승인 가능 상태가 유지된다(`docs/UX.md` UX-004 Failure).
   const hasResult = approvalSnapshot !== null;
+  // T40/AC-005 — CRITICAL 메시지에서는 진입 버튼 자체가 렌더되지 않는다(부재-비활성 원칙,
+  // `ticketOffered`와 같은 판정 형태). 아직 실행 결과가 없으면(`hasResult===false`) 당연히
+  // 렌더하지 않는다 — 어떤 긴급도인지도 모른다.
+  const deadlineNegotiationAvailable =
+    hasResult && displayedUrgency !== null && displayedUrgency !== 'CRITICAL';
   // M2(reviewer 최종 APPROVED, Major 비차단 → 수정) — 재실행이 진행 중일 때(`status==='loading'`)
   // 그 사이 승인이 성공하면, 재실행 완료 후 스냅샷이 새 결과로 교체되어 "발송됨" 표시와 함께
   // 실제로 전송되지 않은 값이 남는 불일치가 생긴다(`docs/UX.md` UX-004 Validation "disabled
@@ -369,6 +391,28 @@ export function MediationWorkspace() {
     }
   }
 
+  // T65/AC-078 — "받는 사람" 필드가 blur될 때(=`docs/UX.md:909`가 이미 확립한 검증 트리거 시점,
+  // "at first blur or first submit attempt"와 같은 지점 재사용) 유효한 이메일이면 링크 표시
+  // 여부를 다시 묻는다. 매 keystroke마다(useEffect+recipient 의존성) 호출하는 대신 blur 이벤트로
+  // 묶은 이유 — ① 이 프로젝트가 이미 확립한 "첫 blur 시점" 검증 관례를 그대로 재사용해 새 타이밍
+  // 규칙을 만들지 않는다. ② keystroke마다 걸리는 디바운스 타이머는 기존 테스트 스위트(수십 건,
+  // `fetchMock`이 알려지지 않은 URL에서 던지는 엄격한 allowlist 패턴)에서 실행 중 임의 시점에
+  // 발화해 무관한 호출 카운트 단언을 깨뜨릴 위험이 있다 — blur는 테스트가 명시적으로 발생시키지
+  // 않는 한 일어나지 않으므로 기존 테스트에 부작용이 없다. 이 GET은 "검색·크롤링"이 아니다 —
+  // 이미 저장된 값 + `pair_protocols` 존재 여부만 읽는다(`apps/web/app/api/enrichment/route.ts`
+  // 헤더 주석 참조, AC-065②는 GitHub 조회에만 적용된다).
+  function handleRecipientBlur() {
+    const trimmed = recipient.trim();
+    if (trimmed === '' || !isValidEmailFormat(trimmed)) {
+      setEnrichmentLinkVisible(false);
+      return;
+    }
+    fetch(`/api/enrichment?recipient=${encodeURIComponent(trimmed)}`)
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error('load failed'))))
+      .then((body: { showEnrichmentLink: boolean }) => setEnrichmentLinkVisible(body.showEnrichmentLink))
+      .catch(() => setEnrichmentLinkVisible(false));
+  }
+
   // 🔴 T25/AC-058① — `RecipientPanel`의 "Convert to Task Ticket" 클릭 핸들러. 승인 대상
   // 스냅샷 시점의 원문(`approvalSnapshot.text` — `SenderPanel`의 `originalTextSnapshot`과 같은
   // 이유: 이 원문이 실제로 `ticketOption.offered`를 판정한 그 텍스트다)을 API 소스 키에 저장하고
@@ -420,6 +464,17 @@ export function MediationWorkspace() {
               // 않으므로 이 값은 실제로 쓰이지 않지만, prop 타입을 `string`으로 단순하게 유지하기
               // 위한 안전한 fallback이다).
               originalTextSnapshot={approvalSnapshot?.text ?? text}
+              // T54 — CRITICAL이면(=`deadlineNegotiationAvailable` false) 빈 배열을 넘긴다.
+              // "기한 재협상" 링크가 열 UX-005 자체가 CRITICAL에서 존재할 수 없다(AC-005, T40과
+              // 같은 게이트) — 경고 문구 자체는 보여도 그 밑의 링크만 없는 상태를 만들지 않는다.
+              holidayConflicts={deadlineNegotiationAvailable ? (result?.holidayConflicts ?? []) : []}
+              onNegotiateDeadline={(deadlineIso) => {
+                setDeadlinePrefill(deadlineIso);
+                setDeadlineModalOpen(true);
+              }}
+              enrichmentLinkVisible={enrichmentLinkVisible}
+              onOpenEnrichment={() => setEnrichmentModalOpen(true)}
+              onRecipientBlur={handleRecipientBlur}
             />
           </div>
           <div className={`${styles.column} ${styles.columnRecipient}`}>
@@ -434,10 +489,39 @@ export function MediationWorkspace() {
               sentAt={sentAt}
               ticketOffered={hasResult && result?.ticketOption.offered === true}
               onConvertToTicket={handleConvertToTicket}
+              deadlineNegotiationAvailable={deadlineNegotiationAvailable}
+              onOpenDeadlineNegotiation={() => {
+                setDeadlinePrefill(null);
+                setDeadlineModalOpen(true);
+              }}
+              confirmedDeadline={confirmedDeadline}
             />
           </div>
         </div>
       </div>
+      {/* T40/UX-005 — `deadlineNegotiationAvailable`이 false로 바뀌어도(예: 재실행으로 CRITICAL로
+          바뀜) 이미 열려 있던 모달은 렌더 게이트로 강제로 닫지 않는다 — 사용자가 진행 중인
+          입력을 잃지 않게 `onClose`로만 닫는다. `urgency`는 열린 시점 기준 `displayedUrgency`이며,
+          모달이 열려 있으려면 `deadlineNegotiationAvailable`이 true였던 시점이 있어야 하므로
+          non-null·non-CRITICAL이 보장된다. */}
+      {deadlineModalOpen && displayedUrgency !== null && (
+        <ResponseDeadlineModal
+          open={deadlineModalOpen}
+          urgency={displayedUrgency}
+          onClose={() => setDeadlineModalOpen(false)}
+          onConfirm={setConfirmedDeadline}
+          prefillDeadline={deadlinePrefill}
+        />
+      )}
+      {/* T65/UX-018 — `enrichmentLinkVisible`이 이후 false로 바뀌어도(예: 그 사이 규약이 생김)
+          이미 열려 있던 모달은 강제로 닫지 않는다 — `ResponseDeadlineModal`과 같은 원칙. */}
+      {enrichmentModalOpen && (
+        <RecipientEnrichmentModal
+          open={enrichmentModalOpen}
+          recipient={recipient}
+          onClose={() => setEnrichmentModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,9 +1,11 @@
 'use client';
 
+import { LENGTH_COUNTER_SHOW_AT, SOFT_LENGTH_CAP } from '@cross-border/core';
 import type { MediationResult, UrgencyLevel } from '@cross-border/core';
 import { isValidEmailFormat } from '../lib/validate-email';
 import { BackTranslationPreview } from './BackTranslationPreview';
 import { ComparisonView } from './ComparisonView';
+import { HolidayConflictWarning } from './HolidayConflictWarning';
 import { MisreadRiskPanel } from './MisreadRiskPanel';
 import { UrgencyPanel } from './UrgencyPanel';
 import styles from './SenderPanel.module.css';
@@ -40,6 +42,30 @@ export interface SenderPanelProps {
    * 화면에 잘못된 조합이 보이는 표시 결함이었다.)
    */
   originalTextSnapshot: string;
+  /**
+   * 🔴 T54/AC-057②③ — "이 마감일은 상대 국가 연휴 N일차입니다" 경고. `HolidayConflictWarning`이
+   * 빈 배열이면 아무것도 렌더하지 않는다(AC-063①). CRITICAL 메시지에서는 부모(`MediationWorkspace`)
+   * 가 이미 빈 배열을 넘긴다 — "기한 재협상" 링크가 열 UX-005 자체가 CRITICAL에서 존재할 수 없기
+   * 때문(AC-005, T40과 같은 게이트). 기본값 `[]` — 기존 호출부를 깨지 않기 위한 선택적 prop이다.
+   */
+  holidayConflicts?: MediationResult['holidayConflicts'];
+  /** "기한 재협상" 클릭 시 호출된다 — 모달을 그 기한으로 여는 것은 부모의 책임이다. */
+  onNegotiateDeadline?: (deadlineIso: string) => void;
+  /**
+   * 🔴 T65/AC-078 — "상대방 정보 보강" 링크 렌더 가능 여부. `GET /api/enrichment`가 계산한
+   * `showEnrichmentLink`을 부모가 그대로 넘긴다 — 이 컴포넌트는 판정하지 않는다(회원 여부가
+   * 아니라 규약·보강 정보 존재 여부로 판정, AC-078② — `MediationWorkspace`의 몫). `ticketOffered`/
+   * `deadlineNegotiationAvailable`과 같은 부재-비활성 원칙 — `false`면 링크 자체를 렌더하지
+   * 않는다(비활성화가 아니다). 기본값 `false` — 기존 호출부를 깨지 않기 위한 선택적 prop이다.
+   */
+  enrichmentLinkVisible?: boolean;
+  /** 링크 클릭 시 호출된다 — 모달을 여는 것은 부모(`MediationWorkspace`)의 책임이다.
+   * `enrichmentLinkVisible=true`일 때만 실제로 렌더·호출된다. */
+  onOpenEnrichment?: () => void;
+  /** 🔴 T65/AC-078 — "받는 사람" 필드가 blur될 때 호출된다(`docs/UX.md:909`의 기존 "첫 blur"
+   * 검증 트리거를 재사용 — `MediationWorkspace.tsx`의 `handleRecipientBlur` 헤더 주석 참조).
+   * `enrichmentLinkVisible`을 갱신하는 것은 부모의 책임이다. */
+  onRecipientBlur?: () => void;
 }
 
 /**
@@ -62,6 +88,11 @@ export function SenderPanel({
   onRunMediation,
   hasResult,
   originalTextSnapshot,
+  holidayConflicts = [],
+  onNegotiateDeadline,
+  enrichmentLinkVisible = false,
+  onOpenEnrichment,
+  onRecipientBlur,
 }: SenderPanelProps) {
   const trimmedRecipient = recipient.trim();
   const recipientFormatInvalid = trimmedRecipient !== '' && !isValidEmailFormat(trimmedRecipient);
@@ -81,9 +112,18 @@ export function SenderPanel({
           type="text"
           value={recipient}
           onChange={(event) => onRecipientChange(event.target.value)}
+          onBlur={() => onRecipientBlur?.()}
         />
         {recipientFormatInvalid && (
           <p className={styles.fieldError}>받는 사람은 이메일 형식이어야 합니다.</p>
+        )}
+        {/* T65/AC-078 — `enrichmentLinkVisible`이 false면 이 블록 자체가 렌더되지 않는다
+            (ticketOffered와 같은 미렌더 원칙, "Entry" 위치는 `docs/UX.md:821` "next to the
+            recipient identifier field on UX-004"). */}
+        {enrichmentLinkVisible && (
+          <button type="button" className={styles.enrichmentLink} onClick={() => onOpenEnrichment?.()}>
+            상대방 정보 보강
+          </button>
         )}
       </div>
 
@@ -94,7 +134,15 @@ export function SenderPanel({
           className={styles.message}
           value={text}
           onChange={(event) => onTextChange(event.target.value)}
+          aria-describedby={text.length >= LENGTH_COUNTER_SHOW_AT ? 'sender-text-counter' : undefined}
         />
+        {/* AC-061 — 하드 차단 아님(②), 자문 전용. `docs/UX.md` v6.2 고정 문구·접근성(키
+            입력마다 announce하지 않고 aria-describedby로만 연결). */}
+        {text.length >= LENGTH_COUNTER_SHOW_AT && (
+          <p id="sender-text-counter" className={styles.lengthCounter}>
+            {text.length.toLocaleString('ko-KR')} / {SOFT_LENGTH_CAP.toLocaleString('ko-KR')}자
+          </p>
+        )}
       </div>
 
       {/* T16(AC-029, docs/UX.md:1015) — 실패 상태에서는 같은 버튼이 "다시 시도"로 바뀐다. 별도
@@ -174,6 +222,9 @@ export function SenderPanel({
               `MisreadRiskPanel`의 `variant` prop 하나만 바꾸면 되고, 데이터 생성(T10)에는 영향이
               없다(같은 패턴이 이미 존재 — "표시만 축소되고 데이터는 항상 동일"). */}
           <MisreadRiskPanel risks={result.misreadRisks} variant="full" />
+          {/* T54 — HolidayConflict 상태. `holidayConflicts`가 빈 배열이면(충돌 없음·데이터 없는
+              국가 둘 다) 이 컴포넌트가 아무것도 렌더하지 않는다(AC-063①). */}
+          <HolidayConflictWarning conflicts={holidayConflicts} onNegotiate={onNegotiateDeadline} />
           {/* MJ-5 — 여기도 스냅샷 시점 원문을 쓴다(역번역은 스냅샷 시점 변환문의 역번역이므로,
               라이브 text와 짝지으면 편집 후 원문·역번역이 서로 다른 시점의 값이 된다).
               🔴 (2026-08-05 갱신 — F1-e, DECISIONS #48 · ADR-0009) `result.source`(합산값) 대신

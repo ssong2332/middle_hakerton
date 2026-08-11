@@ -10,10 +10,15 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { NotFoundError, ValidationError } from '@cross-border/core';
 import {
+  fetchRepliedMessages,
+  fetchSentMessageForReminder,
+  fetchSentMessages,
   insertDiffRecord,
   insertSentMessage,
   insertSentMessageAndDiffRecord,
+  updateSentMessage,
   type CreateDiffRecordInput,
   type CreateSentMessageInput,
 } from './storage';
@@ -302,5 +307,383 @@ describe('insertSentMessageAndDiffRecord', () => {
         messageId,
       })),
     ).rejects.toMatchObject({ message: 'diff insert failed' });
+  });
+});
+
+// T50 — `PATCH /api/messages/{id}`(AC-044①, AC-024). `updateDictionaryEntry`(T23)의
+// `select().eq().eq()` → `update().eq().eq().select()` 2단계 조회/갱신 패턴과 같은 이유(존재·소유
+// 확인을 갱신과 분리해 NotFoundError를 명확히 구분한다).
+interface FakeUpdateHandle {
+  client: SupabaseClient;
+  selectEqCalls: Array<[string, unknown]>;
+  updateEqCalls: Array<[string, unknown]>;
+  updatedPayloads: unknown[];
+}
+
+function createFakeUpdateSentMessageSupabase(
+  options: {
+    existingRows?: Array<{ urgency: string }>;
+    existingError?: { message: string } | null;
+    updatedRows?: Array<{ id: string; replied: boolean; replied_marked_at: string | null; scheduled_for: string | null }>;
+    updateError?: { message: string } | null;
+  } = {},
+): FakeUpdateHandle {
+  const selectEqCalls: Array<[string, unknown]> = [];
+  const updateEqCalls: Array<[string, unknown]> = [];
+  const updatedPayloads: unknown[] = [];
+  const existingRows = options.existingRows ?? [{ urgency: 'NORMAL' }];
+
+  const client = {
+    from(table: string) {
+      if (table !== 'sent_messages') throw new Error(`unexpected table: ${table}`);
+      return {
+        select: () => ({
+          eq: (col1: string, val1: unknown) => {
+            selectEqCalls.push([col1, val1]);
+            return {
+              eq: (col2: string, val2: unknown) => {
+                selectEqCalls.push([col2, val2]);
+                return Promise.resolve({
+                  data: options.existingError ? null : existingRows,
+                  error: options.existingError ?? null,
+                });
+              },
+            };
+          },
+        }),
+        update: (row: unknown) => {
+          updatedPayloads.push(row);
+          return {
+            eq: (col1: string, val1: unknown) => {
+              updateEqCalls.push([col1, val1]);
+              return {
+                eq: (col2: string, val2: unknown) => {
+                  updateEqCalls.push([col2, val2]);
+                  return {
+                    select: () =>
+                      Promise.resolve({
+                        data: options.updateError ? null : (options.updatedRows ?? []),
+                        error: options.updateError ?? null,
+                      }),
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  } as unknown as SupabaseClient;
+
+  return { client, selectEqCalls, updateEqCalls, updatedPayloads };
+}
+
+describe('updateSentMessage — AC-044①, AC-024, AC-005', () => {
+  it('replied:true를 보내면 replied·replied_marked_at을 함께 갱신하고 id·user_id로 스코프한다', async () => {
+    const { client, selectEqCalls, updateEqCalls, updatedPayloads } =
+      createFakeUpdateSentMessageSupabase({
+        updatedRows: [
+          { id: 'msg-1', replied: true, replied_marked_at: '2026-08-10T10:00:00Z', scheduled_for: null },
+        ],
+      });
+
+    const result = await updateSentMessage(client, 'user-1', 'msg-1', { replied: true });
+
+    expect(result).toEqual({
+      id: 'msg-1',
+      replied: true,
+      repliedMarkedAt: '2026-08-10T10:00:00Z',
+      scheduledFor: null,
+    });
+    expect(selectEqCalls).toEqual([
+      ['id', 'msg-1'],
+      ['user_id', 'user-1'],
+    ]);
+    expect(updateEqCalls).toEqual([
+      ['id', 'msg-1'],
+      ['user_id', 'user-1'],
+    ]);
+    expect(updatedPayloads[0]).toMatchObject({ replied: true });
+    expect((updatedPayloads[0] as { replied_marked_at: string }).replied_marked_at).toBeTruthy();
+  });
+
+  it('scheduledFor만 보내면 replied는 건드리지 않는다', async () => {
+    const { client, updatedPayloads } = createFakeUpdateSentMessageSupabase({
+      existingRows: [{ urgency: 'NORMAL' }],
+      updatedRows: [
+        { id: 'msg-2', replied: false, replied_marked_at: null, scheduled_for: '2026-08-11T00:00:00Z' },
+      ],
+    });
+
+    await updateSentMessage(client, 'user-1', 'msg-2', { scheduledFor: '2026-08-11T00:00:00Z' });
+
+    expect(updatedPayloads[0]).toEqual({ scheduled_for: '2026-08-11T00:00:00Z' });
+  });
+
+  it('대상이 없으면(다른 사람 소유 포함) NotFoundError를 던진다', async () => {
+    const { client } = createFakeUpdateSentMessageSupabase({ existingRows: [] });
+
+    await expect(
+      updateSentMessage(client, 'user-1', 'missing-id', { replied: true }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('AC-005 — CRITICAL 메시지의 scheduledFor 변경은 ValidationError로 거부하고 update를 호출하지 않는다', async () => {
+    const { client, updatedPayloads } = createFakeUpdateSentMessageSupabase({
+      existingRows: [{ urgency: 'CRITICAL' }],
+    });
+
+    await expect(
+      updateSentMessage(client, 'user-1', 'msg-critical', { scheduledFor: '2026-08-11T00:00:00Z' }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(updatedPayloads).toEqual([]);
+  });
+
+  it('CRITICAL 메시지라도 replied 마킹은(scheduledFor 아니므로) 그대로 허용한다', async () => {
+    const { client, updatedPayloads } = createFakeUpdateSentMessageSupabase({
+      existingRows: [{ urgency: 'CRITICAL' }],
+      updatedRows: [
+        { id: 'msg-3', replied: true, replied_marked_at: '2026-08-10T10:00:00Z', scheduled_for: null },
+      ],
+    });
+
+    await updateSentMessage(client, 'user-1', 'msg-3', { replied: true });
+
+    expect(updatedPayloads[0]).toMatchObject({ replied: true });
+  });
+});
+
+// T33 — `GET /api/feedback`이 쓰는 조회 함수.
+describe('fetchRepliedMessages — T33', () => {
+  function createFakeFetchRepliedSupabase(
+    rows: Array<{ id: string; sent_at: string; replied_marked_at: string | null; mediation_applied: boolean }>,
+  ): { client: SupabaseClient; eqCalls: Array<[string, unknown]> } {
+    const eqCalls: Array<[string, unknown]> = [];
+    const client = {
+      from(table: string) {
+        if (table !== 'sent_messages') throw new Error(`unexpected table: ${table}`);
+        return {
+          select: () => ({
+            eq: (col1: string, val1: unknown) => {
+              eqCalls.push([col1, val1]);
+              return {
+                eq: (col2: string, val2: unknown) => {
+                  eqCalls.push([col2, val2]);
+                  return Promise.resolve({ data: rows, error: null });
+                },
+              };
+            },
+          }),
+        };
+      },
+    } as unknown as SupabaseClient;
+    return { client, eqCalls };
+  }
+
+  it('user_id·replied=true로 스코프해 camelCase로 변환해 반환한다', async () => {
+    const { client, eqCalls } = createFakeFetchRepliedSupabase([
+      { id: 'm1', sent_at: '2026-08-10T00:00:00Z', replied_marked_at: '2026-08-10T02:00:00Z', mediation_applied: true },
+    ]);
+
+    const result = await fetchRepliedMessages(client, 'user-1');
+
+    expect(eqCalls).toEqual([
+      ['user_id', 'user-1'],
+      ['replied', true],
+    ]);
+    expect(result).toEqual([
+      { id: 'm1', sentAt: '2026-08-10T00:00:00Z', repliedMarkedAt: '2026-08-10T02:00:00Z', mediationApplied: true },
+    ]);
+  });
+
+  it('replied_marked_at이 null인 행은(불변식 위반 방어) 제외한다', async () => {
+    const { client } = createFakeFetchRepliedSupabase([
+      { id: 'm1', sent_at: '2026-08-10T00:00:00Z', replied_marked_at: null, mediation_applied: true },
+      { id: 'm2', sent_at: '2026-08-10T00:00:00Z', replied_marked_at: '2026-08-10T02:00:00Z', mediation_applied: false },
+    ]);
+
+    const result = await fetchRepliedMessages(client, 'user-1');
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('m2');
+  });
+
+  it('결과가 없으면 빈 배열을 반환한다', async () => {
+    const { client } = createFakeFetchRepliedSupabase([]);
+
+    const result = await fetchRepliedMessages(client, 'user-1');
+
+    expect(result).toEqual([]);
+  });
+});
+
+// T52 — `GET /api/messages`가 쓰는 조회 함수. supabase-js 쿼리 빌더는 각 메서드가 자기 자신을
+// 반환하며 체인 끝(또는 중간, `.then()`을 직접 호출하는 지점)에서 await되는 thenable이다 — 다른
+// 페이크들(고정 깊이 체인)과 달리 `repliedFilter`에 따라 체인 길이가 달라져(`.eq('replied', ...)`
+// 가 있을 수도 없을 수도 있다) 이 모양의 페이크가 필요하다.
+interface FakeListHandle {
+  client: SupabaseClient;
+  calls: Array<{ method: string; args: unknown[] }>;
+}
+
+function createFakeListSupabase(
+  rows: Array<Record<string, unknown>>,
+  error: { message: string } | null = null,
+): FakeListHandle {
+  const calls: Array<{ method: string; args: unknown[] }> = [];
+
+  function builder() {
+    const chain: Record<string, unknown> = {
+      select: (...args: unknown[]) => {
+        calls.push({ method: 'select', args });
+        return chain;
+      },
+      eq: (...args: unknown[]) => {
+        calls.push({ method: 'eq', args });
+        return chain;
+      },
+      order: (...args: unknown[]) => {
+        calls.push({ method: 'order', args });
+        return chain;
+      },
+      limit: (...args: unknown[]) => {
+        calls.push({ method: 'limit', args });
+        return chain;
+      },
+      then: (resolve: (value: { data: unknown; error: unknown }) => void) =>
+        resolve({ data: error ? null : rows, error }),
+    };
+    return chain;
+  }
+
+  const client = {
+    from(table: string) {
+      if (table !== 'sent_messages') throw new Error(`unexpected table: ${table}`);
+      return builder();
+    },
+  } as unknown as SupabaseClient;
+
+  return { client, calls };
+}
+
+describe('fetchSentMessages — T52', () => {
+  const row = {
+    id: 'msg-1',
+    recipient_identifier: 'boss@example.com',
+    recipient_country: 'KR',
+    recipient_timezone: 'Asia/Seoul',
+    final_text: 'Please confirm by tomorrow.',
+    urgency: 'NORMAL',
+    sent_at: '2026-08-05T10:00:00Z',
+    replied: false,
+    replied_marked_at: null,
+    is_reminder: false,
+    mediation_applied: true,
+  };
+
+  it('user_id로 스코프하고 sent_at DESC로 정렬·limit해 camelCase로 변환한다', async () => {
+    const { client, calls } = createFakeListSupabase([row]);
+
+    const result = await fetchSentMessages(client, 'user-1', 'all', 50);
+
+    expect(result).toEqual([
+      {
+        id: 'msg-1',
+        recipient: 'boss@example.com',
+        recipientCountry: 'KR',
+        recipientTimezone: 'Asia/Seoul',
+        finalText: 'Please confirm by tomorrow.',
+        urgency: 'NORMAL',
+        sentAt: '2026-08-05T10:00:00Z',
+        replied: false,
+        repliedMarkedAt: null,
+        isReminder: false,
+        mediationApplied: true,
+      },
+    ]);
+    expect(calls.some((c) => c.method === 'eq' && c.args[0] === 'user_id' && c.args[1] === 'user-1')).toBe(true);
+    expect(calls.some((c) => c.method === 'order')).toBe(true);
+    expect(calls.some((c) => c.method === 'limit' && c.args[0] === 50)).toBe(true);
+    // repliedFilter:'all'이면 replied 컬럼 eq는 걸지 않는다.
+    expect(calls.some((c) => c.method === 'eq' && c.args[0] === 'replied')).toBe(false);
+  });
+
+  it("repliedFilter가 'true'/'false'면 replied 컬럼으로도 스코프한다", async () => {
+    const { client: clientTrue, calls: callsTrue } = createFakeListSupabase([row]);
+    await fetchSentMessages(clientTrue, 'user-1', 'true', 50);
+    expect(callsTrue.some((c) => c.method === 'eq' && c.args[0] === 'replied' && c.args[1] === true)).toBe(true);
+
+    const { client: clientFalse, calls: callsFalse } = createFakeListSupabase([row]);
+    await fetchSentMessages(clientFalse, 'user-1', 'false', 50);
+    expect(callsFalse.some((c) => c.method === 'eq' && c.args[0] === 'replied' && c.args[1] === false)).toBe(true);
+  });
+
+  it('조회가 실패하면 에러를 던진다(삼키지 않는다)', async () => {
+    const { client } = createFakeListSupabase([], { message: 'query failed' });
+
+    await expect(fetchSentMessages(client, 'user-1', 'all', 50)).rejects.toBeTruthy();
+  });
+
+  it('결과가 없으면 빈 배열을 반환한다', async () => {
+    const { client } = createFakeListSupabase([]);
+
+    const result = await fetchSentMessages(client, 'user-1', 'all', 50);
+
+    expect(result).toEqual([]);
+  });
+});
+
+// T52 — `POST /api/messages/{id}/reminder`가 대상 메시지 조회에 쓰는 함수.
+describe('fetchSentMessageForReminder — T52', () => {
+  function createFakeFetchOneSupabase(
+    rows: Array<{ final_text: string }>,
+    error: { message: string } | null = null,
+  ): { client: SupabaseClient; eqCalls: Array<[string, unknown]> } {
+    const eqCalls: Array<[string, unknown]> = [];
+    const client = {
+      from(table: string) {
+        if (table !== 'sent_messages') throw new Error(`unexpected table: ${table}`);
+        return {
+          select: () => ({
+            eq: (col1: string, val1: unknown) => {
+              eqCalls.push([col1, val1]);
+              return {
+                eq: (col2: string, val2: unknown) => {
+                  eqCalls.push([col2, val2]);
+                  return Promise.resolve({ data: error ? null : rows, error });
+                },
+              };
+            },
+          }),
+        };
+      },
+    } as unknown as SupabaseClient;
+    return { client, eqCalls };
+  }
+
+  it('id·user_id로 스코프해 finalText를 반환한다', async () => {
+    const { client, eqCalls } = createFakeFetchOneSupabase([{ final_text: 'Please confirm by tomorrow.' }]);
+
+    const result = await fetchSentMessageForReminder(client, 'user-1', 'msg-1');
+
+    expect(result).toEqual({ finalText: 'Please confirm by tomorrow.' });
+    expect(eqCalls).toEqual([
+      ['id', 'msg-1'],
+      ['user_id', 'user-1'],
+    ]);
+  });
+
+  it('대상이 없으면(다른 사람 소유 포함) NotFoundError를 던진다', async () => {
+    const { client } = createFakeFetchOneSupabase([]);
+
+    await expect(fetchSentMessageForReminder(client, 'user-1', 'missing-id')).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+
+  it('조회가 실패하면 에러를 던진다(삼키지 않는다)', async () => {
+    const { client } = createFakeFetchOneSupabase([], { message: 'query failed' });
+
+    await expect(fetchSentMessageForReminder(client, 'user-1', 'msg-1')).rejects.toBeTruthy();
   });
 });

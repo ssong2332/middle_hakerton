@@ -34,7 +34,7 @@
 }
 
 .notice {
-  font: 600 9px var(--font-mono);
+  font: 600 10px var(--font-mono);
   letter-spacing: 0.06em;
   color: var(--color-accent);
   margin-bottom: 6px;
@@ -48,12 +48,8 @@
 
 .overrideLabel {
   display: block;
-  font: 600 9px var(--font-mono);
+  font: 600 10px var(--font-mono);
   letter-spacing: 0.1em;
   color: var(--text-muted-75);
   margin-bottom: 5px;
-}
-
-.overrideSelect {
-  width: auto;
 }

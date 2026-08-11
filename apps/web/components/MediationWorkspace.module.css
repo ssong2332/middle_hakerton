@@ -3,7 +3,7 @@
 .frame {
   border: 2px solid var(--border-strong);
   background: var(--color-bg);
-  box-shadow: 0 3px 10px rgba(45, 43, 43, 0.16);
+  box-shadow: 0 3px 10px var(--shadow-color-frame);
 }
 
 .twoPanel {

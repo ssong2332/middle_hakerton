@@ -1609,3 +1609,237 @@ describe('MediationWorkspace', () => {
     );
   });
 });
+
+// T40/AC-005 — "Set response deadline" 진입 버튼은 CRITICAL 메시지에서는 렌더되지 않고
+// (비활성이 아니라 미렌더, ticketOffered와 같은 원칙), NORMAL/LOW에서는 렌더된다. 문서가
+// 요구하는 대조 확인(둘 다 실행 출력으로 확인) 그대로 두 케이스를 각각 검증한다.
+describe('MediationWorkspace — T40 응답 기한 협상 진입 (AC-005)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('① CRITICAL 판정 메시지에서는 "Set response deadline" 진입 수단이 렌더되지 않는다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mediateSuccessResponse({ urgency: 'CRITICAL' }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    expect(within(recipientPanel).queryByRole('button', { name: 'Set response deadline' })).toBeNull();
+  });
+
+  it('② NORMAL/LOW 판정 메시지에서는 "Set response deadline" 진입 수단이 렌더된다(항상 미노출이 아님을 대조 확인)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mediateSuccessResponse({ urgency: 'NORMAL' }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    expect(
+      within(recipientPanel).getByRole('button', { name: 'Set response deadline' }),
+    ).toBeTruthy();
+  });
+
+  it('진입 버튼을 클릭하면 UX-005 모달이 열린다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mediateSuccessResponse({ urgency: 'NORMAL' }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Set response deadline' }));
+
+    expect(screen.getByRole('dialog', { name: '응답 기한 협상' })).toBeTruthy();
+  });
+
+  it('모달에서 기한을 확정(Use this deadline)하면 수신자 패널에 참고용으로 표시된다', async () => {
+    const futureLocal = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/mediate') return Promise.resolve(mediateSuccessResponse({ urgency: 'NORMAL' }));
+      if (url === '/api/deadline/check') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ feasible: true, reason: '근무 시간 내입니다', counterOffers: [] }),
+        });
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Set response deadline' }));
+
+    fireEvent.change(screen.getByLabelText('희망 응답 기한'), { target: { value: futureLocal } });
+    fireEvent.change(screen.getByLabelText('수신자 타임존(IANA, 예: Asia/Tokyo)'), {
+      target: { value: 'Asia/Tokyo' },
+    });
+    fireEvent.change(screen.getByLabelText('근무 시작'), { target: { value: '09:00' } });
+    fireEvent.change(screen.getByLabelText('근무 종료'), { target: { value: '18:00' } });
+    fireEvent.click(screen.getByRole('button', { name: '실현 가능성 확인' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '이 기한 사용' })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole('button', { name: '이 기한 사용' }));
+
+    expect(screen.queryByRole('dialog', { name: '응답 기한 협상' })).toBeNull();
+    const recipientPanel = screen.getByLabelText('수신자 패널');
+    expect(within(recipientPanel).getByText(/참고 응답 기한/)).toBeTruthy();
+  });
+});
+
+// T54/AC-057②③/AC-063① — HolidayConflict 경고 + "기한 재협상" 진입.
+describe('MediationWorkspace — T54 공휴일 경고 표시 + 기한 재협상 진입', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const CONFLICT = { date: '2026-09-25T00:00:00Z', country: 'KR', holidayName: '추석', dayIndex: 2 };
+
+  it('NORMAL/LOW에서 holidayConflicts가 있으면 경고 문구와 "기한 재협상" 링크가 렌더된다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mediateSuccessResponse({ urgency: 'NORMAL', holidayConflicts: [CONFLICT] }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getByText('이 마감일은 상대 국가 연휴 2일차입니다.')).toBeTruthy();
+    });
+    expect(screen.getByRole('button', { name: '기한 재협상' })).toBeTruthy();
+  });
+
+  it('CRITICAL이면 holidayConflicts가 있어도 경고가 렌더되지 않는다(진입할 UX-005 자체가 없다, AC-005)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mediateSuccessResponse({ urgency: 'CRITICAL', holidayConflicts: [CONFLICT] }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText(/연휴/)).toBeNull();
+    expect(screen.queryByRole('button', { name: '기한 재협상' })).toBeNull();
+  });
+
+  it('"기한 재협상" 클릭 — 모달이 그 충돌의 날짜로 미리 채워져 열린다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mediateSuccessResponse({ urgency: 'NORMAL', holidayConflicts: [CONFLICT] }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '기한 재협상' })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '기한 재협상' }));
+
+    expect(screen.getByRole('dialog', { name: '응답 기한 협상' })).toBeTruthy();
+    const input = screen.getByLabelText('희망 응답 기한') as HTMLInputElement;
+    expect(input.value).not.toBe('');
+  });
+});
+
+// T65/AC-078 — "상대방 정보 보강" 링크. 매 keystroke가 아니라 "받는 사람" 필드가 blur될 때만
+// `GET /api/enrichment`를 부른다(`MediationWorkspace.tsx`의 `handleRecipientBlur` 헤더 주석 —
+// 기존 테스트 스위트가 blur를 발생시키지 않아 부작용이 없다는 것도 그 판단의 근거였다).
+describe('MediationWorkspace — T65 상대방 정보 보강 링크(AC-078)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function blurRecipientWith(value: string) {
+    const input = screen.getByLabelText('받는 사람');
+    fireEvent.change(input, { target: { value } });
+    fireEvent.blur(input);
+  }
+
+  it('blur 전에는 링크가 렌더되지 않고 /api/enrichment도 호출되지 않는다', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+
+    fireEvent.change(screen.getByLabelText('받는 사람'), { target: { value: 'boss@example.com' } });
+
+    expect(screen.queryByRole('button', { name: '상대방 정보 보강' })).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('유효한 이메일로 blur되고 showEnrichmentLink:true면 링크가 나타난다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ showEnrichmentLink: true }) });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+
+    blurRecipientWith('boss@example.com');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '상대방 정보 보강' })).toBeTruthy();
+    });
+    expect(fetchMock).toHaveBeenCalledWith('/api/enrichment?recipient=boss%40example.com');
+  });
+
+  it('showEnrichmentLink:false면 링크가 나타나지 않는다(AC-078④, 이미 정보가 있음)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ showEnrichmentLink: false }) });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+
+    blurRecipientWith('boss@example.com');
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('button', { name: '상대방 정보 보강' })).toBeNull();
+  });
+
+  it('유효하지 않은 이메일로 blur되면 /api/enrichment를 호출하지 않는다', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+
+    blurRecipientWith('not-an-email');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('링크 클릭 시 RecipientEnrichmentModal이 열린다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ showEnrichmentLink: true }) });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    blurRecipientWith('boss@example.com');
+    await waitFor(() => expect(screen.getByRole('button', { name: '상대방 정보 보강' })).toBeTruthy());
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        location: null,
+        company: null,
+        activityHourHistogram: null,
+        activitySampleCount: null,
+        activityTimezoneConfirmed: null,
+        timezoneCandidates: [],
+        activityTimeCandidate: null,
+        fetchedAt: null,
+        sourceUrl: null,
+        showEnrichmentLink: true,
+      }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: '상대방 정보 보강' }));
+
+    expect(screen.getByRole('dialog', { name: '상대방 정보 보강' })).toBeTruthy();
+  });
+});

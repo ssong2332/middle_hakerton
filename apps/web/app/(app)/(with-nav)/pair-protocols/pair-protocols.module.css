@@ -1,0 +1,209 @@
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 56px 24px;
+}
+
+.title {
+  font: 800 24px var(--font-sans);
+  letter-spacing: -0.01em;
+  margin-bottom: 10px;
+}
+
+.lead {
+  font: 400 13px var(--font-sans);
+  color: var(--text-muted-75);
+  margin-bottom: 24px;
+}
+
+.skeleton {
+  display: grid;
+  gap: 12px;
+}
+
+.skeletonRow {
+  height: 48px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--border-thin);
+}
+
+.banner {
+  border: 2px solid var(--color-focus);
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font: 400 12px var(--font-sans);
+}
+
+.banner p {
+  margin: 0 0 6px;
+}
+
+.retryButton {
+  min-height: 44px;
+  padding: 6px 10px;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  font: 800 11px var(--font-sans);
+}
+
+.openSection {
+  border: 1px solid var(--border-thin);
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.sectionTitle {
+  font: 700 13px var(--font-sans);
+  margin-bottom: 10px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.field label {
+  font: 700 11px var(--font-sans);
+}
+
+.field input {
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-thin);
+  font: 400 13px var(--font-sans);
+}
+
+.openButton {
+  min-height: 44px;
+  padding: 10px 16px;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  font: 800 12px var(--font-sans);
+  justify-self: start;
+}
+
+.openButton:disabled {
+  opacity: 0.45;
+}
+
+.errorText {
+  font: 400 12px var(--font-sans);
+  color: var(--color-danger-text);
+  margin: 0;
+}
+
+.emptyMessage {
+  font: 400 13px var(--font-sans);
+  color: var(--text-muted-60);
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item a {
+  display: block;
+  border: 1px solid var(--border-thin);
+  padding: 12px 14px;
+  font: 700 12px var(--font-sans);
+  text-decoration: none;
+  color: inherit;
+}
+
+.item a:hover {
+  border-color: var(--border-strong);
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: 16px;
+  font: 700 12px var(--font-sans);
+}
+
+.badge {
+  display: inline-block;
+  border: 1px solid var(--border-strong);
+  padding: 4px 10px;
+  font: 700 11px var(--font-sans);
+  margin-bottom: 20px;
+}
+
+.form {
+  display: grid;
+  gap: 18px;
+}
+
+.choiceGroup {
+  display: flex;
+  gap: 8px;
+}
+
+.choiceButton {
+  min-height: 44px;
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  font: 700 12px var(--font-sans);
+}
+
+.choiceButtonActive {
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border-color: var(--color-accent);
+}
+
+.saveButton {
+  min-height: 44px;
+  padding: 10px 16px;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  font: 800 12px var(--font-sans);
+  justify-self: start;
+}
+
+.saveButton:disabled {
+  opacity: 0.45;
+}
+
+.savedText {
+  font: 400 12px var(--font-sans);
+  color: var(--text-muted-75);
+  margin: 0;
+}
+
+.mismatchBanner {
+  border: 1px solid var(--color-focus);
+  background: var(--color-surface-alt);
+  padding: 8px 10px;
+  font: 400 12px var(--font-sans);
+  display: grid;
+  gap: 6px;
+}
+
+.mismatchBanner p {
+  margin: 0;
+}
+
+.mismatchActions {
+  display: flex;
+  gap: 8px;
+}
+
+.mismatchButton {
+  min-height: 32px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  font: 700 11px var(--font-sans);
+}

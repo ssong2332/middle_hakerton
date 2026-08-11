@@ -16,6 +16,7 @@ vi.mock('../../../lib/auth', () => ({
 }));
 vi.mock('../../../lib/messages/storage', () => ({
   insertSentMessageAndDiffRecord: vi.fn(),
+  fetchSentMessages: vi.fn(),
 }));
 // T20 — 3회 반복 판정(`applyPatternLearningSafe`)은 별도 모듈이라 여기서는 배선만 확인한다.
 // 실제 임계값 동작(2회 미반영/3회 반영)과 내부 에러 흡수 동작은
@@ -25,13 +26,14 @@ vi.mock('../../../lib/messages/pattern-learning', () => ({
 }));
 
 import { resolveSession } from '../../../lib/auth';
-import { insertSentMessageAndDiffRecord } from '../../../lib/messages/storage';
+import { fetchSentMessages, insertSentMessageAndDiffRecord } from '../../../lib/messages/storage';
 import { applyPatternLearningSafe } from '../../../lib/messages/pattern-learning';
-import { POST } from './route';
+import { GET, POST } from './route';
 
 const mockResolveSession = vi.mocked(resolveSession);
 const mockInsertSentMessageAndDiffRecord = vi.mocked(insertSentMessageAndDiffRecord);
 const mockApplyPatternLearningSafe = vi.mocked(applyPatternLearningSafe);
+const mockFetchSentMessages = vi.mocked(fetchSentMessages);
 
 const fakeClient = { from: vi.fn() } as never;
 
@@ -174,6 +176,45 @@ describe('POST /api/messages', () => {
     expect(secondBody).toEqual(firstBody);
   });
 
+  // 🔴 T32(reviewer 재검토, 2026-08-10 발견·수정) — `docs/API.md:122` 서버 규칙 "CRITICAL이면
+  // scheduledFor를 무시하고 NULL로 저장한다(AC-005)"가 계약에는 있었지만 실제로는 클라이언트가
+  // 보낸 값을 그대로 저장하고 있었다(T14 구현 당시부터의 회귀 — 그때는 아직 T32가 검증하기 전).
+  it('AC-005 — CRITICAL이면 클라이언트가 scheduledFor를 보내도 무시하고 NULL로 저장한다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
+    mockInsertSentMessageAndDiffRecord.mockResolvedValue({
+      sentMessage: { id: 'msg-critical', sentAt: '2026-08-10T10:00:00Z' },
+      diffRecord: { id: 'diff-critical', patternKey: null },
+    });
+
+    await POST(
+      jsonRequest({ ...validBody, urgency: 'CRITICAL', scheduledFor: '2026-08-11T00:00:00Z' }),
+    );
+
+    expect(mockInsertSentMessageAndDiffRecord).toHaveBeenCalledWith(
+      fakeClient,
+      expect.objectContaining({ urgency: 'CRITICAL', scheduledFor: null }),
+      expect.any(Function),
+    );
+  });
+
+  it('NORMAL/LOW이면 클라이언트가 보낸 scheduledFor를 그대로 저장한다(대조군)', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
+    mockInsertSentMessageAndDiffRecord.mockResolvedValue({
+      sentMessage: { id: 'msg-normal', sentAt: '2026-08-10T10:00:00Z' },
+      diffRecord: { id: 'diff-normal', patternKey: null },
+    });
+
+    await POST(
+      jsonRequest({ ...validBody, urgency: 'NORMAL', scheduledFor: '2026-08-11T00:00:00Z' }),
+    );
+
+    expect(mockInsertSentMessageAndDiffRecord).toHaveBeenCalledWith(
+      fakeClient,
+      expect.objectContaining({ urgency: 'NORMAL', scheduledFor: '2026-08-11T00:00:00Z' }),
+      expect.any(Function),
+    );
+  });
+
   it('Idempotency-Key 헤더가 없으면 매번 저장소를 새로 호출한다(기본 동작 불변)', async () => {
     mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
     mockInsertSentMessageAndDiffRecord
@@ -190,5 +231,124 @@ describe('POST /api/messages', () => {
     await POST(jsonRequest(validBody));
 
     expect(mockInsertSentMessageAndDiffRecord).toHaveBeenCalledTimes(2);
+  });
+});
+
+// T52 — `GET /api/messages`(UX-015 목록). `fetchSentMessages`는 모킹한다(쿼리 구성은
+// storage.test.ts가 이미 검증) — 여기서는 배선(쿼리 파라미터 파싱 → 조회 호출 → 업무일 경과
+// 계산 배선 → 응답 조합)만 본다.
+function getRequest(query = ''): Request {
+  return new Request(`http://localhost/api/messages${query}`, { method: 'GET' });
+}
+
+describe('GET /api/messages — T52', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("쿼리 파라미터가 없으면 replied='all'·limit=50으로 조회한다", async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
+    mockFetchSentMessages.mockResolvedValue([]);
+
+    const response = await GET(getRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ items: [] });
+    expect(mockFetchSentMessages).toHaveBeenCalledWith(fakeClient, 'user-1', 'all', 50);
+  });
+
+  it('replied=true·limit=10 쿼리를 그대로 전달한다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
+    mockFetchSentMessages.mockResolvedValue([]);
+
+    await GET(getRequest('?replied=true&limit=10'));
+
+    expect(mockFetchSentMessages).toHaveBeenCalledWith(fakeClient, 'user-1', 'true', 10);
+  });
+
+  it("replied가 all/true/false가 아닌 값이면 'all'로 취급한다(임의 문자열 방어)", async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
+    mockFetchSentMessages.mockResolvedValue([]);
+
+    await GET(getRequest('?replied=bogus'));
+
+    expect(mockFetchSentMessages).toHaveBeenCalledWith(fakeClient, 'user-1', 'all', 50);
+  });
+
+  it('AC-044② — 미답장 건은 businessDaysElapsed/reminderSuggested를 계산해 채운다(주말만 낀 3일 경과)', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
+    // 2026-08-05(수) 발송, country=null(공휴일 데이터 없음 — 주말만 제외).
+    mockFetchSentMessages.mockResolvedValue([
+      {
+        id: 'msg-1',
+        recipient: 'boss@example.com',
+        recipientCountry: null,
+        recipientTimezone: null,
+        finalText: 'Please confirm by tomorrow.',
+        urgency: 'NORMAL',
+        sentAt: '2026-08-05T00:00:00Z',
+        replied: false,
+        repliedMarkedAt: null,
+        isReminder: false,
+        mediationApplied: true,
+      },
+    ]);
+
+    // 2026-08-05(수) → 2026-08-10(월) now: 목/금/월 = 업무일 3일(토/일 제외).
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-10T00:00:00Z'));
+    let body: { items: Array<Record<string, unknown>> };
+    try {
+      const response = await GET(getRequest());
+      body = await response.json();
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(body.items[0]).toMatchObject({
+      id: 'msg-1',
+      businessDaysElapsed: 3,
+      reminderSuggested: true,
+    });
+    // recipientTimezone은 응답 필드에 없다(docs/API.md:132).
+    expect(body.items[0].recipientTimezone).toBeUndefined();
+  });
+
+  it('AC-044 — 답장 받은 건은 businessDaysElapsed:null·reminderSuggested:false로 응답한다', async () => {
+    mockResolveSession.mockResolvedValue({ userId: 'user-1', client: fakeClient });
+    mockFetchSentMessages.mockResolvedValue([
+      {
+        id: 'msg-2',
+        recipient: 'boss@example.com',
+        recipientCountry: 'KR',
+        recipientTimezone: 'Asia/Seoul',
+        finalText: '확인했습니다.',
+        urgency: 'NORMAL',
+        sentAt: '2026-08-01T00:00:00Z',
+        replied: true,
+        repliedMarkedAt: '2026-08-02T00:00:00Z',
+        isReminder: false,
+        mediationApplied: true,
+      },
+    ]);
+
+    const response = await GET(getRequest());
+    const body = await response.json();
+
+    expect(body.items[0]).toMatchObject({
+      id: 'msg-2',
+      businessDaysElapsed: null,
+      reminderSuggested: false,
+    });
+  });
+
+  it('세션이 없으면 401 AUTH_REQUIRED를 반환하고 조회하지 않는다', async () => {
+    mockResolveSession.mockResolvedValue(null);
+
+    const response = await GET(getRequest());
+
+    expect(response.status).toBe(401);
+    expect(mockFetchSentMessages).not.toHaveBeenCalled();
   });
 });
