@@ -1,7 +1,7 @@
 # Tasks — 크로스보더 협업 중재 서비스
 
 Owner: planner (see AGENTS.md). Status values: `todo` / `in-progress` / `review` / `done` / `absorbed`(신규 v4.7, PRD Planning Decision #129 — "범위가 다른 태스크에 흡수되어 잔여 구현 0건. 착수하지 않으며 QA 게이트는 흡수한 행에서 수행한다". P2 코드 태스크 분모 카운트에서 제외한다 — 아래 Rules 조건 ④ 참조).
-기준 PRD: **docs/PRD.md v4.7** (2026-08-11). 부속 문서(planner 소유, **AGENTS.md 소유표 등재 완료**): `docs/TestCases.md` **v1.8** · `docs/DemoScript.md` v2.9. 신규 부속 산출물(DS 소유): `docs/Presentation.md` v1.0(T37 초안).
+기준 PRD: **docs/PRD.md v4.8** (2026-08-11). 부속 문서(planner 소유, **AGENTS.md 소유표 등재 완료**): `docs/TestCases.md` **v1.8** · `docs/DemoScript.md` v2.9. 신규 부속 산출물(DS 소유): `docs/Presentation.md` v1.0(T37 초안).
 
 > ✅ **v4.53 반영 요약(T68 구현 완료 — Status `todo` → `review`. 신규 태스크 0건 · 신규 AC 0건 · 기존 AC 조건 변경 0건 · 우선순위 변경 0건 · Status 변경 1건)**: `POST /api/enrichment/observe`(신규, T64가 남긴 착수 전제) + `POST /api/enrichment/suggest`(신규, LLM 호출, `packages/core/src/steps/suggest.ts`). **사용자 확인 후 제안 축을 4개에서 1개(이모지)로 축소** — `observe` 응답 계약(API.md 고정 4-key)이 이모지 축만 방어 가능한 근거이고, 나머지(직설↔코멘트길이, 마감↔응답지연)는 이 리포가 이미 금지한 억지 매핑, 호칭은 대응 지표 자체가 없음. T71 확장 지표를 쓰면 가능하지만 그러려면 API.md 계약을 벗어나야 해 계약을 그대로 따르는 쪽으로 확정(architect가 계약을 넓히면 확장 가능한 구조). 임계값은 T64/T71에서 이미 실측 확정된 기존 상수 재사용(원문의 "잠정 하한 30건"은 stale). 신규 테스트 25건, 전체(웹+코어+확장) 1424/1424 통과, typecheck·lint 클린. 상세는 T68 행 각주 참조.
 >
