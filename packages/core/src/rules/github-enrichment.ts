@@ -74,6 +74,17 @@ export function computeActivityHourHistogram(
  * `null`을 돌려준다 — 미등록 케이스에서 추측값을 만들지 않는다(AC-065⑤와 동일 원칙).
  */
 export function deriveActivityTimeCandidate(histogram: number[] | null): string | null {
+  const peakHour = derivePeakActivityHour(histogram);
+  if (peakHour === null) return null;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const nextHour = (peakHour + 1) % 24;
+  return `UTC ${pad(peakHour)}:00–${pad(nextHour)}:00`;
+}
+
+/** T68 — `POST /api/enrichment/observe`의 `activityHours` 지표 값(숫자 하나, 0~23시 UTC)이 이
+ * 함수를 그대로 재사용한다 — `deriveActivityTimeCandidate()`의 최빈 시(hour) 계산과 같은 값을
+ * 두 곳에서 따로 구하지 않는다(T26/T27 "계산 중복 회피" 선례와 같은 원칙). */
+export function derivePeakActivityHour(histogram: number[] | null): number | null {
   if (histogram === null) return null;
   let peakHour = 0;
   let peakCount = histogram[0] ?? 0;
@@ -84,8 +95,5 @@ export function deriveActivityTimeCandidate(histogram: number[] | null): string 
       peakCount = count;
     }
   }
-  if (peakCount === 0) return null;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const nextHour = (peakHour + 1) % 24;
-  return `UTC ${pad(peakHour)}:00–${pad(nextHour)}:00`;
+  return peakCount === 0 ? null : peakHour;
 }

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { computeIndicatorDeltas } from './indicators';
+import {
+  computeIndicatorDeltas,
+  computeObserveIndicators,
+  type ComputeObserveIndicatorsInput,
+} from './indicators';
 
 describe('computeIndicatorDeltas — AC-080④, T71', () => {
   it('문장 수 — 마침표/느낌표/물음표/줄바꿈으로 나눈다', () => {
@@ -50,5 +54,91 @@ describe('computeIndicatorDeltas — AC-080④, T71', () => {
     expect(Object.keys(result).sort()).toEqual(
       ['addressFormKind', 'charCount', 'deadlineMentionKind', 'emojiCount', 'hedgeCount', 'sentenceCount'].sort(),
     );
+  });
+});
+
+const EMPTY_OBSERVE_INPUT: ComputeObserveIndicatorsInput = {
+  manual: { sampleCount: 0, sentenceCountSum: 0, emojiCountSum: 0 },
+  github: { sampleCount: 0, sentenceCountSum: 0, emojiCountSum: 0 },
+  activityHourHistogram: null,
+  activitySampleCount: 0,
+};
+
+describe('computeObserveIndicators — AC-072, T68', () => {
+  it('4개 키를 항상 전부 반환한다(표본이 전혀 없어도)', () => {
+    const result = computeObserveIndicators(EMPTY_OBSERVE_INPUT);
+    expect(result.map((r) => r.key)).toEqual(['commentLength', 'emojiFrequency', 'responseDelay', 'activityHours']);
+  });
+
+  it('표본이 없으면 value:null·sampleCount:0이다(지어내지 않는다)', () => {
+    const [commentLength, emojiFrequency] = computeObserveIndicators(EMPTY_OBSERVE_INPUT);
+    expect(commentLength).toMatchObject({ value: null, sampleCount: 0 });
+    expect(emojiFrequency).toMatchObject({ value: null, sampleCount: 0 });
+  });
+
+  it('commentLength — 두 출처 표본을 합쳐 평균 문장 수를 계산한다', () => {
+    const input: ComputeObserveIndicatorsInput = {
+      ...EMPTY_OBSERVE_INPUT,
+      manual: { sampleCount: 2, sentenceCountSum: 6, emojiCountSum: 0 },
+      github: { sampleCount: 3, sentenceCountSum: 9, emojiCountSum: 0 },
+    };
+    const [commentLength] = computeObserveIndicators(input);
+    expect(commentLength).toEqual({
+      key: 'commentLength',
+      value: 3, // (6+9)/(2+3)
+      sampleCount: 5,
+      sampleCountBySource: { manual: 2, github: 3 },
+    });
+  });
+
+  it('emojiFrequency — 두 출처 표본을 합쳐 평균 이모지 개수를 계산한다', () => {
+    const input: ComputeObserveIndicatorsInput = {
+      ...EMPTY_OBSERVE_INPUT,
+      manual: { sampleCount: 4, sentenceCountSum: 0, emojiCountSum: 2 },
+      github: { sampleCount: 0, sentenceCountSum: 0, emojiCountSum: 0 },
+    };
+    const [, emojiFrequency] = computeObserveIndicators(input);
+    expect(emojiFrequency).toEqual({
+      key: 'emojiFrequency',
+      value: 0.5,
+      sampleCount: 4,
+      sampleCountBySource: { manual: 4, github: 0 },
+    });
+  });
+
+  it('responseDelay — 계산할 데이터가 없어 항상 null/0이다(지어내지 않는다)', () => {
+    const input: ComputeObserveIndicatorsInput = {
+      ...EMPTY_OBSERVE_INPUT,
+      manual: { sampleCount: 10, sentenceCountSum: 20, emojiCountSum: 5 },
+    };
+    const [, , responseDelay] = computeObserveIndicators(input);
+    expect(responseDelay).toEqual({
+      key: 'responseDelay',
+      value: null,
+      sampleCount: 0,
+      sampleCountBySource: { manual: 0, github: 0 },
+    });
+  });
+
+  it('activityHours — recipient_enrichments의 히스토그램에서 최빈 시간대를 뽑는다(GitHub 전용)', () => {
+    const histogram = new Array<number>(24).fill(0);
+    histogram[14] = 20;
+    const input: ComputeObserveIndicatorsInput = {
+      ...EMPTY_OBSERVE_INPUT,
+      activityHourHistogram: histogram,
+      activitySampleCount: 30,
+    };
+    const [, , , activityHours] = computeObserveIndicators(input);
+    expect(activityHours).toEqual({
+      key: 'activityHours',
+      value: 14,
+      sampleCount: 30,
+      sampleCountBySource: { manual: 0, github: 30 },
+    });
+  });
+
+  it('activityHours — 히스토그램이 null(표본 부족)이면 value가 null이다', () => {
+    const [, , , activityHours] = computeObserveIndicators(EMPTY_OBSERVE_INPUT);
+    expect(activityHours.value).toBeNull();
   });
 });

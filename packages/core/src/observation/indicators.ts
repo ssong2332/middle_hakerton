@@ -23,6 +23,7 @@
  * 객관적으로 계산 가능해 이번에 구현한다.
  */
 import { countCushionPhrases, countEmoji } from '../rules/pattern-detection';
+import { derivePeakActivityHour } from '../rules/github-enrichment';
 
 export interface IndicatorDeltas {
   /** 문장 수 — `.`/`!`/`?`/줄바꿈으로 끊은 뒤 빈 조각을 제외한 개수. */
@@ -66,4 +67,77 @@ export function computeIndicatorDeltas(text: string): IndicatorDeltas {
     addressFormKind: null,
     deadlineMentionKind: null,
   };
+}
+
+/**
+ * T68 — `docs/API.md:317` `POST /api/enrichment/observe` Response의 `indicators[]`. 🔴 이
+ * 함수가 만드는 4개 키는 `IndicatorDeltas`의 6개 필드와 **이름도 목적도 다르다** — `AC-072`가
+ * 정의하는 "관측 단계 1" 지표 세트(코멘트 길이/이모지 빈도/응답 지연/활동 시간대)이고,
+ * `IndicatorDeltas`는 `AC-080④`가 정의하는 "#24 규약 축과 직접 매핑되는" 확장 지표 세트다 —
+ * 이 리포에 지표 정의가 의도적으로 두 벌 존재한다(하나로 합치면 `POST /api/enrichment/observe`의
+ * 고정된 4-key 응답 계약을 어기게 된다, `apps/web/app/api/enrichment/observe/route.ts` 헤더
+ * 주석 참조).
+ *
+ * 🔴 **`responseDelay`는 항상 `value: null, sampleCount: 0`이다** — 이 지표를 계산할 데이터가
+ * `observation_samples.indicator_deltas`에도 없다(6개 필드 중 없음). 지어내지 않는다.
+ */
+export interface ObserveIndicator {
+  key: 'commentLength' | 'emojiFrequency' | 'responseDelay' | 'activityHours';
+  value: number | null;
+  sampleCount: number;
+  sampleCountBySource: { manual: number; github: number };
+}
+
+export interface ObserveIndicatorSourceTotals {
+  sampleCount: number;
+  sentenceCountSum: number;
+  emojiCountSum: number;
+}
+
+export interface ComputeObserveIndicatorsInput {
+  manual: ObserveIndicatorSourceTotals;
+  github: ObserveIndicatorSourceTotals;
+  /** `recipient_enrichments.activity_hour_histogram`(T64) — `observation_samples`가 아니라
+   * 별도 테이블에서 온다(GitHub 전용 경로, 아직 수동 표시 쪽 활동 시간대 데이터가 없다). */
+  activityHourHistogram: number[] | null;
+  activitySampleCount: number;
+}
+
+function average(sum: number, count: number): number | null {
+  return count === 0 ? null : sum / count;
+}
+
+export function computeObserveIndicators(input: ComputeObserveIndicatorsInput): ObserveIndicator[] {
+  const totalSampleCount = input.manual.sampleCount + input.github.sampleCount;
+  const sampleCountBySource = { manual: input.manual.sampleCount, github: input.github.sampleCount };
+
+  const commentLength: ObserveIndicator = {
+    key: 'commentLength',
+    value: average(input.manual.sentenceCountSum + input.github.sentenceCountSum, totalSampleCount),
+    sampleCount: totalSampleCount,
+    sampleCountBySource,
+  };
+
+  const emojiFrequency: ObserveIndicator = {
+    key: 'emojiFrequency',
+    value: average(input.manual.emojiCountSum + input.github.emojiCountSum, totalSampleCount),
+    sampleCount: totalSampleCount,
+    sampleCountBySource,
+  };
+
+  const responseDelay: ObserveIndicator = {
+    key: 'responseDelay',
+    value: null,
+    sampleCount: 0,
+    sampleCountBySource: { manual: 0, github: 0 },
+  };
+
+  const activityHours: ObserveIndicator = {
+    key: 'activityHours',
+    value: derivePeakActivityHour(input.activityHourHistogram),
+    sampleCount: input.activitySampleCount,
+    sampleCountBySource: { manual: 0, github: input.activitySampleCount },
+  };
+
+  return [commentLength, emojiFrequency, responseDelay, activityHours];
 }
