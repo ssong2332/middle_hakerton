@@ -316,4 +316,72 @@ describe('RecipientPanel', () => {
     fireEvent.click(link);
     expect(onConvertToTicket).toHaveBeenCalledTimes(1);
   });
+
+  // T40/AC-005 — "Set response deadline"은 ticketOffered와 같은 부재-비활성 패턴.
+  it('T40 — deadlineNegotiationAvailable이 false면(기본값) 진입 버튼이 렌더되지 않는다', () => {
+    render(
+      <RecipientPanel
+        hasResult={true}
+        isStale={false}
+        finalText="Please confirm by tomorrow."
+        onFinalTextChange={vi.fn()}
+        onApprove={vi.fn()}
+        approveStatus="idle"
+        sentAt={null}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Set response deadline' })).toBeNull();
+  });
+
+  it('T40 — deadlineNegotiationAvailable이 true면 진입 버튼이 렌더되고 클릭 시 콜백을 호출한다', () => {
+    const onOpen = vi.fn();
+    render(
+      <RecipientPanel
+        hasResult={true}
+        isStale={false}
+        deadlineNegotiationAvailable={true}
+        onOpenDeadlineNegotiation={onOpen}
+        finalText="Please confirm by tomorrow."
+        onFinalTextChange={vi.fn()}
+        onApprove={vi.fn()}
+        approveStatus="idle"
+        sentAt={null}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: 'Set response deadline' });
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('T40 — confirmedDeadline이 있으면 참고용으로 표시된다(값이 없으면 아무것도 렌더하지 않는다)', () => {
+    const { rerender } = render(
+      <RecipientPanel
+        hasResult={true}
+        isStale={false}
+        finalText="Please confirm by tomorrow."
+        onFinalTextChange={vi.fn()}
+        onApprove={vi.fn()}
+        approveStatus="idle"
+        sentAt={null}
+      />,
+    );
+    expect(screen.queryByText(/참고 응답 기한/)).toBeNull();
+
+    rerender(
+      <RecipientPanel
+        hasResult={true}
+        isStale={false}
+        confirmedDeadline="2026-08-20T09:00:00Z"
+        finalText="Please confirm by tomorrow."
+        onFinalTextChange={vi.fn()}
+        onApprove={vi.fn()}
+        approveStatus="idle"
+        sentAt={null}
+      />,
+    );
+    expect(screen.getByText(/참고 응답 기한/)).toBeTruthy();
+  });
 });

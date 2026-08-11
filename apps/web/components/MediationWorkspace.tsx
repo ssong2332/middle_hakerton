@@ -9,6 +9,7 @@ import {
   TICKET_RESTORE_SESSION_KEY,
 } from '../lib/ticket-draft';
 import { RecipientPanel } from './RecipientPanel';
+import { ResponseDeadlineModal } from './ResponseDeadlineModal';
 import { SenderPanel } from './SenderPanel';
 import styles from './MediationWorkspace.module.css';
 
@@ -119,6 +120,12 @@ export function MediationWorkspace() {
   const [approvalSnapshot, setApprovalSnapshot] = useState<ApprovalSnapshot | null>(null);
   const [approveStatus, setApproveStatus] = useState<ApproveStatus>('idle');
   const [sentAt, setSentAt] = useState<string | null>(null);
+  // T40/UX-005 — 협상 모달 open 여부 + 확정된 기한(참고 표시용, `docs/UX.md:464` "chosen deadline
+  // attached to the message" — 이 리포에 그 값을 실을 스키마 필드가 없어(AC-005/AC-036의 요구는
+  // "표시 + 자동 변경 금지"뿐, 저장·전송 필드는 명시돼 있지 않다) 클라이언트 로컬 표시로 범위를
+  // 좁혔다, `ResponseDeadlineModal.tsx` 헤더 주석과 같은 스코프 결정).
+  const [deadlineModalOpen, setDeadlineModalOpen] = useState(false);
+  const [confirmedDeadline, setConfirmedDeadline] = useState<string | null>(null);
   // MJ-4(reviewer 재검토, Major 1 → 수정) — Idempotency-Key는 "승인 시도 하나"의 정체성(스냅샷 +
   // 최종문)에 묶여 한 번만 생성돼야 한다. `handleApprove` 안에서 매번 `crypto.randomUUID()`를
   // 부르면 응답 유실 후 재시도마다 새 키가 나가 서버의 멱등성 백스톱이 아무것도 막지 못하고
@@ -176,6 +183,11 @@ export function MediationWorkspace() {
   // 재실행이 실패해도(status가 'error'로 바뀌어도) 직전 성공 결과의 스냅샷은 남아 있으므로
   // 승인 가능 상태가 유지된다(`docs/UX.md` UX-004 Failure).
   const hasResult = approvalSnapshot !== null;
+  // T40/AC-005 — CRITICAL 메시지에서는 진입 버튼 자체가 렌더되지 않는다(부재-비활성 원칙,
+  // `ticketOffered`와 같은 판정 형태). 아직 실행 결과가 없으면(`hasResult===false`) 당연히
+  // 렌더하지 않는다 — 어떤 긴급도인지도 모른다.
+  const deadlineNegotiationAvailable =
+    hasResult && displayedUrgency !== null && displayedUrgency !== 'CRITICAL';
   // M2(reviewer 최종 APPROVED, Major 비차단 → 수정) — 재실행이 진행 중일 때(`status==='loading'`)
   // 그 사이 승인이 성공하면, 재실행 완료 후 스냅샷이 새 결과로 교체되어 "발송됨" 표시와 함께
   // 실제로 전송되지 않은 값이 남는 불일치가 생긴다(`docs/UX.md` UX-004 Validation "disabled
@@ -434,10 +446,26 @@ export function MediationWorkspace() {
               sentAt={sentAt}
               ticketOffered={hasResult && result?.ticketOption.offered === true}
               onConvertToTicket={handleConvertToTicket}
+              deadlineNegotiationAvailable={deadlineNegotiationAvailable}
+              onOpenDeadlineNegotiation={() => setDeadlineModalOpen(true)}
+              confirmedDeadline={confirmedDeadline}
             />
           </div>
         </div>
       </div>
+      {/* T40/UX-005 — `deadlineNegotiationAvailable`이 false로 바뀌어도(예: 재실행으로 CRITICAL로
+          바뀜) 이미 열려 있던 모달은 렌더 게이트로 강제로 닫지 않는다 — 사용자가 진행 중인
+          입력을 잃지 않게 `onClose`로만 닫는다. `urgency`는 열린 시점 기준 `displayedUrgency`이며,
+          모달이 열려 있으려면 `deadlineNegotiationAvailable`이 true였던 시점이 있어야 하므로
+          non-null·non-CRITICAL이 보장된다. */}
+      {deadlineModalOpen && displayedUrgency !== null && (
+        <ResponseDeadlineModal
+          open={deadlineModalOpen}
+          urgency={displayedUrgency}
+          onClose={() => setDeadlineModalOpen(false)}
+          onConfirm={setConfirmedDeadline}
+        />
+      )}
     </div>
   );
 }

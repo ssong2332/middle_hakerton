@@ -1,0 +1,129 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal {
+  background: var(--color-surface);
+  border: 1px solid var(--border-strong);
+  padding: 24px;
+  width: min(480px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 12px;
+}
+
+.title {
+  font: 800 16px var(--font-sans);
+  margin-bottom: 4px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.field label {
+  font: 700 11px var(--font-sans);
+}
+
+.field input,
+.field select {
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-thin);
+  font: 400 13px var(--font-sans);
+}
+
+.fieldRow {
+  display: flex;
+  gap: 12px;
+}
+
+.fieldRow .field {
+  flex: 1;
+}
+
+.sectionLabel {
+  font: 700 11px var(--font-sans);
+  margin-top: 4px;
+}
+
+.sectionHint {
+  font: 400 11px var(--font-sans);
+  color: var(--text-muted-60);
+}
+
+.errorText {
+  font: 400 11px var(--font-sans);
+  color: var(--color-danger-text);
+}
+
+.submitButton {
+  min-height: 44px;
+  padding: 8px 14px;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  font: 800 12px var(--font-sans);
+}
+
+.submitButton:disabled {
+  opacity: 0.45;
+}
+
+.resultBox {
+  border: 1px solid var(--border-thin);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.offerList {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.offerList legend {
+  font: 700 11px var(--font-sans);
+  padding: 0;
+}
+
+.offerItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 12px var(--font-sans);
+}
+
+.confirmButton {
+  min-height: 44px;
+  padding: 6px 12px;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  font: 700 12px var(--font-sans);
+  justify-self: start;
+}
+
+.confirmButton:disabled {
+  opacity: 0.45;
+}
+
+.cancelButton {
+  min-height: 44px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--border-thin);
+  font: 700 12px var(--font-sans);
+  justify-self: start;
+}
