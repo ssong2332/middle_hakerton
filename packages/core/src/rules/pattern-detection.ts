@@ -28,7 +28,9 @@ export type DiffPatternKey = 'emoji_removed' | 'cushion_insert';
  */
 const EMOJI_PATTERN = /\p{Extended_Pictographic}/gu;
 
-function countEmoji(text: string): number {
+/** T71 — `observation/indicators.ts`의 `emojiCount` 지표가 이 함수를 그대로 재사용한다(같은
+ * 이모지 판정을 두 곳에서 따로 구현하지 않는다, T26/T27 "계산 중복 회피" 선례와 같은 원칙). */
+export function countEmoji(text: string): number {
   return text.match(EMOJI_PATTERN)?.length ?? 0;
 }
 
@@ -38,7 +40,7 @@ function countEmoji(text: string): number {
  * 이 배열에 추가한다. 목록은 실제 비즈니스 이메일/메시지에서 흔히 쓰이는 요청 앞 완충구로
  * 한정했다.
  */
-const CUSHION_PHRASES = [
+export const CUSHION_PHRASES = [
   '혹시',
   '괜찮으시다면',
   '괜찮으시면',
@@ -60,6 +62,13 @@ function hasCushionInsert(aiText: string, finalText: string): boolean {
   return CUSHION_PHRASES.some(
     (phrase) => countOccurrences(finalText, phrase) > countOccurrences(aiText, phrase),
   );
+}
+
+/** T71 — `observation/indicators.ts`의 `hedgeCount` 지표가 이 목록을 그대로 재사용한다(diff
+ * 비교가 아니라 텍스트 1건에서 완충 표현이 몇 번 나오는지 총합만 센다 — `hasCushionInsert`와
+ * 달리 boolean이 아니라 개수를 돌려준다). 새 목록을 따로 만들지 않는다. */
+export function countCushionPhrases(text: string): number {
+  return CUSHION_PHRASES.reduce((total, phrase) => total + countOccurrences(text, phrase), 0);
 }
 
 /**

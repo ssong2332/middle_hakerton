@@ -10,7 +10,7 @@ vi.mock('./token-storage', () => ({
 }));
 
 import { getStoredToken } from './token-storage';
-import { callMediationApi, MEDIATE_REQUEST_MESSAGE_TYPE } from './api';
+import { addSample, callMediationApi, MEDIATE_REQUEST_MESSAGE_TYPE, SAMPLE_ADD_REQUEST_MESSAGE_TYPE } from './api';
 
 const mockedGetStoredToken = vi.mocked(getStoredToken);
 
@@ -170,5 +170,106 @@ describe('callMediationApi', () => {
     if (!result.ok) {
       expect(result.reason).toBe('request-failed');
     }
+  });
+});
+
+// T71(AC-080/081) — `addSample`. `callMediationApi`와 정확히 같은 패턴(토큰 확인 → sendMessage
+// 위임 → 응답 검증)이라 같은 테스트 형태를 그대로 따른다.
+describe('addSample', () => {
+  let sendMessageMock: ReturnType<typeof vi.fn>;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  const REQUEST_BODY = {
+    counterpart: 'boss@example.com',
+    source: 'manual' as const,
+    indicatorDeltas: {
+      sentenceCount: 2,
+      emojiCount: 0,
+      charCount: 20,
+      hedgeCount: 1,
+      addressFormKind: null,
+      deadlineMentionKind: null,
+    },
+    collectedAt: '2026-08-11T09:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    sendMessageMock = vi.fn();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('chrome', { runtime: { sendMessage: sendMessageMock } });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it('토큰이 없으면 background에 메시지조차 보내지 않고 not-logged-in을 반환한다', async () => {
+    mockedGetStoredToken.mockResolvedValue(null);
+
+    const result = await addSample(REQUEST_BODY);
+
+    expect(result).toEqual({ ok: false, reason: 'not-logged-in' });
+    expect(sendMessageMock).not.toHaveBeenCalled();
+  });
+
+  it('직접 fetch하지 않고 sendMessage로만 위임한다', async () => {
+    mockedGetStoredToken.mockResolvedValue('tok-abc');
+    sendMessageMock.mockResolvedValue({
+      ok: true,
+      data: { id: 's-1', counterpart: 'boss@example.com', source: 'manual', collectedAt: REQUEST_BODY.collectedAt },
+    });
+
+    await addSample(REQUEST_BODY);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMessageMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('cbm:sample-add-request 메시지에 요청 body를 그대로 담아 보낸다(원문 텍스트 필드가 없다)', async () => {
+    mockedGetStoredToken.mockResolvedValue('tok-abc');
+    sendMessageMock.mockResolvedValue({
+      ok: true,
+      data: { id: 's-1', counterpart: 'boss@example.com', source: 'manual', collectedAt: REQUEST_BODY.collectedAt },
+    });
+
+    await addSample(REQUEST_BODY);
+
+    expect(sendMessageMock).toHaveBeenCalledWith({
+      type: SAMPLE_ADD_REQUEST_MESSAGE_TYPE,
+      body: REQUEST_BODY,
+    });
+    const sentPayload = JSON.stringify(sendMessageMock.mock.calls[0][0]);
+    expect(sentPayload).not.toMatch(/rawText|excerpt|quote/i);
+  });
+
+  it('getStoredToken이 reject해도 not-logged-in으로 빠진다', async () => {
+    mockedGetStoredToken.mockRejectedValue(new Error('storage access error'));
+
+    const result = await addSample(REQUEST_BODY);
+
+    expect(result).toEqual({ ok: false, reason: 'not-logged-in' });
+    expect(sendMessageMock).not.toHaveBeenCalled();
+  });
+
+  it('sendMessage 자체가 실패하면 request-failed를 반환한다', async () => {
+    mockedGetStoredToken.mockResolvedValue('tok-abc');
+    sendMessageMock.mockRejectedValue(new Error('no receiving end'));
+
+    const result = await addSample(REQUEST_BODY);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('request-failed');
+  });
+
+  it('background 응답이 판별 불가능한 형태면 request-failed를 반환한다', async () => {
+    mockedGetStoredToken.mockResolvedValue('tok-abc');
+    sendMessageMock.mockResolvedValue(undefined);
+
+    const result = await addSample(REQUEST_BODY);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('request-failed');
   });
 });
