@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * 상시 내비게이션 바 — T73③(`docs/Tasks.md` T73 row), `docs/UX.md:893`. 항목 순서·문구는
  * `docs/UX.md:893`를 **그대로** 쓴다: Mediate | Profile | Terminology | Pair Protocols |
