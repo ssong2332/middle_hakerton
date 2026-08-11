@@ -26,6 +26,22 @@
   margin-top: 2px;
 }
 
+.enrichmentLink {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  margin-top: 4px;
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font: 700 12px var(--font-sans);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .lengthCounter {
   font: 400 11px var(--font-sans);
   color: var(--text-muted-75);

@@ -14,7 +14,9 @@ import type { ProtocolPutRequest } from './schema';
  */
 const PAIR_KEY_SEPARATOR = '';
 
-function computePairKey(a: string, b: string): string {
+/** T65 — AC-078 링크 표시 판정(`docs/Database.md:233` SQL)이 같은 `pair_key` 계산을 재사용한다
+ * (T26/T27 선례가 경고한 "같은 계산의 중복" 회피 — `apps/web/app/api/enrichment/route.ts` 참조). */
+export function computePairKey(a: string, b: string): string {
   const [first, second] = [a.toLowerCase(), b.toLowerCase()].sort();
   return `${first}${PAIR_KEY_SEPARATOR}${second}`;
 }

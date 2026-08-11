@@ -613,3 +613,35 @@ describe('SenderPanel — T54 HolidayConflict', () => {
     expect(screen.queryByText(/한국/)).toBeNull();
   });
 });
+
+// T65/AC-078 — "상대방 정보 보강" 링크는 부모가 넘긴 `enrichmentLinkVisible`로만 렌더 여부가
+// 갈린다(부재-비활성 원칙, ticketOffered/deadlineNegotiationAvailable과 같은 형태).
+describe('SenderPanel — T65 상대방 정보 보강 링크(AC-078)', () => {
+  it('enrichmentLinkVisible이 기본값(false)이면 링크를 렌더하지 않는다', () => {
+    render(<SenderPanel {...baseProps()} recipient="boss@example.com" />);
+
+    expect(screen.queryByRole('button', { name: '상대방 정보 보강' })).toBeNull();
+  });
+
+  it('enrichmentLinkVisible이 true면 링크를 렌더한다', () => {
+    render(<SenderPanel {...baseProps()} recipient="boss@example.com" enrichmentLinkVisible />);
+
+    expect(screen.getByRole('button', { name: '상대방 정보 보강' })).toBeTruthy();
+  });
+
+  it('클릭하면 onOpenEnrichment가 호출된다', () => {
+    const onOpenEnrichment = vi.fn();
+    render(
+      <SenderPanel
+        {...baseProps()}
+        recipient="boss@example.com"
+        enrichmentLinkVisible
+        onOpenEnrichment={onOpenEnrichment}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '상대방 정보 보강' }));
+
+    expect(onOpenEnrichment).toHaveBeenCalledTimes(1);
+  });
+});

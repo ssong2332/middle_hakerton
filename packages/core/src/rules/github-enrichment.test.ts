@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeActivityHourHistogram, extractProfileFields } from './github-enrichment';
+import { computeActivityHourHistogram, deriveActivityTimeCandidate, extractProfileFields } from './github-enrichment';
 
 describe('extractProfileFields — AC-065⑤', () => {
   it('location/company를 그대로 추출한다', () => {
@@ -83,5 +83,35 @@ describe('computeActivityHourHistogram — AC-071②/AC-072③', () => {
     const timestamps = Array.from({ length: 30 }, (_, i) => isoAt(9, i));
     const result = computeActivityHourHistogram(timestamps);
     expect(result.histogram).not.toBeNull();
+  });
+});
+
+describe('deriveActivityTimeCandidate — AC-071①③', () => {
+  it('histogram이 null(표본 부족)이면 후보를 만들지 않는다', () => {
+    expect(deriveActivityTimeCandidate(null)).toBeNull();
+  });
+
+  it('최빈 시간대를 UTC 범위 문구로 반환한다', () => {
+    const histogram = new Array<number>(24).fill(0);
+    histogram[9] = 20;
+    histogram[14] = 10;
+    expect(deriveActivityTimeCandidate(histogram)).toBe('UTC 09:00–10:00');
+  });
+
+  it('동률이면 더 이른 시(hour)를 택한다(결정적)', () => {
+    const histogram = new Array<number>(24).fill(0);
+    histogram[3] = 15;
+    histogram[20] = 15;
+    expect(deriveActivityTimeCandidate(histogram)).toBe('UTC 03:00–04:00');
+  });
+
+  it('23시가 최빈이면 다음 시간대는 자정으로 넘어간다(00:00)', () => {
+    const histogram = new Array<number>(24).fill(0);
+    histogram[23] = 5;
+    expect(deriveActivityTimeCandidate(histogram)).toBe('UTC 23:00–00:00');
+  });
+
+  it('전부 0건이면(이론상 도달 불가하지만 방어적으로) null을 반환한다', () => {
+    expect(deriveActivityTimeCandidate(new Array<number>(24).fill(0))).toBeNull();
   });
 });
