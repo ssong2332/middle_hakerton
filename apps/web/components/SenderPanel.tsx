@@ -51,6 +51,21 @@ export interface SenderPanelProps {
   holidayConflicts?: MediationResult['holidayConflicts'];
   /** "기한 재협상" 클릭 시 호출된다 — 모달을 그 기한으로 여는 것은 부모의 책임이다. */
   onNegotiateDeadline?: (deadlineIso: string) => void;
+  /**
+   * 🔴 T65/AC-078 — "상대방 정보 보강" 링크 렌더 가능 여부. `GET /api/enrichment`가 계산한
+   * `showEnrichmentLink`을 부모가 그대로 넘긴다 — 이 컴포넌트는 판정하지 않는다(회원 여부가
+   * 아니라 규약·보강 정보 존재 여부로 판정, AC-078② — `MediationWorkspace`의 몫). `ticketOffered`/
+   * `deadlineNegotiationAvailable`과 같은 부재-비활성 원칙 — `false`면 링크 자체를 렌더하지
+   * 않는다(비활성화가 아니다). 기본값 `false` — 기존 호출부를 깨지 않기 위한 선택적 prop이다.
+   */
+  enrichmentLinkVisible?: boolean;
+  /** 링크 클릭 시 호출된다 — 모달을 여는 것은 부모(`MediationWorkspace`)의 책임이다.
+   * `enrichmentLinkVisible=true`일 때만 실제로 렌더·호출된다. */
+  onOpenEnrichment?: () => void;
+  /** 🔴 T65/AC-078 — "받는 사람" 필드가 blur될 때 호출된다(`docs/UX.md:909`의 기존 "첫 blur"
+   * 검증 트리거를 재사용 — `MediationWorkspace.tsx`의 `handleRecipientBlur` 헤더 주석 참조).
+   * `enrichmentLinkVisible`을 갱신하는 것은 부모의 책임이다. */
+  onRecipientBlur?: () => void;
 }
 
 /**
@@ -75,6 +90,9 @@ export function SenderPanel({
   originalTextSnapshot,
   holidayConflicts = [],
   onNegotiateDeadline,
+  enrichmentLinkVisible = false,
+  onOpenEnrichment,
+  onRecipientBlur,
 }: SenderPanelProps) {
   const trimmedRecipient = recipient.trim();
   const recipientFormatInvalid = trimmedRecipient !== '' && !isValidEmailFormat(trimmedRecipient);
@@ -94,9 +112,18 @@ export function SenderPanel({
           type="text"
           value={recipient}
           onChange={(event) => onRecipientChange(event.target.value)}
+          onBlur={() => onRecipientBlur?.()}
         />
         {recipientFormatInvalid && (
           <p className={styles.fieldError}>받는 사람은 이메일 형식이어야 합니다.</p>
+        )}
+        {/* T65/AC-078 — `enrichmentLinkVisible`이 false면 이 블록 자체가 렌더되지 않는다
+            (ticketOffered와 같은 미렌더 원칙, "Entry" 위치는 `docs/UX.md:821` "next to the
+            recipient identifier field on UX-004"). */}
+        {enrichmentLinkVisible && (
+          <button type="button" className={styles.enrichmentLink} onClick={() => onOpenEnrichment?.()}>
+            상대방 정보 보강
+          </button>
         )}
       </div>
 

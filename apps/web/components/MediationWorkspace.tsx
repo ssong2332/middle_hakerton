@@ -8,6 +8,8 @@ import {
   TICKET_DRAFT_SESSION_KEY,
   TICKET_RESTORE_SESSION_KEY,
 } from '../lib/ticket-draft';
+import { isValidEmailFormat } from '../lib/validate-email';
+import { RecipientEnrichmentModal } from './RecipientEnrichmentModal';
 import { RecipientPanel } from './RecipientPanel';
 import { ResponseDeadlineModal } from './ResponseDeadlineModal';
 import { SenderPanel } from './SenderPanel';
@@ -129,6 +131,11 @@ export function MediationWorkspace() {
   // T54 — "기한 재협상" 링크(HolidayConflictWarning)로 열렸을 때만 채워지는 값. "Set response
   // deadline" 버튼으로 여는 일반 경로는 `null`을 넘겨(prefill 없음) 빈 필드로 시작한다.
   const [deadlinePrefill, setDeadlinePrefill] = useState<string | null>(null);
+  // T65/AC-078 — "상대방 정보 보강" 링크 표시 여부. `recipient`가 유효한 이메일로 바뀔 때마다
+  // `GET /api/enrichment`(AC-078 판정)를 다시 물어 갱신한다 — 링크는 서버가 계산한 이 값이
+  // true일 때만 렌더된다(`SenderPanel`은 판정하지 않는다, 부재-비활성 원칙).
+  const [enrichmentLinkVisible, setEnrichmentLinkVisible] = useState(false);
+  const [enrichmentModalOpen, setEnrichmentModalOpen] = useState(false);
   // MJ-4(reviewer 재검토, Major 1 → 수정) — Idempotency-Key는 "승인 시도 하나"의 정체성(스냅샷 +
   // 최종문)에 묶여 한 번만 생성돼야 한다. `handleApprove` 안에서 매번 `crypto.randomUUID()`를
   // 부르면 응답 유실 후 재시도마다 새 키가 나가 서버의 멱등성 백스톱이 아무것도 막지 못하고
@@ -384,6 +391,28 @@ export function MediationWorkspace() {
     }
   }
 
+  // T65/AC-078 — "받는 사람" 필드가 blur될 때(=`docs/UX.md:909`가 이미 확립한 검증 트리거 시점,
+  // "at first blur or first submit attempt"와 같은 지점 재사용) 유효한 이메일이면 링크 표시
+  // 여부를 다시 묻는다. 매 keystroke마다(useEffect+recipient 의존성) 호출하는 대신 blur 이벤트로
+  // 묶은 이유 — ① 이 프로젝트가 이미 확립한 "첫 blur 시점" 검증 관례를 그대로 재사용해 새 타이밍
+  // 규칙을 만들지 않는다. ② keystroke마다 걸리는 디바운스 타이머는 기존 테스트 스위트(수십 건,
+  // `fetchMock`이 알려지지 않은 URL에서 던지는 엄격한 allowlist 패턴)에서 실행 중 임의 시점에
+  // 발화해 무관한 호출 카운트 단언을 깨뜨릴 위험이 있다 — blur는 테스트가 명시적으로 발생시키지
+  // 않는 한 일어나지 않으므로 기존 테스트에 부작용이 없다. 이 GET은 "검색·크롤링"이 아니다 —
+  // 이미 저장된 값 + `pair_protocols` 존재 여부만 읽는다(`apps/web/app/api/enrichment/route.ts`
+  // 헤더 주석 참조, AC-065②는 GitHub 조회에만 적용된다).
+  function handleRecipientBlur() {
+    const trimmed = recipient.trim();
+    if (trimmed === '' || !isValidEmailFormat(trimmed)) {
+      setEnrichmentLinkVisible(false);
+      return;
+    }
+    fetch(`/api/enrichment?recipient=${encodeURIComponent(trimmed)}`)
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error('load failed'))))
+      .then((body: { showEnrichmentLink: boolean }) => setEnrichmentLinkVisible(body.showEnrichmentLink))
+      .catch(() => setEnrichmentLinkVisible(false));
+  }
+
   // 🔴 T25/AC-058① — `RecipientPanel`의 "Convert to Task Ticket" 클릭 핸들러. 승인 대상
   // 스냅샷 시점의 원문(`approvalSnapshot.text` — `SenderPanel`의 `originalTextSnapshot`과 같은
   // 이유: 이 원문이 실제로 `ticketOption.offered`를 판정한 그 텍스트다)을 API 소스 키에 저장하고
@@ -443,6 +472,9 @@ export function MediationWorkspace() {
                 setDeadlinePrefill(deadlineIso);
                 setDeadlineModalOpen(true);
               }}
+              enrichmentLinkVisible={enrichmentLinkVisible}
+              onOpenEnrichment={() => setEnrichmentModalOpen(true)}
+              onRecipientBlur={handleRecipientBlur}
             />
           </div>
           <div className={`${styles.column} ${styles.columnRecipient}`}>
@@ -479,6 +511,15 @@ export function MediationWorkspace() {
           onClose={() => setDeadlineModalOpen(false)}
           onConfirm={setConfirmedDeadline}
           prefillDeadline={deadlinePrefill}
+        />
+      )}
+      {/* T65/UX-018 — `enrichmentLinkVisible`이 이후 false로 바뀌어도(예: 그 사이 규약이 생김)
+          이미 열려 있던 모달은 강제로 닫지 않는다 — `ResponseDeadlineModal`과 같은 원칙. */}
+      {enrichmentModalOpen && (
+        <RecipientEnrichmentModal
+          open={enrichmentModalOpen}
+          recipient={recipient}
+          onClose={() => setEnrichmentModalOpen(false)}
         />
       )}
     </div>

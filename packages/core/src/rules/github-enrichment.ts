@@ -63,3 +63,29 @@ export function computeActivityHourHistogram(
   }
   return { histogram, sampleCount };
 }
+
+/**
+ * T65/AC-071①③ — `histogram`에서 "공개 활동 시간대" 후보 문구 1개를 뽑는다. `location` 기반
+ * 후보(`deriveTimezoneCandidates`)와 같은 원칙 — 확정 타임존을 지어내지 않고, 관측된 최빈
+ * 시간대(UTC)만 사실 그대로 서술한다(AC-071⑤ "관측 형태로만" — 성향·성격 서술 금지). 동률이면
+ * 가장 이른 시(hour)를 택한다(결정적).
+ *
+ * `histogram`이 `null`(표본 부족, `computeActivityHourHistogram` 참조)이면 후보를 만들지 않고
+ * `null`을 돌려준다 — 미등록 케이스에서 추측값을 만들지 않는다(AC-065⑤와 동일 원칙).
+ */
+export function deriveActivityTimeCandidate(histogram: number[] | null): string | null {
+  if (histogram === null) return null;
+  let peakHour = 0;
+  let peakCount = histogram[0] ?? 0;
+  for (let hour = 1; hour < histogram.length; hour += 1) {
+    const count = histogram[hour] ?? 0;
+    if (count > peakCount) {
+      peakHour = hour;
+      peakCount = count;
+    }
+  }
+  if (peakCount === 0) return null;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const nextHour = (peakHour + 1) % 24;
+  return `UTC ${pad(peakHour)}:00–${pad(nextHour)}:00`;
+}

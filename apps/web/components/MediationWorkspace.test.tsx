@@ -1756,3 +1756,90 @@ describe('MediationWorkspace — T54 공휴일 경고 표시 + 기한 재협상 
     expect(input.value).not.toBe('');
   });
 });
+
+// T65/AC-078 — "상대방 정보 보강" 링크. 매 keystroke가 아니라 "받는 사람" 필드가 blur될 때만
+// `GET /api/enrichment`를 부른다(`MediationWorkspace.tsx`의 `handleRecipientBlur` 헤더 주석 —
+// 기존 테스트 스위트가 blur를 발생시키지 않아 부작용이 없다는 것도 그 판단의 근거였다).
+describe('MediationWorkspace — T65 상대방 정보 보강 링크(AC-078)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function blurRecipientWith(value: string) {
+    const input = screen.getByLabelText('받는 사람');
+    fireEvent.change(input, { target: { value } });
+    fireEvent.blur(input);
+  }
+
+  it('blur 전에는 링크가 렌더되지 않고 /api/enrichment도 호출되지 않는다', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+
+    fireEvent.change(screen.getByLabelText('받는 사람'), { target: { value: 'boss@example.com' } });
+
+    expect(screen.queryByRole('button', { name: '상대방 정보 보강' })).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('유효한 이메일로 blur되고 showEnrichmentLink:true면 링크가 나타난다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ showEnrichmentLink: true }) });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+
+    blurRecipientWith('boss@example.com');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '상대방 정보 보강' })).toBeTruthy();
+    });
+    expect(fetchMock).toHaveBeenCalledWith('/api/enrichment?recipient=boss%40example.com');
+  });
+
+  it('showEnrichmentLink:false면 링크가 나타나지 않는다(AC-078④, 이미 정보가 있음)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ showEnrichmentLink: false }) });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+
+    blurRecipientWith('boss@example.com');
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('button', { name: '상대방 정보 보강' })).toBeNull();
+  });
+
+  it('유효하지 않은 이메일로 blur되면 /api/enrichment를 호출하지 않는다', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+
+    blurRecipientWith('not-an-email');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('링크 클릭 시 RecipientEnrichmentModal이 열린다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ showEnrichmentLink: true }) });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    blurRecipientWith('boss@example.com');
+    await waitFor(() => expect(screen.getByRole('button', { name: '상대방 정보 보강' })).toBeTruthy());
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        location: null,
+        company: null,
+        activityHourHistogram: null,
+        activitySampleCount: null,
+        activityTimezoneConfirmed: null,
+        timezoneCandidates: [],
+        activityTimeCandidate: null,
+        fetchedAt: null,
+        sourceUrl: null,
+        showEnrichmentLink: true,
+      }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: '상대방 정보 보강' }));
+
+    expect(screen.getByRole('dialog', { name: '상대방 정보 보강' })).toBeTruthy();
+  });
+});
