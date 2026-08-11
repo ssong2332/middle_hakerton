@@ -1,0 +1,159 @@
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 56px 24px;
+}
+
+.title {
+  font: 800 24px var(--font-sans);
+  letter-spacing: -0.01em;
+  margin-bottom: 10px;
+}
+
+.lead {
+  font: 400 13px var(--font-sans);
+  color: var(--text-muted-75);
+  margin-bottom: 24px;
+}
+
+.skeleton {
+  display: grid;
+  gap: 12px;
+}
+
+.skeletonRow {
+  height: 48px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--border-thin);
+}
+
+.banner {
+  border: 2px solid var(--color-focus);
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font: 400 12px var(--font-sans);
+}
+
+.banner p {
+  margin: 0 0 6px;
+}
+
+.retryButton {
+  min-height: 44px;
+  padding: 6px 10px;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  font: 800 11px var(--font-sans);
+}
+
+.errorText {
+  font: 400 12px var(--font-sans);
+  color: var(--color-danger-text);
+  margin: 0;
+}
+
+.emptyMessage {
+  font: 400 13px var(--font-sans);
+  color: var(--text-muted-60);
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border-thin);
+  padding: 12px 14px;
+  font: 700 12px var(--font-sans);
+  text-decoration: none;
+  color: inherit;
+}
+
+.item a:hover {
+  border-color: var(--border-strong);
+}
+
+.itemCounterpart {
+  font-weight: 700;
+}
+
+.itemMeta {
+  font: 400 11px var(--font-sans);
+  color: var(--text-muted-75);
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: 16px;
+  font: 700 12px var(--font-sans);
+}
+
+.sampleList {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sampleItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border-thin);
+  padding: 12px 14px;
+}
+
+.sourceTag {
+  font: 700 11px var(--font-sans);
+  border: 1px solid var(--border-strong);
+  padding: 2px 8px;
+}
+
+.collectedAt {
+  font: 400 12px var(--font-sans);
+  color: var(--text-muted-75);
+}
+
+.deleteButton {
+  min-height: 44px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--color-danger-text);
+  color: var(--color-danger-text);
+  font: 700 11px var(--font-sans);
+  margin-left: auto;
+}
+
+.confirmBox {
+  width: 100%;
+  border: 2px solid var(--color-focus);
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+}
+
+.confirmActions button {
+  min-height: 44px;
+  padding: 6px 12px;
+  font: 700 11px var(--font-sans);
+  border: 1px solid var(--border-strong);
+  background: transparent;
+}
