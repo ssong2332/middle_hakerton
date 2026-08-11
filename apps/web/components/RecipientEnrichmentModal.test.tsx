@@ -212,3 +212,243 @@ describe('RecipientEnrichmentModal (UX-018 Stage 1/2)', () => {
     expect(screen.queryByText(/분석했/)).toBeNull();
   });
 });
+
+describe('RecipientEnrichmentModal (UX-018 Stage 3/4, T69, AC-073/AC-074)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockResolvedValue(jsonOk(EMPTY_GET_RESPONSE));
+  });
+
+  it('Stage 2 렌더 후에만 "협업 스타일 제안 보기" 버튼이 나타난다(자동 생성 없음)', async () => {
+    render(<RecipientEnrichmentModal open={true} recipient="boss@example.com" onClose={vi.fn()} />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    expect(screen.getByRole('button', { name: '협업 스타일 제안 보기' })).toBeTruthy();
+  });
+
+  it('AC-037/AC-074④ — 상대가 이미 규약을 작성했으면 제안을 만들지 않고 안내+링크만 보여준다', async () => {
+    render(<RecipientEnrichmentModal open={true} recipient="boss@example.com" onClose={vi.fn()} />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    mockFetch.mockResolvedValueOnce(jsonOk({ suggestions: [], protocolAlreadyAuthored: true }));
+    fireEvent.click(screen.getByRole('button', { name: '협업 스타일 제안 보기' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/상대가 이미 이 규약을 직접 작성했습니다/)).toBeTruthy();
+    });
+    expect(screen.getByRole('link', { name: '규약 보기' }).getAttribute('href')).toBe(
+      '/pair-protocols/boss%40example.com',
+    );
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      '/api/enrichment/suggest',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('AC-073⑤ — 표본 부족이면 전체를 보류하고 안내 문구만 보여준다(축 일부도 채우지 않는다)', async () => {
+    render(<RecipientEnrichmentModal open={true} recipient="boss@example.com" onClose={vi.fn()} />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    mockFetch.mockResolvedValueOnce(
+      jsonOk({ suggestions: [], insufficientSample: true, requiredSampleCount: 3, currentSampleCount: 1 }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '협업 스타일 제안 보기' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/표본 부족으로 제안하지 않음 \(현재 표본 1건, 필요 3건\)/)).toBeTruthy();
+    });
+    expect(screen.queryByRole('button', { name: '확정하고 규약에 저장' })).toBeNull();
+  });
+
+  it('AC-073③④ — 제안 결과에 근거·평가지표가 함께 표시된다', async () => {
+    render(<RecipientEnrichmentModal open={true} recipient="boss@example.com" onClose={vi.fn()} />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    mockFetch.mockResolvedValueOnce(
+      jsonOk({
+        suggestions: [
+          {
+            axis: 'emojiPolicy',
+            value: 'ok',
+            evidence: { indicatorKey: 'emojiFrequency', observedValue: 0.5 },
+            evidenceCount: 12,
+          },
+        ],
+        source: 'live',
+      }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      jsonOk({
+        directnessAllowed: null,
+        emojiPolicy: null,
+        addressForm: null,
+        deadlineStyle: null,
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '협업 스타일 제안 보기' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/이모지: ok — 근거: emojiFrequency 0.5 \(근거 12건\)/)).toBeTruthy();
+      expect(screen.getByText('이것은 제안이며 확정 전에는 저장되지 않습니다.')).toBeTruthy();
+    });
+  });
+
+  it('AC-074② — 확정 클릭 전까지 confirm-inference를 호출하지 않는다', async () => {
+    render(<RecipientEnrichmentModal open={true} recipient="boss@example.com" onClose={vi.fn()} />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    mockFetch.mockResolvedValueOnce(
+      jsonOk({
+        suggestions: [
+          {
+            axis: 'emojiPolicy',
+            value: 'ok',
+            evidence: { indicatorKey: 'emojiFrequency', observedValue: 0.5 },
+            evidenceCount: 12,
+          },
+        ],
+        source: 'live',
+      }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      jsonOk({ directnessAllowed: null, emojiPolicy: null, addressForm: null, deadlineStyle: null }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '협업 스타일 제안 보기' }));
+    await waitFor(() => expect(screen.getByText('사용 가능')).toBeTruthy());
+
+    expect(
+      mockFetch.mock.calls.some(([url]) => url === '/api/protocol/confirm-inference'),
+    ).toBe(false);
+  });
+
+  it('제안이 없는 축은 기존 규약값으로 채워지고(null로 지어내지 않음), 4축 완성 전에는 확정 버튼이 비활성화된다', async () => {
+    render(<RecipientEnrichmentModal open={true} recipient="boss@example.com" onClose={vi.fn()} />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    mockFetch.mockResolvedValueOnce(
+      jsonOk({
+        suggestions: [
+          {
+            axis: 'emojiPolicy',
+            value: 'ok',
+            evidence: { indicatorKey: 'emojiFrequency', observedValue: 0.5 },
+            evidenceCount: 12,
+          },
+        ],
+        source: 'live',
+      }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      jsonOk({ directnessAllowed: 'yes', emojiPolicy: null, addressForm: '님', deadlineStyle: 'EOD' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '협업 스타일 제안 보기' }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('호칭') as HTMLInputElement).value).toBe('님');
+    });
+    expect((screen.getByLabelText('마감 표현') as HTMLInputElement).value).toBe('EOD');
+    expect((screen.getByRole('radio', { name: '허용' }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('radio', { name: '사용 가능' }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('button', { name: '확정하고 규약에 저장' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it('확정 성공 시 저장 확인 + 규약 보기 링크를 보여준다', async () => {
+    render(<RecipientEnrichmentModal open={true} recipient="boss@example.com" onClose={vi.fn()} />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    mockFetch.mockResolvedValueOnce(
+      jsonOk({
+        suggestions: [
+          {
+            axis: 'emojiPolicy',
+            value: 'ok',
+            evidence: { indicatorKey: 'emojiFrequency', observedValue: 0.5 },
+            evidenceCount: 12,
+          },
+        ],
+        source: 'live',
+      }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      jsonOk({ directnessAllowed: 'yes', emojiPolicy: null, addressForm: '님', deadlineStyle: 'EOD' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '협업 스타일 제안 보기' }));
+    await waitFor(() =>
+      expect((screen.getByRole('button', { name: '확정하고 규약에 저장' }) as HTMLButtonElement).disabled).toBe(
+        false,
+      ),
+    );
+
+    mockFetch.mockResolvedValueOnce(
+      jsonOk({
+        pairKey: 'k',
+        counterpart: 'boss@example.com',
+        directnessAllowed: 'yes',
+        emojiPolicy: 'ok',
+        addressForm: '님',
+        deadlineStyle: 'EOD',
+        authorshipState: 'sender_confirmed',
+        updatedAt: '2026-08-11T00:00:00.000Z',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '확정하고 규약에 저장' }));
+
+    await waitFor(() => expect(screen.getByText('규약에 저장되었습니다.')).toBeTruthy());
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      '/api/protocol/confirm-inference',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    const body = JSON.parse(
+      (mockFetch.mock.calls[mockFetch.mock.calls.length - 1][1] as RequestInit).body as string,
+    );
+    expect(body).toEqual({
+      counterpart: 'boss@example.com',
+      directnessAllowed: 'yes',
+      emojiPolicy: 'ok',
+      addressForm: '님',
+      deadlineStyle: 'EOD',
+    });
+  });
+
+  it('AC-074④ — 409 응답이면 초안을 버리고 상대 값이 적용됨을 안내 + 규약 보기 링크를 보여준다', async () => {
+    render(<RecipientEnrichmentModal open={true} recipient="boss@example.com" onClose={vi.fn()} />);
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    mockFetch.mockResolvedValueOnce(
+      jsonOk({
+        suggestions: [
+          {
+            axis: 'emojiPolicy',
+            value: 'ok',
+            evidence: { indicatorKey: 'emojiFrequency', observedValue: 0.5 },
+            evidenceCount: 12,
+          },
+        ],
+        source: 'live',
+      }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      jsonOk({ directnessAllowed: 'yes', emojiPolicy: null, addressForm: '님', deadlineStyle: 'EOD' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '협업 스타일 제안 보기' }));
+    await waitFor(() =>
+      expect((screen.getByRole('button', { name: '확정하고 규약에 저장' }) as HTMLButtonElement).disabled).toBe(
+        false,
+      ),
+    );
+
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => ({ error: { code: 'CONFLICT_PROTOCOL_AUTHORED', message: 'x', retryable: false } }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: '확정하고 규약에 저장' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/상대가 그 사이 이 규약을 직접 작성해 확정할 수 없습니다/)).toBeTruthy();
+    });
+    expect(screen.getByRole('link', { name: '규약 보기' })).toBeTruthy();
+  });
+});

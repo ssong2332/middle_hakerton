@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fetchProtocol, saveProtocol } from './storage';
+import { fetchProtocol, saveProtocol, confirmInference } from './storage';
 
 function createFakeSupabaseForFetch(row: unknown, error: { message: string } | null = null) {
   const eqCalls: [string, string][] = [];
@@ -153,6 +153,130 @@ describe('saveProtocol', () => {
 
     await expect(
       saveProtocol(client, 'me@example.com', 'user-1', { counterpart: 'tanaka@sakuradigital.example' }),
+    ).rejects.toMatchObject({ message: 'boom' });
+  });
+});
+
+interface ConfirmResults {
+  updateResult: { data: unknown; error: { message: string } | null };
+  existsResult?: { data: unknown; error: { message: string } | null };
+  insertResult?: { data: unknown; error: { message: string } | null };
+}
+
+function createFakeSupabaseForConfirm({ updateResult, existsResult, insertResult }: ConfirmResults) {
+  const calls: { update: unknown[]; neq: [string, string][]; insert: unknown[] } = {
+    update: [],
+    neq: [],
+    insert: [],
+  };
+  const client = {
+    from(table: string) {
+      if (table !== 'pair_protocols') throw new Error(`unexpected table: ${table}`);
+      return {
+        update: (value: unknown) => {
+          calls.update.push(value);
+          return {
+            eq: () => ({
+              neq: (column: string, value2: string) => {
+                calls.neq.push([column, value2]);
+                return { select: () => ({ maybeSingle: () => Promise.resolve(updateResult) }) };
+              },
+            }),
+          };
+        },
+        select: () => ({
+          eq: () => ({ maybeSingle: () => Promise.resolve(existsResult) }),
+        }),
+        insert: (value: unknown) => {
+          calls.insert.push(value);
+          return { select: () => ({ single: () => Promise.resolve(insertResult) }) };
+        },
+      };
+    },
+  } as unknown as SupabaseClient;
+  return { client, calls };
+}
+
+describe('confirmInference — T69, AC-074④', () => {
+  it('행이 있고 counterpart_authored가 아니면 조건부 UPDATE로 sender_confirmed로 저장한다', async () => {
+    const { client, calls } = createFakeSupabaseForConfirm({
+      updateResult: {
+        data: {
+          pair_key: 'k',
+          party_a: 'me@example.com',
+          party_b: 'tanaka@sakuradigital.example',
+          directness_allowed: null,
+          emoji_policy: 'ok',
+          address_form: null,
+          deadline_style: null,
+          authorship_state: 'sender_confirmed',
+          updated_at: '2026-08-11T00:00:00.000Z',
+        },
+        error: null,
+      },
+    });
+
+    const result = await confirmInference(client, 'me@example.com', 'user-1', {
+      counterpart: 'tanaka@sakuradigital.example',
+      emojiPolicy: 'ok',
+    });
+
+    expect(calls.neq).toEqual([['authorship_state', 'counterpart_authored']]);
+    expect(result.authorshipState).toBe('sender_confirmed');
+    expect(result.emojiPolicy).toBe('ok');
+  });
+
+  it('행이 존재하지만 UPDATE 영향이 0행이면(counterpart_authored) 409 ConflictError를 던진다', async () => {
+    const { client } = createFakeSupabaseForConfirm({
+      updateResult: { data: null, error: null },
+      existsResult: { data: { pair_key: 'k' }, error: null },
+    });
+
+    await expect(
+      confirmInference(client, 'me@example.com', 'user-1', {
+        counterpart: 'tanaka@sakuradigital.example',
+        emojiPolicy: 'ok',
+      }),
+    ).rejects.toMatchObject({ code: 'CONFLICT_PROTOCOL_AUTHORED' });
+  });
+
+  it('행이 아예 없으면(untouched) INSERT로 새로 만든다', async () => {
+    const { client, calls } = createFakeSupabaseForConfirm({
+      updateResult: { data: null, error: null },
+      existsResult: { data: null, error: null },
+      insertResult: {
+        data: {
+          pair_key: 'k',
+          party_a: 'me@example.com',
+          party_b: 'tanaka@sakuradigital.example',
+          directness_allowed: null,
+          emoji_policy: 'ok',
+          address_form: null,
+          deadline_style: null,
+          authorship_state: 'sender_confirmed',
+          updated_at: '2026-08-11T00:00:00.000Z',
+        },
+        error: null,
+      },
+    });
+
+    const result = await confirmInference(client, 'me@example.com', 'user-1', {
+      counterpart: 'tanaka@sakuradigital.example',
+      emojiPolicy: 'ok',
+    });
+
+    expect(calls.insert).toHaveLength(1);
+    expect(result.emojiPolicy).toBe('ok');
+    expect(result.authorshipState).toBe('sender_confirmed');
+  });
+
+  it('UPDATE 에러는 삼키지 않고 던진다', async () => {
+    const { client } = createFakeSupabaseForConfirm({
+      updateResult: { data: null, error: { message: 'boom' } },
+    });
+
+    await expect(
+      confirmInference(client, 'me@example.com', 'user-1', { counterpart: 'tanaka@sakuradigital.example' }),
     ).rejects.toMatchObject({ message: 'boom' });
   });
 });

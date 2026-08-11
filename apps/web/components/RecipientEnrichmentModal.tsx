@@ -1,26 +1,35 @@
 'use client';
 
 /**
- * T65 — UX-018 Stage 1(조회) + Stage 2 일부(관측, AC-071만) (`docs/UX.md:814-843`). AC-065,
- * AC-071, AC-072, AC-078.
+ * T65/T69 — UX-018 Stage 1(조회)~4(합의) (`docs/UX.md:814-843`). AC-065, AC-071, AC-072, AC-073,
+ * AC-074, AC-078.
  *
  * 🔴 **ux-design 라우팅은 stale하다(Duty to Refute) — 이 화면은 이미 UX-018로 완전히 스펙되어
  * 있다**(`docs/UX.md:814` "Recipient Public Profile Enrichment & Collaboration Style
- * Inference", States 절이 Stage 1·2를 문항 단위로 고정). `docs/Tasks.md` T65 행의 "화면 신설이므로
- * ux-design 라우팅 필요"는 v2.7 시점(UX.md가 2필드짜리 초안이었을 때)의 문구가 v5.0 재설계 이후
- * 갱신되지 않은 채 남은 것이다 — T52/T40/T54와 같은 패턴(전부 stale로 확인됨).
+ * Inference", States 절이 Stage 1~4를 문항 단위로 고정). `docs/Tasks.md` T65/T69 행의 "화면
+ * 신설이므로 ux-design 라우팅 필요"는 v2.7 시점(UX.md가 2필드짜리 초안이었을 때)의 문구가 v5.0
+ * 재설계 이후 갱신되지 않은 채 남은 것이다 — T52/T40/T54/T65와 같은 패턴(전부 stale로 확인됨).
  *
- * 🔴 **범위 — Stage 3(제안)·Stage 4(합의)는 이 컴포넌트에 없다.** `docs/UX.md:834` Architect
- * Handoff Priority: "T68·T69 are the new tasks covering Stages 2–4" — 근거 인용·확신도·규약
- * 저장은 T68/T69의 몫이다. 이 컴포넌트는 URL 조회 → location/company/미등록 표시 → 타임존 후보
- * 확정 → (있으면) 활동 시간대 관측 사실 표시까지만 담당한다.
+ * 🔴 **(2026-08-11, T69) Stage 3(제안)·Stage 4(합의) 추가.** `docs/UX.md:834` Architect
+ * Handoff Priority가 "T68·T69 are the new tasks covering Stages 2–4"라고 명시한 그대로 — T68이
+ * `POST /api/enrichment/suggest`(Stage 3, 근거 인용)를 만들었고, 이 컴포넌트가 그 응답을 보여준
+ * 뒤 사용자가 확인·수정한 값만 `POST /api/protocol/confirm-inference`(Stage 4, T69 신규)로
+ * 확정 저장한다. **확정 전에는 이 컴포넌트가 그 어떤 저장 요청도 보내지 않는다**(AC-074② —
+ * `suggest` 응답은 세션 상태(`suggestions`)로만 들고 있고, "확정하고 규약에 저장" 클릭 전까지
+ * 네트워크 쓰기 요청이 없다).
+ *
+ * 🔴 **Stage 4 초안 값은 제안이 없는 3축을 null로 지어내 덮지 않는다** — `confirmInference()`가
+ * 받은 4개 필드를 그대로 UPDATE하므로(`saveProtocol()`과 같은 "전체 상태 전송" 계약), 제안이
+ * 없는 축은 기존 규약값(`GET /api/protocol`)으로 미리 채워 넣는다. 이 화면이 "합의" 단계라고
+ * 해서 나머지 3축을 비우는 부작용을 만들지 않는다.
  *
  * 🔴 **관측 지표는 4종이 아니라 1종만 표시한다(스코프 갭, T64가 이미 architect 라우팅 표시함)** —
  * `docs/Tasks.md` T65 원문은 "관측 지표 4종도 함께 표시"라고 적지만, T64가 실제로 산출·저장하는
  * 것은 활동 시간대(AC-071) 하나뿐이다(`apps/web/app/api/enrichment/fetch/route.ts` 헤더 주석 —
  * 코멘트 길이/이모지 빈도/응답 지연 3종은 `POST /api/enrichment/observe`(T68 범위)가 필요한데
  * 아직 스키마·라우트가 없다). 없는 지표를 지어내 보여줄 수 없으므로 여기서는 활동 시간대만
- * 렌더하고, 나머지 3종은 렌더하지 않는다(있는 척하지 않는다 — AC-034와 같은 원칙).
+ * 렌더하고, 나머지 3종은 렌더하지 않는다(있는 척하지 않는다 — AC-034와 같은 원칙). **제안(Stage
+ * 3)은 이모지 축 하나뿐이다** — `packages/core/src/steps/suggest.ts` 헤더 주석과 같은 이유.
  *
  * 🔴 **확정 타임존은 슬롯이 하나뿐이다** — `recipient_enrichments.activity_timezone_confirmed`
  * (`docs/Database.md:221`) 컬럼은 1개이며, location 기반 후보와 활동 기반 후보를 담을 별도
@@ -31,7 +40,42 @@
  * 따른다.
  */
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import styles from './RecipientEnrichmentModal.module.css';
+
+interface StyleSuggestionDraft {
+  axis: 'directnessAllowed' | 'emojiPolicy' | 'addressForm' | 'deadlineStyle';
+  value: string;
+  evidence: { indicatorKey: string; observedValue: number };
+  evidenceCount?: number;
+  confidence?: number;
+}
+
+type SuggestResponseBody =
+  | { suggestions: StyleSuggestionDraft[]; source: string }
+  | { suggestions: []; insufficientSample: true; requiredSampleCount: number; currentSampleCount: number }
+  | { suggestions: []; protocolAlreadyAuthored: true };
+
+interface ProtocolSnapshot {
+  directnessAllowed: 'yes' | 'no' | null;
+  emojiPolicy: 'ok' | 'avoid' | null;
+  addressForm: string | null;
+  deadlineStyle: string | null;
+}
+
+type SuggestStatus = 'idle' | 'loading' | 'result' | 'insufficientSample' | 'protocolAuthored' | 'error';
+type AgreementStatus = 'idle' | 'confirming' | 'confirmed' | 'conflict' | 'error';
+
+const AXIS_LABEL: Record<StyleSuggestionDraft['axis'], string> = {
+  directnessAllowed: '직설 허용',
+  emojiPolicy: '이모지',
+  addressForm: '호칭',
+  deadlineStyle: '마감 표현',
+};
+
+function findDraftValue(suggestions: StyleSuggestionDraft[], axis: StyleSuggestionDraft['axis']): string | null {
+  return suggestions.find((suggestion) => suggestion.axis === axis)?.value ?? null;
+}
 
 interface EnrichmentSnapshot {
   location: string | null;
@@ -81,6 +125,19 @@ export function RecipientEnrichmentModal({ open, recipient, onClose }: Recipient
   const [confirmStatus, setConfirmStatus] = useState<ConfirmStatus>('idle');
   const [clearStatus, setClearStatus] = useState<ClearStatus>('idle');
 
+  // Stage 3(제안, AC-073) — `suggestions`는 세션 상태로만 존재하고 확정 전까지 어디에도
+  // 저장되지 않는다(AC-074②).
+  const [suggestStatus, setSuggestStatus] = useState<SuggestStatus>('idle');
+  const [suggestions, setSuggestions] = useState<StyleSuggestionDraft[]>([]);
+  const [sampleInfo, setSampleInfo] = useState<{ required: number; current: number } | null>(null);
+
+  // Stage 4(합의, AC-074) — 제안이 없는 축은 기존 규약값으로 미리 채운다(위 파일 헤더 주석).
+  const [draftDirectness, setDraftDirectness] = useState<'yes' | 'no' | null>(null);
+  const [draftEmoji, setDraftEmoji] = useState<'ok' | 'avoid' | null>(null);
+  const [draftAddressForm, setDraftAddressForm] = useState('');
+  const [draftDeadlineStyle, setDraftDeadlineStyle] = useState('');
+  const [agreementStatus, setAgreementStatus] = useState<AgreementStatus>('idle');
+
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
@@ -110,6 +167,14 @@ export function RecipientEnrichmentModal({ open, recipient, onClose }: Recipient
       setSelectedTimezone('');
       setConfirmStatus('idle');
       setClearStatus('idle');
+      setSuggestStatus('idle');
+      setSuggestions([]);
+      setSampleInfo(null);
+      setDraftDirectness(null);
+      setDraftEmoji(null);
+      setDraftAddressForm('');
+      setDraftDeadlineStyle('');
+      setAgreementStatus('idle');
       returnFocusRef.current?.focus();
     }
   }, [open, recipient]);
@@ -203,6 +268,90 @@ export function RecipientEnrichmentModal({ open, recipient, onClose }: Recipient
       setClearStatus('idle');
     } catch {
       setClearStatus('error');
+    }
+  }
+
+  // 🔴 AC-073⑤ — 이 클릭이 Stage 3 진입을 만드는 유일한 트리거다(자동 생성 아님, UX-018
+  // Validation "협업 스타일 제안 보기 is enabled once Stage 2's observation has rendered").
+  async function handleViewSuggestion() {
+    setSuggestStatus('loading');
+    try {
+      const response = await fetch('/api/enrichment/suggest', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ recipient }),
+      });
+      if (!response.ok) {
+        setSuggestStatus('error');
+        return;
+      }
+      const body = (await response.json()) as SuggestResponseBody;
+      if ('protocolAlreadyAuthored' in body && body.protocolAlreadyAuthored) {
+        setSuggestStatus('protocolAuthored');
+        return;
+      }
+      if ('insufficientSample' in body && body.insufficientSample) {
+        setSampleInfo({ required: body.requiredSampleCount, current: body.currentSampleCount });
+        setSuggestStatus('insufficientSample');
+        return;
+      }
+
+      // 🔴 파일 헤더 주석 — 제안이 없는 3축은 null로 지어내지 않고 기존 규약값으로 채운다.
+      let existing: ProtocolSnapshot | null = null;
+      try {
+        const protocolResponse = await fetch(`/api/protocol?counterpart=${encodeURIComponent(recipient)}`);
+        if (protocolResponse.ok) {
+          existing = (await protocolResponse.json()) as ProtocolSnapshot;
+        }
+      } catch {
+        existing = null;
+      }
+      setSuggestions(body.suggestions);
+      setDraftDirectness(
+        (findDraftValue(body.suggestions, 'directnessAllowed') as 'yes' | 'no' | null) ??
+          existing?.directnessAllowed ??
+          null,
+      );
+      setDraftEmoji(
+        (findDraftValue(body.suggestions, 'emojiPolicy') as 'ok' | 'avoid' | null) ??
+          existing?.emojiPolicy ??
+          null,
+      );
+      setDraftAddressForm(findDraftValue(body.suggestions, 'addressForm') ?? existing?.addressForm ?? '');
+      setDraftDeadlineStyle(findDraftValue(body.suggestions, 'deadlineStyle') ?? existing?.deadlineStyle ?? '');
+      setSuggestStatus('result');
+    } catch {
+      setSuggestStatus('error');
+    }
+  }
+
+  // 🔴 AC-074② — 이 클릭 전까지 규약/추론 레코드는 어디에도 쓰이지 않는다(`suggestions`는
+  // 컴포넌트 상태일 뿐). AC-074④ — 409면 상대가 그 사이 직접 작성한 것이므로 초안을 버린다.
+  async function handleConfirmAgreement() {
+    setAgreementStatus('confirming');
+    try {
+      const response = await fetch('/api/protocol/confirm-inference', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          counterpart: recipient,
+          directnessAllowed: draftDirectness,
+          emojiPolicy: draftEmoji,
+          addressForm: draftAddressForm.trim() || null,
+          deadlineStyle: draftDeadlineStyle.trim() || null,
+        }),
+      });
+      if (response.status === 409) {
+        setAgreementStatus('conflict');
+        return;
+      }
+      if (!response.ok) {
+        setAgreementStatus('error');
+        return;
+      }
+      setAgreementStatus('confirmed');
+    } catch {
+      setAgreementStatus('error');
     }
   }
 
@@ -343,6 +492,133 @@ export function RecipientEnrichmentModal({ open, recipient, onClose }: Recipient
           <p role="alert" className={styles.errorText}>
             삭제에 실패했습니다. 다시 시도해주세요.
           </p>
+        )}
+
+        {/* Stage 3(제안, AC-073) — 관측이 렌더된 뒤에만 트리거를 보여준다(UX-018 Validation).
+            자동 생성 없음 — 사용자의 이 클릭 하나가 유일한 진입점이다. */}
+        {loadStatus === 'loaded' && suggestStatus === 'idle' && (
+          <button
+            type="button"
+            className={styles.fetchButton}
+            onClick={() => void handleViewSuggestion()}
+          >
+            협업 스타일 제안 보기
+          </button>
+        )}
+        {suggestStatus === 'loading' && (
+          <p role="status" className={styles.statusText}>
+            제안을 불러오는 중…
+          </p>
+        )}
+        {suggestStatus === 'error' && (
+          <p role="alert" className={styles.errorText}>
+            제안을 불러오지 못했습니다. 다시 시도해주세요.
+          </p>
+        )}
+        {suggestStatus === 'protocolAuthored' && (
+          <div className={styles.resultBox} role="status">
+            <p>상대가 이미 이 규약을 직접 작성했습니다 — 제안을 만들지 않습니다.</p>
+            <Link href={`/pair-protocols/${encodeURIComponent(recipient)}`}>규약 보기</Link>
+          </div>
+        )}
+        {suggestStatus === 'insufficientSample' && sampleInfo && (
+          <p role="status" className={styles.statusText}>
+            표본 부족으로 제안하지 않음 (현재 표본 {sampleInfo.current}건, 필요 {sampleInfo.required}건).
+          </p>
+        )}
+
+        {/* Stage 4(합의, AC-074) — SuggestionResult에서만 진입 가능. 확정 전까지는 저장하지
+            않는다는 고지가 항상 함께 보인다(AC-074⑤). */}
+        {suggestStatus === 'result' && agreementStatus !== 'confirmed' && agreementStatus !== 'conflict' && (
+          <div className={styles.resultBox}>
+            <p className={styles.sectionLabel}>제안 — 근거와 함께</p>
+            {suggestions.map((suggestion) => (
+              <p key={suggestion.axis}>
+                {AXIS_LABEL[suggestion.axis]}: {suggestion.value} — 근거: {suggestion.evidence.indicatorKey}{' '}
+                {suggestion.evidence.observedValue} (근거 {suggestion.evidenceCount ?? suggestion.confidence}건)
+              </p>
+            ))}
+            <p className={styles.disclosure}>이것은 제안이며 확정 전에는 저장되지 않습니다.</p>
+
+            <fieldset className={styles.timezoneFieldset}>
+              <legend>직설 허용</legend>
+              {(['yes', 'no'] as const).map((value) => (
+                <label key={value} className={styles.candidateItem}>
+                  <input
+                    type="radio"
+                    name="draft-directness"
+                    checked={draftDirectness === value}
+                    onChange={() => setDraftDirectness(value)}
+                  />
+                  {value === 'yes' ? '허용' : '비허용'}
+                </label>
+              ))}
+            </fieldset>
+            <fieldset className={styles.timezoneFieldset}>
+              <legend>이모지</legend>
+              {(['ok', 'avoid'] as const).map((value) => (
+                <label key={value} className={styles.candidateItem}>
+                  <input
+                    type="radio"
+                    name="draft-emoji"
+                    checked={draftEmoji === value}
+                    onChange={() => setDraftEmoji(value)}
+                  />
+                  {value === 'ok' ? '사용 가능' : '사용 지양'}
+                </label>
+              ))}
+            </fieldset>
+            <div className={styles.field}>
+              <label htmlFor="draft-address-form">호칭</label>
+              <input
+                id="draft-address-form"
+                type="text"
+                value={draftAddressForm}
+                onChange={(event) => setDraftAddressForm(event.target.value)}
+              />
+            </div>
+            <div className={styles.field}>
+              <label htmlFor="draft-deadline-style">마감 표현</label>
+              <input
+                id="draft-deadline-style"
+                type="text"
+                value={draftDeadlineStyle}
+                onChange={(event) => setDraftDeadlineStyle(event.target.value)}
+              />
+            </div>
+
+            <button
+              type="button"
+              className={styles.confirmButton}
+              disabled={
+                agreementStatus === 'confirming' ||
+                draftDirectness === null ||
+                draftEmoji === null ||
+                draftAddressForm.trim().length === 0 ||
+                draftDeadlineStyle.trim().length === 0
+              }
+              onClick={() => void handleConfirmAgreement()}
+            >
+              확정하고 규약에 저장
+            </button>
+            {agreementStatus === 'error' && (
+              <p role="alert" className={styles.errorText}>
+                확정 저장에 실패했습니다. 다시 시도해주세요.
+              </p>
+            )}
+          </div>
+        )}
+        {agreementStatus === 'confirmed' && (
+          <div className={styles.resultBox} role="status">
+            <p>규약에 저장되었습니다.</p>
+            <Link href={`/pair-protocols/${encodeURIComponent(recipient)}`}>규약 보기</Link>
+          </div>
+        )}
+        {agreementStatus === 'conflict' && (
+          <div className={styles.resultBox} role="alert">
+            <p>상대가 그 사이 이 규약을 직접 작성해 확정할 수 없습니다 — 상대가 정한 값이 적용됩니다.</p>
+            <Link href={`/pair-protocols/${encodeURIComponent(recipient)}`}>규약 보기</Link>
+          </div>
         )}
 
         <button type="button" className={styles.closeButton} onClick={close}>
