@@ -7,7 +7,11 @@
 //    서비스 워커(background)는 면제된다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getStoredToken, setStoredToken } from './shared/token-storage';
-import { COUNTERPARTS_REQUEST_MESSAGE_TYPE, MEDIATE_REQUEST_MESSAGE_TYPE } from './shared/api';
+import {
+  COUNTERPARTS_REQUEST_MESSAGE_TYPE,
+  MEDIATE_REQUEST_MESSAGE_TYPE,
+  SAMPLE_ADD_REQUEST_MESSAGE_TYPE,
+} from './shared/api';
 
 type Listener<Args extends unknown[]> = (...args: Args) => unknown;
 
@@ -285,6 +289,111 @@ describe('background', () => {
 
       expect(sendResponse).toHaveBeenCalledWith({ ok: false, reason: 'not-logged-in' });
       expect(await getStoredToken()).toBeNull();
+    });
+  });
+
+  // T71(AC-080/081) — 같은 디스패처가 세 번째 메시지 타입도 처리한다.
+  describe('cbm:sample-add-request internal message (T71)', () => {
+    const requestBody = {
+      counterpart: 'boss@example.com',
+      source: 'manual' as const,
+      indicatorDeltas: {
+        sentenceCount: 2,
+        emojiCount: 0,
+        charCount: 20,
+        hedgeCount: 1,
+        addressFormKind: null,
+        deadlineMentionKind: null,
+      },
+      collectedAt: '2026-08-11T09:00:00.000Z',
+    };
+
+    it('fetches POST /api/samples with a Bearer header and returns the parsed result on success', async () => {
+      await setStoredToken('tok-abc');
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          id: 's-1',
+          counterpart: 'boss@example.com',
+          source: 'manual',
+          collectedAt: '2026-08-11T09:00:00.000Z',
+        }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      await import('./background');
+      const sendResponse = vi.fn();
+      fake.fireMessage({ type: SAMPLE_ADD_REQUEST_MESSAGE_TYPE, body: requestBody }, {}, sendResponse);
+      await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://app.example.com/api/samples');
+      expect(init.method).toBe('POST');
+      expect(init.headers.authorization).toBe('Bearer tok-abc');
+      // 🔴 AC-081①③ — 보내는 body에 원문 텍스트 필드가 없다(요청 body 자체가 그것을 배제).
+      expect(JSON.parse(init.body)).toEqual(requestBody);
+      expect(sendResponse).toHaveBeenCalledWith({
+        ok: true,
+        data: { id: 's-1', counterpart: 'boss@example.com', source: 'manual', collectedAt: '2026-08-11T09:00:00.000Z' },
+      });
+    });
+
+    it('returns not-logged-in without fetching when no token is stored', async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+
+      await import('./background');
+      const sendResponse = vi.fn();
+      fake.fireMessage({ type: SAMPLE_ADD_REQUEST_MESSAGE_TYPE, body: requestBody }, {}, sendResponse);
+      await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(sendResponse).toHaveBeenCalledWith({ ok: false, reason: 'not-logged-in' });
+    });
+
+    it('maps a 401 AUTH_REQUIRED response to not-logged-in and clears the stored token', async () => {
+      await setStoredToken('tok-expired');
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          error: { code: 'AUTH_REQUIRED', message: '인증이 필요합니다', retryable: false },
+        }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      await import('./background');
+      const sendResponse = vi.fn();
+      fake.fireMessage({ type: SAMPLE_ADD_REQUEST_MESSAGE_TYPE, body: requestBody }, {}, sendResponse);
+      await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+      expect(sendResponse).toHaveBeenCalledWith({ ok: false, reason: 'not-logged-in' });
+      expect(await getStoredToken()).toBeNull();
+    });
+
+    it('returns a request-failed result with the server error envelope on a non-401 non-2xx response', async () => {
+      await setStoredToken('tok-abc');
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({
+          error: { code: 'VALIDATION_FAILED', message: '요청이 올바르지 않습니다', retryable: false },
+        }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      await import('./background');
+      const sendResponse = vi.fn();
+      fake.fireMessage({ type: SAMPLE_ADD_REQUEST_MESSAGE_TYPE, body: requestBody }, {}, sendResponse);
+      await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+      expect(sendResponse).toHaveBeenCalledWith({
+        ok: false,
+        reason: 'request-failed',
+        error: { code: 'VALIDATION_FAILED', message: '요청이 올바르지 않습니다', retryable: false },
+      });
     });
   });
 });

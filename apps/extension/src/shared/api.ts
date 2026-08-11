@@ -20,7 +20,7 @@
  * origin이 아니라 확장 자신의 컨텍스트에서 실행되므로, 여전히 `VITE_APP_ORIGIN`으로 절대 URL을
  * 만들어야 한다(그 조립은 이제 `background.ts` 쪽 책임이다).
  */
-import type { MediationResult } from '@cross-border/core';
+import type { IndicatorDeltas, MediationResult } from '@cross-border/core';
 import { getStoredToken } from './token-storage';
 
 export interface MediateApiRequest {
@@ -103,6 +103,81 @@ export async function fetchKnownCounterparts(): Promise<CounterpartsApiResult> {
   }
 
   if (!isCounterpartsApiResult(response)) {
+    return {
+      ok: false,
+      reason: 'request-failed',
+      error: genericError('확장 내부 통신 오류가 발생했습니다.'),
+    };
+  }
+
+  return response;
+}
+
+/**
+ * T71(AC-080/081) — `POST /api/samples`(UX-016 Mark 모드) 호출. `callMediationApi`/
+ * `fetchKnownCounterparts`와 같은 이유로 콘텐츠 스크립트에서 직접 fetch하지 않고 `background.ts`에
+ * 위임한다(CORS, 파일 헤더 주석). 🔴 이 요청 body에는 원문 텍스트가 없다 — 호출부
+ * (`MediationPanel.tsx`)가 `@cross-border/core`의 `computeIndicatorDeltas()`로 이미 집계값만
+ * 뽑아 넘긴다(AC-081①③).
+ */
+export const SAMPLE_ADD_REQUEST_MESSAGE_TYPE = 'cbm:sample-add-request' as const;
+
+export interface AddSampleRequest {
+  counterpart: string;
+  source: 'manual';
+  indicatorDeltas: IndicatorDeltas;
+  collectedAt: string;
+}
+
+export interface SampleAddRequestMessage {
+  type: typeof SAMPLE_ADD_REQUEST_MESSAGE_TYPE;
+  body: AddSampleRequest;
+}
+
+export interface StoredSampleSummary {
+  id: string;
+  counterpart: string;
+  source: 'manual';
+  collectedAt: string;
+}
+
+export type AddSampleApiResult =
+  | { ok: true; data: StoredSampleSummary }
+  | { ok: false; reason: 'not-logged-in' }
+  | { ok: false; reason: 'request-failed'; error: MediateApiErrorEnvelope };
+
+function isAddSampleApiResult(value: unknown): value is AddSampleApiResult {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as { ok?: unknown };
+  return candidate.ok === true || candidate.ok === false;
+}
+
+/** `callMediationApi`와 같은 패턴 — 토큰이 없으면 background에 메시지조차 보내지 않는다. */
+export async function addSample(body: AddSampleRequest): Promise<AddSampleApiResult> {
+  let token: string | null;
+  try {
+    token = await getStoredToken();
+  } catch {
+    return { ok: false, reason: 'not-logged-in' };
+  }
+  if (!token) {
+    return { ok: false, reason: 'not-logged-in' };
+  }
+
+  const message: SampleAddRequestMessage = { type: SAMPLE_ADD_REQUEST_MESSAGE_TYPE, body };
+
+  let response: unknown;
+  try {
+    response = await chrome.runtime.sendMessage(message);
+  } catch {
+    return {
+      ok: false,
+      reason: 'request-failed',
+      error: genericError('확장 내부 통신 오류가 발생했습니다.'),
+    };
+  }
+
+  if (!isAddSampleApiResult(response)) {
     return {
       ok: false,
       reason: 'request-failed',
