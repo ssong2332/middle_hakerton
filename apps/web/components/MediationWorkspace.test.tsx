@@ -1700,3 +1700,59 @@ describe('MediationWorkspace — T40 응답 기한 협상 진입 (AC-005)', () =
     expect(within(recipientPanel).getByText(/참고 응답 기한/)).toBeTruthy();
   });
 });
+
+// T54/AC-057②③/AC-063① — HolidayConflict 경고 + "기한 재협상" 진입.
+describe('MediationWorkspace — T54 공휴일 경고 표시 + 기한 재협상 진입', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const CONFLICT = { date: '2026-09-25T00:00:00Z', country: 'KR', holidayName: '추석', dayIndex: 2 };
+
+  it('NORMAL/LOW에서 holidayConflicts가 있으면 경고 문구와 "기한 재협상" 링크가 렌더된다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mediateSuccessResponse({ urgency: 'NORMAL', holidayConflicts: [CONFLICT] }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getByText('이 마감일은 상대 국가 연휴 2일차입니다.')).toBeTruthy();
+    });
+    expect(screen.getByRole('button', { name: '기한 재협상' })).toBeTruthy();
+  });
+
+  it('CRITICAL이면 holidayConflicts가 있어도 경고가 렌더되지 않는다(진입할 UX-005 자체가 없다, AC-005)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mediateSuccessResponse({ urgency: 'CRITICAL', holidayConflicts: [CONFLICT] }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText(/연휴/)).toBeNull();
+    expect(screen.queryByRole('button', { name: '기한 재협상' })).toBeNull();
+  });
+
+  it('"기한 재협상" 클릭 — 모달이 그 충돌의 날짜로 미리 채워져 열린다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mediateSuccessResponse({ urgency: 'NORMAL', holidayConflicts: [CONFLICT] }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<MediationWorkspace />);
+    fillAndRun();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '기한 재협상' })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '기한 재협상' }));
+
+    expect(screen.getByRole('dialog', { name: '응답 기한 협상' })).toBeTruthy();
+    const input = screen.getByLabelText('희망 응답 기한') as HTMLInputElement;
+    expect(input.value).not.toBe('');
+  });
+});

@@ -5,6 +5,7 @@ import type { MediationResult, UrgencyLevel } from '@cross-border/core';
 import { isValidEmailFormat } from '../lib/validate-email';
 import { BackTranslationPreview } from './BackTranslationPreview';
 import { ComparisonView } from './ComparisonView';
+import { HolidayConflictWarning } from './HolidayConflictWarning';
 import { MisreadRiskPanel } from './MisreadRiskPanel';
 import { UrgencyPanel } from './UrgencyPanel';
 import styles from './SenderPanel.module.css';
@@ -41,6 +42,15 @@ export interface SenderPanelProps {
    * 화면에 잘못된 조합이 보이는 표시 결함이었다.)
    */
   originalTextSnapshot: string;
+  /**
+   * 🔴 T54/AC-057②③ — "이 마감일은 상대 국가 연휴 N일차입니다" 경고. `HolidayConflictWarning`이
+   * 빈 배열이면 아무것도 렌더하지 않는다(AC-063①). CRITICAL 메시지에서는 부모(`MediationWorkspace`)
+   * 가 이미 빈 배열을 넘긴다 — "기한 재협상" 링크가 열 UX-005 자체가 CRITICAL에서 존재할 수 없기
+   * 때문(AC-005, T40과 같은 게이트). 기본값 `[]` — 기존 호출부를 깨지 않기 위한 선택적 prop이다.
+   */
+  holidayConflicts?: MediationResult['holidayConflicts'];
+  /** "기한 재협상" 클릭 시 호출된다 — 모달을 그 기한으로 여는 것은 부모의 책임이다. */
+  onNegotiateDeadline?: (deadlineIso: string) => void;
 }
 
 /**
@@ -63,6 +73,8 @@ export function SenderPanel({
   onRunMediation,
   hasResult,
   originalTextSnapshot,
+  holidayConflicts = [],
+  onNegotiateDeadline,
 }: SenderPanelProps) {
   const trimmedRecipient = recipient.trim();
   const recipientFormatInvalid = trimmedRecipient !== '' && !isValidEmailFormat(trimmedRecipient);
@@ -183,6 +195,9 @@ export function SenderPanel({
               `MisreadRiskPanel`의 `variant` prop 하나만 바꾸면 되고, 데이터 생성(T10)에는 영향이
               없다(같은 패턴이 이미 존재 — "표시만 축소되고 데이터는 항상 동일"). */}
           <MisreadRiskPanel risks={result.misreadRisks} variant="full" />
+          {/* T54 — HolidayConflict 상태. `holidayConflicts`가 빈 배열이면(충돌 없음·데이터 없는
+              국가 둘 다) 이 컴포넌트가 아무것도 렌더하지 않는다(AC-063①). */}
+          <HolidayConflictWarning conflicts={holidayConflicts} onNegotiate={onNegotiateDeadline} />
           {/* MJ-5 — 여기도 스냅샷 시점 원문을 쓴다(역번역은 스냅샷 시점 변환문의 역번역이므로,
               라이브 text와 짝지으면 편집 후 원문·역번역이 서로 다른 시점의 값이 된다).
               🔴 (2026-08-05 갱신 — F1-e, DECISIONS #48 · ADR-0009) `result.source`(합산값) 대신
