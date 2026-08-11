@@ -339,12 +339,12 @@ describe('getIndicatorRollupForCounterpart — T70/AC-079/AC-083', () => {
     const result = await getIndicatorRollupForCounterpart(client, 'user-1', 'tanaka@example.com');
 
     expect(result).toEqual({
-      manual: { sampleCount: 0, emojiCount: 0, hedgeCount: 0 },
-      github: { sampleCount: 0, emojiCount: 0, hedgeCount: 0 },
+      manual: { sampleCount: 0, emojiCount: 0, hedgeCount: 0, sentenceCount: 0 },
+      github: { sampleCount: 0, emojiCount: 0, hedgeCount: 0, sentenceCount: 0 },
     });
   });
 
-  it('출처별로 sampleCount·emojiCount·hedgeCount를 합산한다', async () => {
+  it('출처별로 sampleCount·emojiCount·hedgeCount·sentenceCount를 합산한다', async () => {
     const { client } = createFakeRollupSupabase({
       rows: [
         { source: 'manual', indicator_deltas: { ...SAMPLE_DELTAS, emojiCount: 2, hedgeCount: 1 } },
@@ -356,8 +356,8 @@ describe('getIndicatorRollupForCounterpart — T70/AC-079/AC-083', () => {
     const result = await getIndicatorRollupForCounterpart(client, 'user-1', 'tanaka@example.com');
 
     expect(result).toEqual({
-      manual: { sampleCount: 2, emojiCount: 3, hedgeCount: 4 },
-      github: { sampleCount: 1, emojiCount: 5, hedgeCount: 0 },
+      manual: { sampleCount: 2, emojiCount: 3, hedgeCount: 4, sentenceCount: 4 },
+      github: { sampleCount: 1, emojiCount: 5, hedgeCount: 0, sentenceCount: 2 },
     });
   });
 

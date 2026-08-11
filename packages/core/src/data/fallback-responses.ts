@@ -138,6 +138,18 @@ export const FALLBACK_RESPONSES: FallbackResponseEntry[] = [
       decisions: [],
     }),
   },
+  /**
+   * 🔴 T68(2026-08-11) — suggest 폴백. 위 항목들과 다른 이유로 존재한다 — 이 스텝은 실제
+   * 원문이 아니라 이미 서버가 계산한 관측값(`emojiFrequency`)을 입력받으므로 "원문을 못 봤다"는
+   * 말이 성립하지 않는다. 대신 이 폴백 콘텐츠는 `steps/suggest.ts`가 실제로 파싱하지 않는다 —
+   * 그 파일은 폴백이 **존재한다는 사실만** 확인하고 `suggestions: []`를 반환한다(근거 없는
+   * `emojiPolicy` 값을 지어내지 않는다, AC-073③). 여기 담은 내용은 그 "존재 확인"용 자리표시자이며,
+   * 조회 실패(`findFallbackResponse`가 `undefined`)와 조회 성공을 구분하는 것 외의 역할이 없다.
+   */
+  {
+    step: 'suggest',
+    content: JSON.stringify({ note: '폴백 — 관측값 기반 판정은 실호출에서만 만든다' }),
+  },
 ];
 
 /**

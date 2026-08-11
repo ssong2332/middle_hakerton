@@ -165,8 +165,8 @@ export async function deleteSample(
 }
 
 export interface CounterpartIndicatorRollup {
-  manual: { sampleCount: number; emojiCount: number; hedgeCount: number };
-  github: { sampleCount: number; emojiCount: number; hedgeCount: number };
+  manual: { sampleCount: number; emojiCount: number; hedgeCount: number; sentenceCount: number };
+  github: { sampleCount: number; emojiCount: number; hedgeCount: number; sentenceCount: number };
 }
 
 interface RollupRow {
@@ -195,14 +195,15 @@ export async function getIndicatorRollupForCounterpart(
   if (error) throw error;
 
   const rollup: CounterpartIndicatorRollup = {
-    manual: { sampleCount: 0, emojiCount: 0, hedgeCount: 0 },
-    github: { sampleCount: 0, emojiCount: 0, hedgeCount: 0 },
+    manual: { sampleCount: 0, emojiCount: 0, hedgeCount: 0, sentenceCount: 0 },
+    github: { sampleCount: 0, emojiCount: 0, hedgeCount: 0, sentenceCount: 0 },
   };
   for (const row of (data ?? []) as RollupRow[]) {
     const bucket = rollup[row.source];
     bucket.sampleCount += 1;
     bucket.emojiCount += row.indicator_deltas.emojiCount;
     bucket.hedgeCount += row.indicator_deltas.hedgeCount;
+    bucket.sentenceCount += row.indicator_deltas.sentenceCount;
   }
   return rollup;
 }

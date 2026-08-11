@@ -48,8 +48,8 @@ const PROTOCOL_RECORD = {
 };
 
 const ROLLUP = {
-  manual: { sampleCount: 5, emojiCount: 2, hedgeCount: 0 },
-  github: { sampleCount: 0, emojiCount: 0, hedgeCount: 0 },
+  manual: { sampleCount: 5, emojiCount: 2, hedgeCount: 0, sentenceCount: 10 },
+  github: { sampleCount: 0, emojiCount: 0, hedgeCount: 0, sentenceCount: 0 },
 };
 
 describe('GET /api/protocol/mismatches — AC-079/AC-083', () => {
