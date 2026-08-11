@@ -45,6 +45,25 @@ export interface ResponseDeadlineModalProps {
   onClose: () => void;
   /** "Use this deadline" 또는 "Accept counter-offer" 클릭 시, 확정된 기한(UTC ISO)과 함께 호출된다. */
   onConfirm: (deadlineIso: string) => void;
+  /**
+   * 🔴 T54/UX-005 Entry — "the '기한 재협상' link on UX-004's Holiday Conflict warning
+   * (pre-fills the needed-by field with the flagged deadline)". `HolidayConflictWarning`에서
+   * 열렸을 때만 채워지는 UTC ISO 값 — 열릴 때(`open` true로 전환되는 시점) `neededBy` 필드의
+   * 초기값으로 쓴다. `null`/생략이면(일반 "Set response deadline" 진입) 빈 값으로 시작한다.
+   */
+  prefillDeadline?: string | null;
+}
+
+/** UTC ISO → `<input type="datetime-local">`가 받는 로컬 표현(`YYYY-MM-DDTHH:mm`)으로 변환한다.
+ * 브라우저 로컬 타임존 기준 — 사용자가 이 입력을 직접 수정할 때도 같은 로컬 타임존으로 해석되므로
+ * (`new Date(neededBy)`가 로컬로 파싱) 왕복 시 값이 어긋나지 않는다. */
+function toDatetimeLocalValue(iso: string): string {
+  const date = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
 }
 
 const COUNTRY_OPTIONS: Array<{ value: CountryCode | ''; label: string }> = [
@@ -76,7 +95,13 @@ function isFuture(neededByValue: string): boolean {
 
 type Status = 'idle' | 'loading' | 'error' | 'result';
 
-export function ResponseDeadlineModal({ open, urgency, onClose, onConfirm }: ResponseDeadlineModalProps) {
+export function ResponseDeadlineModal({
+  open,
+  urgency,
+  onClose,
+  onConfirm,
+  prefillDeadline = null,
+}: ResponseDeadlineModalProps) {
   const [neededBy, setNeededBy] = useState('');
   // react-hooks/purity — `Date.now()`를 렌더 본문에서 직접 읽지 않기 위해, "미래인가" 판정을
   // 값이 바뀌는 이벤트 핸들러 시점에만 계산해 상태로 들고 있는다(`isFuture()` 참조).
@@ -98,13 +123,21 @@ export function ResponseDeadlineModal({ open, urgency, onClose, onConfirm }: Res
   useEffect(() => {
     if (open) {
       returnFocusRef.current = document.activeElement as HTMLElement | null;
+      // T54 — `prefillDeadline`이 있으면(HolidayConflict 경고의 "기한 재협상" 진입) 그 값으로
+      // needed-by 필드를 미리 채운다. 자동으로 확정하지 않는다(AC-036) — 사용자가 여전히
+      // "실현 가능성 확인"을 눌러야 다음 단계로 간다.
+      // 모달 open 시(외부 트리거) prefill 반영 — `else` 분기의 폼 초기화와 같은 근거(아래 참조).
+      if (prefillDeadline) {
+        const localValue = toDatetimeLocalValue(prefillDeadline);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setNeededBy(localValue);
+        setNeededByIsFuture(isFuture(localValue));
+      }
       const first = dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
       first?.focus();
     } else {
-      // `terminology/page.tsx`의 fetch-on-mount와 같은 근거로 이 블록만 억제한다 — 모달이
-      // 닫히는 시점에 폼 상태를 초기화하는 것은 외부 트리거(부모의 `open` 변경)에 대한 정당한
-      // 동기화이며, 사용자 입력에 반응하는 일반적인 setState와는 다른 성격이다.
-      /* eslint-disable react-hooks/set-state-in-effect -- 모달 close 시 폼 초기화, 위 근거 참조 */
+      // 모달이 닫히는 시점에 폼 상태를 초기화한다 — 외부 트리거(부모의 `open` 변경)에 대한
+      // 정당한 동기화다(`terminology/page.tsx`의 fetch-on-mount와 같은 근거).
       setNeededBy('');
       setNeededByIsFuture(true);
       setTimezone('');
@@ -114,10 +147,9 @@ export function ResponseDeadlineModal({ open, urgency, onClose, onConfirm }: Res
       setStatus('idle');
       setResult(null);
       setSelectedOffer(null);
-      /* eslint-enable react-hooks/set-state-in-effect */
       returnFocusRef.current?.focus();
     }
-  }, [open]);
+  }, [open, prefillDeadline]);
 
   if (!open) return null;
 

@@ -126,6 +126,9 @@ export function MediationWorkspace() {
   // 좁혔다, `ResponseDeadlineModal.tsx` 헤더 주석과 같은 스코프 결정).
   const [deadlineModalOpen, setDeadlineModalOpen] = useState(false);
   const [confirmedDeadline, setConfirmedDeadline] = useState<string | null>(null);
+  // T54 — "기한 재협상" 링크(HolidayConflictWarning)로 열렸을 때만 채워지는 값. "Set response
+  // deadline" 버튼으로 여는 일반 경로는 `null`을 넘겨(prefill 없음) 빈 필드로 시작한다.
+  const [deadlinePrefill, setDeadlinePrefill] = useState<string | null>(null);
   // MJ-4(reviewer 재검토, Major 1 → 수정) — Idempotency-Key는 "승인 시도 하나"의 정체성(스냅샷 +
   // 최종문)에 묶여 한 번만 생성돼야 한다. `handleApprove` 안에서 매번 `crypto.randomUUID()`를
   // 부르면 응답 유실 후 재시도마다 새 키가 나가 서버의 멱등성 백스톱이 아무것도 막지 못하고
@@ -432,6 +435,14 @@ export function MediationWorkspace() {
               // 않으므로 이 값은 실제로 쓰이지 않지만, prop 타입을 `string`으로 단순하게 유지하기
               // 위한 안전한 fallback이다).
               originalTextSnapshot={approvalSnapshot?.text ?? text}
+              // T54 — CRITICAL이면(=`deadlineNegotiationAvailable` false) 빈 배열을 넘긴다.
+              // "기한 재협상" 링크가 열 UX-005 자체가 CRITICAL에서 존재할 수 없다(AC-005, T40과
+              // 같은 게이트) — 경고 문구 자체는 보여도 그 밑의 링크만 없는 상태를 만들지 않는다.
+              holidayConflicts={deadlineNegotiationAvailable ? (result?.holidayConflicts ?? []) : []}
+              onNegotiateDeadline={(deadlineIso) => {
+                setDeadlinePrefill(deadlineIso);
+                setDeadlineModalOpen(true);
+              }}
             />
           </div>
           <div className={`${styles.column} ${styles.columnRecipient}`}>
@@ -447,7 +458,10 @@ export function MediationWorkspace() {
               ticketOffered={hasResult && result?.ticketOption.offered === true}
               onConvertToTicket={handleConvertToTicket}
               deadlineNegotiationAvailable={deadlineNegotiationAvailable}
-              onOpenDeadlineNegotiation={() => setDeadlineModalOpen(true)}
+              onOpenDeadlineNegotiation={() => {
+                setDeadlinePrefill(null);
+                setDeadlineModalOpen(true);
+              }}
               confirmedDeadline={confirmedDeadline}
             />
           </div>
@@ -464,6 +478,7 @@ export function MediationWorkspace() {
           urgency={displayedUrgency}
           onClose={() => setDeadlineModalOpen(false)}
           onConfirm={setConfirmedDeadline}
+          prefillDeadline={deadlinePrefill}
         />
       )}
     </div>

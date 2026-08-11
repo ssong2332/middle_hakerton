@@ -1,0 +1,24 @@
+.list {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.item {
+  font: 400 12px var(--font-sans);
+  color: var(--text-muted-75);
+}
+
+.negotiateLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 0 0 6px;
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font: 700 12px var(--font-sans);
+  text-decoration: underline;
+  cursor: pointer;
+}
