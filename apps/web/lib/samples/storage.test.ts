@@ -5,7 +5,13 @@
 import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { IndicatorDeltas } from '@cross-border/core';
-import { deleteSample, insertSample, listSamples, type InsertSampleInput } from './storage';
+import {
+  deleteSample,
+  getIndicatorRollupForCounterpart,
+  insertSample,
+  listSamples,
+  type InsertSampleInput,
+} from './storage';
 
 interface FakeHandle {
   client: SupabaseClient;
@@ -282,5 +288,82 @@ describe('deleteSample', () => {
     const { client } = createFakeDeleteSupabase({ error: { message: 'delete failed' } });
 
     await expect(deleteSample(client, 'user-1', 'sample-1')).rejects.toBeTruthy();
+  });
+});
+
+interface FakeRollupHandle {
+  client: SupabaseClient;
+  eqCalls: string[];
+}
+
+function createFakeRollupSupabase(
+  options: {
+    rows?: Array<{ source: 'manual' | 'github'; indicator_deltas: IndicatorDeltas }>;
+    error?: { message: string } | null;
+  } = {},
+): FakeRollupHandle {
+  const eqCalls: string[] = [];
+  const client = {
+    from(table: string) {
+      if (table !== 'observation_samples') throw new Error(`unexpected table: ${table}`);
+      return {
+        select: () => ({
+          eq: (column: string, value: string) => {
+            eqCalls.push(`${column}=${value}`);
+            return {
+              eq: async (column2: string, value2: string) => {
+                eqCalls.push(`${column2}=${value2}`);
+                return { data: options.error ? null : (options.rows ?? []), error: options.error ?? null };
+              },
+            };
+          },
+        }),
+      };
+    },
+  } as unknown as SupabaseClient;
+  return { client, eqCalls };
+}
+
+describe('getIndicatorRollupForCounterpart — T70/AC-079/AC-083', () => {
+  it('owner_user_id·counterpart_identifier 둘 다로 필터링한다', async () => {
+    const { client, eqCalls } = createFakeRollupSupabase({ rows: [] });
+
+    await getIndicatorRollupForCounterpart(client, 'user-1', 'tanaka@example.com');
+
+    expect(eqCalls).toEqual(['owner_user_id=user-1', 'counterpart_identifier=tanaka@example.com']);
+  });
+
+  it('행이 없으면 두 출처 모두 0으로 채워진 롤업을 반환한다', async () => {
+    const { client } = createFakeRollupSupabase({ rows: [] });
+
+    const result = await getIndicatorRollupForCounterpart(client, 'user-1', 'tanaka@example.com');
+
+    expect(result).toEqual({
+      manual: { sampleCount: 0, emojiCount: 0, hedgeCount: 0 },
+      github: { sampleCount: 0, emojiCount: 0, hedgeCount: 0 },
+    });
+  });
+
+  it('출처별로 sampleCount·emojiCount·hedgeCount를 합산한다', async () => {
+    const { client } = createFakeRollupSupabase({
+      rows: [
+        { source: 'manual', indicator_deltas: { ...SAMPLE_DELTAS, emojiCount: 2, hedgeCount: 1 } },
+        { source: 'manual', indicator_deltas: { ...SAMPLE_DELTAS, emojiCount: 1, hedgeCount: 3 } },
+        { source: 'github', indicator_deltas: { ...SAMPLE_DELTAS, emojiCount: 5, hedgeCount: 0 } },
+      ],
+    });
+
+    const result = await getIndicatorRollupForCounterpart(client, 'user-1', 'tanaka@example.com');
+
+    expect(result).toEqual({
+      manual: { sampleCount: 2, emojiCount: 3, hedgeCount: 4 },
+      github: { sampleCount: 1, emojiCount: 5, hedgeCount: 0 },
+    });
+  });
+
+  it('조회가 실패하면 에러를 던진다', async () => {
+    const { client } = createFakeRollupSupabase({ error: { message: 'select failed' } });
+
+    await expect(getIndicatorRollupForCounterpart(client, 'user-1', 'tanaka@example.com')).rejects.toBeTruthy();
   });
 });

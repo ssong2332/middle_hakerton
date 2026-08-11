@@ -163,3 +163,46 @@ export async function deleteSample(
     throw new NotFoundError('표본을 찾을 수 없습니다');
   }
 }
+
+export interface CounterpartIndicatorRollup {
+  manual: { sampleCount: number; emojiCount: number; hedgeCount: number };
+  github: { sampleCount: number; emojiCount: number; hedgeCount: number };
+}
+
+interface RollupRow {
+  source: 'manual' | 'github';
+  indicator_deltas: IndicatorDeltas;
+}
+
+/**
+ * T70 — `GET /api/protocol/mismatches`(AC-079/AC-083)의 입력. 특정 상대에 대해서만 출처별로
+ * `emojiCount`/`hedgeCount`를 합산한다 — `listSamples()`(사용자 전체 표본용)와는 조회 대상이
+ * 다르다(이 함수는 `counterpart_identifier`까지 필터링). 판정 로직 자체는
+ * `packages/core/src/rules/protocol-mismatch.ts`의 `computeProtocolMismatches()`가 소유한다
+ * (이 함수는 집계만 하고 "불일치인지"는 판단하지 않는다 — DB 조회와 규칙을 분리하는 이 리포의
+ * 관례, `docs/Architecture.md` Conventions 11).
+ */
+export async function getIndicatorRollupForCounterpart(
+  client: SupabaseClient,
+  userId: string,
+  counterpartIdentifier: string,
+): Promise<CounterpartIndicatorRollup> {
+  const { data, error } = await client
+    .from('observation_samples')
+    .select('source, indicator_deltas')
+    .eq('owner_user_id', userId)
+    .eq('counterpart_identifier', counterpartIdentifier);
+  if (error) throw error;
+
+  const rollup: CounterpartIndicatorRollup = {
+    manual: { sampleCount: 0, emojiCount: 0, hedgeCount: 0 },
+    github: { sampleCount: 0, emojiCount: 0, hedgeCount: 0 },
+  };
+  for (const row of (data ?? []) as RollupRow[]) {
+    const bucket = rollup[row.source];
+    bucket.sampleCount += 1;
+    bucket.emojiCount += row.indicator_deltas.emojiCount;
+    bucket.hedgeCount += row.indicator_deltas.hedgeCount;
+  }
+  return rollup;
+}
