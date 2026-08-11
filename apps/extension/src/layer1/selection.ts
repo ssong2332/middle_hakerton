@@ -3,6 +3,8 @@
 //    이 파일은 현재 페이지 주소를 읽어 분기하지 않는다 — 읽으면 위반(`docs/CodingRules.md`
 //    Directory Rules `apps/extension/src/layer1` 행, 검증: `selection.test.ts`).
 
+import { getLayer1ColorScheme, getLayer1Theme } from './theme';
+
 const BUTTON_ID = 'cbm-layer1-selection-button';
 
 export interface SelectionPayload {
@@ -133,24 +135,59 @@ function createFloatingButton(
   const button = document.createElement('button');
   button.id = BUTTON_ID;
   button.type = 'button';
-  button.textContent = '중재하기';
+
+  // 🔴 (2026-08-12, T81) "중재하기" 텍스트를 아이콘 단독으로 바꾸지 않는다 — `docs/UX.md`
+  // Accessibility "Error Messaging"·T77 Decision Log("existing icon+text convention... a nav
+  // toggle is no exception")가 이미 확정한 아이콘 단독 금지 원칙을 그대로 따른다. 대신 웹앱
+  // 브랜드(`PrimaryNav.module.css`의 "MEDIATE" 워드마크, 별도 픽토그램 없음)와 통일되게 accent
+  // 배경의 작은 "M" 모노그램 배지 + 기존 "중재하기" 텍스트를 함께 둔다(새 픽토그램을 지어내지
+  // 않고 기존 브랜드 정체성을 재사용 — 이 프로젝트의 "지어내지 않는다" 원칙과 같은 결).
+  const theme = getLayer1Theme();
+  const mark = document.createElement('span');
+  mark.setAttribute('aria-hidden', 'true');
+  Object.assign(mark.style, {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '14px',
+    height: '14px',
+    borderRadius: '3px',
+    background: theme.accent,
+    color: theme.accentText,
+    fontWeight: '800',
+    fontSize: '9px',
+    lineHeight: '1',
+    flexShrink: '0',
+  });
+  mark.textContent = 'M';
+  const label = document.createElement('span');
+  label.textContent = '중재하기';
+  button.append(mark, label);
 
   // position: fixed — getBoundingClientRect()가 이미 뷰포트 기준 좌표라 스크롤 오프셋 보정이
   // 필요 없다. top/left는 DOM에 붙인 뒤 실제 버튼 크기를 측정해서 계산한다(clamp 근거는
   // computeClampedPosition 주석 참조) — 초기값은 measure 전까지만 존재하는 placeholder다.
+  // 🔴 (2026-08-12, T81) 다크모드: host 페이지가 아니라 OS/브라우저 신호(`theme.ts`)를 읽는다.
+  // `colorScheme`을 명시해 브라우저의 강제 다크모드 재처리가 이미 테마 처리된 이 버튼을 다시
+  // 건드리지 않게 한다(`docs/UX.md` "Selection-triggered floating button" 패턴, 다크모드 절 참조).
   Object.assign(button.style, {
     position: 'fixed',
     top: '0px',
     left: '0px',
     zIndex: '2147483647',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
     padding: '4px 10px',
     fontSize: '12px',
     lineHeight: '1.4',
     borderRadius: '4px',
-    border: '1px solid #ccc',
-    background: '#fff',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+    border: `1px solid ${theme.border}`,
+    background: theme.bg,
+    color: theme.text,
+    boxShadow: `0 1px 4px ${theme.shadow}`,
     cursor: 'pointer',
+    colorScheme: getLayer1ColorScheme(),
   });
 
   // M-1(reviewer): 실브라우저에서 host 페이지 어디든 mousedown하면 document selection이
@@ -171,6 +208,32 @@ function createFloatingButton(
   document.body.appendChild(button);
 
   // C-1(reviewer): DOM에 붙인 뒤에야 실제 크기를 측정할 수 있다(붙기 전엔 항상 0×0).
+  const size = button.getBoundingClientRect();
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const { top, left } = computeClampedPosition(
+    payload.rect,
+    { width: size.width, height: size.height },
+    viewport,
+  );
+  button.style.top = `${top}px`;
+  button.style.left = `${left}px`;
+}
+
+/**
+ * 🔴 (2026-08-12, T81) 스크롤 시 버튼을 선택 위치에 맞춰 다시 그린다 — 지운다(M-3, 아래
+ * `initSelectionOverlay` 주석)와는 다른 동작이다. 이전에는 scroll 이벤트 자체를 아예 다루지
+ * 않아 버튼이 화면 좌표에 고정된 채 남았다(사용자 실측 발견 — 선택 후 페이지를 스크롤하면
+ * 버튼이 원래 선택 위치를 벗어나 엉뚱한 곳에 떠 있었다). `getSelectionPayload()`를 다시 호출해
+ * 최신 rect를 구한다 — Range/폼 컨트롤 selection은 스크롤로 사라지지 않으므로 이 값은 항상
+ * 갱신된 뷰포트 기준 좌표다. `docs/UX.md` "Selection-triggered floating button" 패턴에 이
+ * 동작을 새로 명시했다(스크롤은 여전히 해제 트리거가 아니다 — M-3의 "지우지 않는다" 결정은
+ * 그대로 유지, 위치만 갱신한다).
+ */
+function repositionFloatingButton(): void {
+  const button = getExistingButton();
+  if (!button) return;
+  const payload = getSelectionPayload();
+  if (!payload) return;
   const size = button.getBoundingClientRect();
   const viewport = { width: window.innerWidth, height: window.innerHeight };
   const { top, left } = computeClampedPosition(
@@ -283,16 +346,29 @@ export function initSelectionOverlay(options: SelectionOverlayOptions = {}): () 
   // M-3(reviewer): `docs/UX.md:928`가 명시하는 해제 트리거는 정확히 3개(다른 곳 클릭 / Escape /
   // 새 빈 선택)뿐이고 scroll은 없다 — 이전 구현은 scroll 리스너를 `capture:true`로 window에
   // 걸어 중첩 스크롤 컨테이너(예: 자동 스크롤되는 채팅 목록)에서 버블링된 scroll에도 버튼을
-  // 지웠다. 문서에 없는 동작을 임의로 추가하지 않고 제거한다.
+  // 지웠다. 문서에 없는 동작을 임의로 추가하지 않고 제거했다(이 판단 자체는 유지).
+  //
+  // 🔴 (2026-08-12, T81) 지우는 대신 위치를 갱신하는 scroll 리스너를 다시 추가한다 — M-3이
+  // 지운 것은 "지운다"는 동작이었지, "스크롤을 완전히 무시한다"는 결정이 아니었다(위 M-3 원문도
+  // "해제 트리거가 아니다"라고만 말한다). 스크롤 후에도 버튼이 화면에 그대로 있지만 원래
+  // 선택했던 위치와 어긋나 있던 것은 실사용에서 발견된 별도의 버그다(`repositionFloatingButton`
+  // 헤더 주석) — `docs/UX.md`에 이 재배치 동작을 새로 명시했다. `capture:true`로 중첩 스크롤
+  // 컨테이너의 스크롤도 잡고, `passive:true`로 host 페이지의 스크롤 성능에 관여하지 않는다
+  // (AC-052⑤ — preventDefault/stopPropagation을 호출하지 않는다).
+  const handleScroll = (): void => {
+    repositionFloatingButton();
+  };
 
   document.addEventListener('mouseup', handleMouseUp);
   document.addEventListener('selectionchange', handleSelectionChange);
   document.addEventListener('keydown', handleKeyDown);
+  document.addEventListener('scroll', handleScroll, { capture: true, passive: true });
 
   return () => {
     document.removeEventListener('mouseup', handleMouseUp);
     document.removeEventListener('selectionchange', handleSelectionChange);
     document.removeEventListener('keydown', handleKeyDown);
+    document.removeEventListener('scroll', handleScroll, { capture: true });
     removeFloatingButton();
   };
 }

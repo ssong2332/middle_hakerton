@@ -7,6 +7,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // `MediationPanel` was actually rendered with (identity check, not just truthiness) —
 // see the "passes the origin element through" test below.
 let receivedOrigin: HTMLElement | null | undefined;
+// 🔴 (2026-08-12, T81) `receivedAnchorRect` — same pattern for `payload.rect`, which used to be
+// silently dropped (never passed to MediationPanel at all, so the panel could never position
+// itself near the selection). See "passes the payload rect through as anchorRect" below.
+let receivedAnchorRect: DOMRect | null | undefined;
 
 vi.mock('./MediationPanel', () => ({
   MediationPanel: ({
@@ -14,13 +18,16 @@ vi.mock('./MediationPanel', () => ({
     onClose,
     adapter,
     origin,
+    anchorRect,
   }: {
     initialText: string;
     onClose: () => void;
     adapter?: { id: string } | null;
     origin?: HTMLElement | null;
+    anchorRect?: DOMRect | null;
   }) => {
     receivedOrigin = origin;
+    receivedAnchorRect = anchorRect;
     return (
       <div data-testid="mock-panel">
         <span>{initialText}</span>
@@ -43,6 +50,7 @@ describe('panel-mount', () => {
     closeMediationPanel();
     document.body.innerHTML = '';
     receivedOrigin = undefined;
+    receivedAnchorRect = undefined;
   });
 
   it('mounts the panel inside a shadow root host attached to document.body', () => {
@@ -144,5 +152,16 @@ describe('panel-mount', () => {
     openMediationPanel({ text: 'x', rect: FAKE_RECT, origin: originEl });
 
     expect(receivedOrigin).toBe(originEl);
+  });
+
+  // 🔴 (2026-08-12, T81) Red evidence — before wiring `anchorRect={payload.rect}` in
+  // `panel-mount.tsx`, this test failed with `expected undefined to be { top: 5, ... }`
+  // (`payload.rect` was received here but never forwarded). Confirms the panel now has what it
+  // needs to position itself near the selection instead of always defaulting to the corner.
+  it('passes the payload rect through as anchorRect to MediationPanel', () => {
+    const rect = { top: 5, bottom: 25, left: 15, right: 115 } as DOMRect;
+    openMediationPanel({ text: 'x', rect, origin: null });
+
+    expect(receivedAnchorRect).toBe(rect);
   });
 });

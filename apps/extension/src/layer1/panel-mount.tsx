@@ -61,6 +61,7 @@ export function openMediationPanel(
         onClose={closeMediationPanel}
         adapter={adapter}
         origin={payload.origin}
+        anchorRect={payload.rect}
       />,
     );
   });
