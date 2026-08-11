@@ -24,6 +24,8 @@ export * from './rules/deadline-negotiation';
 export * from './rules/scheduled-send';
 export * from './rules/feedback-summary';
 export * from './rules/business-days';
+export * from './rules/github-enrichment';
+export * from './rules/timezone-candidates';
 export * from './constants';
 export * from './data/fallback-responses';
 export * from './data/emoji-risk';
