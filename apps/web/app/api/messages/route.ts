@@ -24,9 +24,16 @@
  * false`로 안전하게 응답한다 — 아래 본문 주석 및 `applyPatternLearningSafe` 헤더 주석 참조.
  */
 import { z } from 'zod';
-import { resolveDeliveryPath, type CountryCode, type UrgencyLevel } from '@cross-border/core';
+import {
+  businessDaysElapsed,
+  isReminderSuggested,
+  resolveDeliveryPath,
+  type CountryCode,
+  type UrgencyLevel,
+} from '@cross-border/core';
 import { withApi } from '../../../lib/http';
 import {
+  fetchSentMessages,
   insertSentMessageAndDiffRecord,
   type SentMessageChannel,
 } from '../../../lib/messages/storage';
@@ -149,5 +156,97 @@ export const POST = withApi<MessagesRequest, MessagesResponse>(
     }
 
     return responseBody;
+  },
+);
+
+/**
+ * `GET /api/messages` — `docs/API.md` "GET /api/messages" · T52(UX-015). 발송 목록 +
+ * 업무일 경과·무응답 판정. 계산 자체는 T51의 `businessDaysElapsed`/`isReminderSuggested`
+ * (`@cross-border/core`, 순수 함수)에 위임한다 — 이 라우트는 조회 + 배선만 한다.
+ *
+ * 🔴 이미 답장을 받은 건(`replied === true`)은 업무일 경과가 의미가 없다(더 이상 무응답이 아니다)
+ * — `businessDaysElapsed: null`, `reminderSuggested: false`로 응답한다. `recipientTimezone`은
+ * 계산에만 쓰고 응답 필드에는 담지 않는다(`docs/API.md:132` Response 200 필드 목록에 없음).
+ */
+export interface MessageListItem {
+  id: string;
+  recipient: string;
+  recipientCountry: CountryCode | null;
+  finalText: string;
+  urgency: string;
+  sentAt: string;
+  replied: boolean;
+  repliedMarkedAt: string | null;
+  businessDaysElapsed: number | null;
+  reminderSuggested: boolean;
+  isReminder: boolean;
+  mediationApplied: boolean;
+}
+
+export interface MessagesListResponse {
+  items: MessageListItem[];
+}
+
+const DEFAULT_LIST_LIMIT = 50;
+
+function parseRepliedFilter(value: string | null): 'all' | 'true' | 'false' {
+  return value === 'true' || value === 'false' ? value : 'all';
+}
+
+function parseLimit(value: string | null): number {
+  const parsed = value === null ? NaN : Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_LIST_LIMIT;
+}
+
+export const GET = withApi<undefined, MessagesListResponse>(
+  { requireAuth: true },
+  async ({ request, session }) => {
+    const client = session?.client;
+    if (!client) {
+      throw new Error('세션에 인증된 Supabase 클라이언트가 없습니다');
+    }
+
+    const url = new URL(request.url);
+    const repliedFilter = parseRepliedFilter(url.searchParams.get('replied'));
+    const limit = parseLimit(url.searchParams.get('limit'));
+
+    const rows = await fetchSentMessages(client, session.userId, repliedFilter, limit);
+    const now = new Date();
+
+    const items: MessageListItem[] = rows.map((row) => {
+      if (row.replied) {
+        return {
+          id: row.id,
+          recipient: row.recipient,
+          recipientCountry: row.recipientCountry,
+          finalText: row.finalText,
+          urgency: row.urgency,
+          sentAt: row.sentAt,
+          replied: row.replied,
+          repliedMarkedAt: row.repliedMarkedAt,
+          businessDaysElapsed: null,
+          reminderSuggested: false,
+          isReminder: row.isReminder,
+          mediationApplied: row.mediationApplied,
+        };
+      }
+      const days = businessDaysElapsed(row.sentAt, now, row.recipientTimezone, row.recipientCountry);
+      return {
+        id: row.id,
+        recipient: row.recipient,
+        recipientCountry: row.recipientCountry,
+        finalText: row.finalText,
+        urgency: row.urgency,
+        sentAt: row.sentAt,
+        replied: row.replied,
+        repliedMarkedAt: row.repliedMarkedAt,
+        businessDaysElapsed: days,
+        reminderSuggested: isReminderSuggested(days),
+        isReminder: row.isReminder,
+        mediationApplied: row.mediationApplied,
+      };
+    });
+
+    return { items };
   },
 );
