@@ -26,6 +26,7 @@ export * from './rules/feedback-summary';
 export * from './rules/business-days';
 export * from './rules/github-enrichment';
 export * from './rules/timezone-candidates';
+export * from './rules/protocol-mismatch';
 export * from './observation/indicators';
 export * from './constants';
 export * from './data/fallback-responses';
