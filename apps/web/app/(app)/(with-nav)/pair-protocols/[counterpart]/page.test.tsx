@@ -29,10 +29,13 @@ const UNTOUCHED_RECORD = {
   updatedAt: new Date(0).toISOString(),
 };
 
-function mockLoadSuccess(record: unknown) {
+function mockLoadSuccess(record: unknown, mismatches: unknown = { axes: [] }) {
   mockFetch.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
+    if (method === 'GET' && url.startsWith('/api/protocol/mismatches?counterpart=')) {
+      return Promise.resolve(jsonOk(mismatches));
+    }
     if (method === 'GET' && url.startsWith('/api/protocol?counterpart=')) {
       return Promise.resolve(jsonOk(record));
     }
@@ -123,6 +126,9 @@ describe('PairProtocolCounterpartPage (UX-011 상세) — AC-037/AC-075', () => 
     mockFetch.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? 'GET';
+      if (method === 'GET' && url.startsWith('/api/protocol/mismatches?counterpart=')) {
+        return Promise.resolve(jsonOk({ axes: [] }));
+      }
       if (method === 'GET') return Promise.resolve(jsonOk(UNTOUCHED_RECORD));
       if (method === 'PUT' && url === '/api/protocol') {
         return Promise.resolve(
@@ -172,6 +178,9 @@ describe('PairProtocolCounterpartPage (UX-011 상세) — AC-037/AC-075', () => 
     mockFetch.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? 'GET';
+      if (method === 'GET' && url.startsWith('/api/protocol/mismatches?counterpart=')) {
+        return Promise.resolve(jsonOk({ axes: [] }));
+      }
       if (method === 'GET') {
         return Promise.resolve(
           jsonOk({
@@ -197,5 +206,129 @@ describe('PairProtocolCounterpartPage (UX-011 상세) — AC-037/AC-075', () => 
       expect(screen.getByRole('alert').textContent).toBe('저장하지 못했습니다, 다시 시도해주세요');
     });
     expect((screen.getByLabelText('호칭') as HTMLInputElement).value).toBe('님');
+  });
+});
+
+describe('PairProtocolCounterpartPage — MismatchBanner (T69/UF-022, AC-079/AC-083)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('불일치가 없으면 배너를 렌더하지 않는다', async () => {
+    mockLoadSuccess(UNTOUCHED_RECORD, { axes: [] });
+    render(<PairProtocolCounterpartPage />);
+
+    await waitFor(() => screen.getByText('아직 정해지지 않음'));
+    expect(screen.queryByText('합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?')).toBeNull();
+  });
+
+  it('이모지 축이 불일치면 이모지 필드 위에 고정 문구 배너를 보여준다(판정 문구 아님)', async () => {
+    mockLoadSuccess(UNTOUCHED_RECORD, {
+      axes: [
+        { axis: 'emoji', mismatched: true, comparison: '규약: 이모지 사용 지양 · 관측: 이모지 5건', sampleCount: 5, sources: ['manual'] },
+      ],
+    });
+    render(<PairProtocolCounterpartPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?')).toBeTruthy();
+    });
+    expect(screen.queryByText(/규약: 이모지 사용 지양/)).toBeNull();
+  });
+
+  it('"확인"을 누르면 집계 어휘만 담은 비교 문장이 펼쳐진다(원문 인용 없음)', async () => {
+    mockLoadSuccess(UNTOUCHED_RECORD, {
+      axes: [
+        {
+          axis: 'directness',
+          mismatched: true,
+          comparison: '규약: 직설 허용 · 관측: 완곡 표현 3건 (표본 5건)',
+          sampleCount: 5,
+          sources: ['manual'],
+        },
+      ],
+    });
+    render(<PairProtocolCounterpartPage />);
+    await waitFor(() => screen.getByText('합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?'));
+
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+
+    expect(screen.getByText('규약: 직설 허용 · 관측: 완곡 표현 3건 (표본 5건)')).toBeTruthy();
+  });
+
+  it('"나중에"를 누르면 배너가 사라지고 값은 바뀌지 않는다(AC-079⑤)', async () => {
+    mockLoadSuccess(UNTOUCHED_RECORD, {
+      axes: [
+        { axis: 'emoji', mismatched: true, comparison: '규약: 이모지 사용 지양 · 관측: 이모지 5건', sampleCount: 5, sources: ['manual'] },
+      ],
+    });
+    render(<PairProtocolCounterpartPage />);
+    await waitFor(() => screen.getByText('합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?'));
+
+    fireEvent.click(screen.getByRole('button', { name: '나중에' }));
+
+    expect(screen.queryByText('합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?')).toBeNull();
+  });
+
+  it('저장을 누르면(값 변경 없이도) 배너가 전부 지워진다', async () => {
+    mockFetch.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? 'GET';
+      if (method === 'GET' && url.startsWith('/api/protocol/mismatches?counterpart=')) {
+        return Promise.resolve(
+          jsonOk({
+            axes: [
+              { axis: 'emoji', mismatched: true, comparison: 'x', sampleCount: 5, sources: ['manual'] },
+            ],
+          }),
+        );
+      }
+      if (method === 'GET') {
+        return Promise.resolve(
+          jsonOk({
+            ...UNTOUCHED_RECORD,
+            directnessAllowed: 'yes',
+            emojiPolicy: 'avoid',
+            addressForm: '님',
+            deadlineStyle: 'EOD',
+          }),
+        );
+      }
+      if (method === 'PUT') {
+        return Promise.resolve(
+          jsonOk({
+            ...UNTOUCHED_RECORD,
+            directnessAllowed: 'yes',
+            emojiPolicy: 'avoid',
+            addressForm: '님',
+            deadlineStyle: 'EOD',
+            authorshipState: 'sender_confirmed',
+          }),
+        );
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${method} ${url}`));
+    });
+    render(<PairProtocolCounterpartPage />);
+    await waitFor(() => screen.getByText('합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?'));
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => expect(screen.getByText('저장됨')).toBeTruthy());
+    expect(screen.queryByText('합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?')).toBeNull();
+  });
+
+  it('불일치 조회 실패는 에러가 아니다 — 배너 영역이 그냥 렌더되지 않는다', async () => {
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/protocol/mismatches?counterpart=')) {
+        return Promise.resolve({ ok: false, json: async () => ({}) });
+      }
+      return Promise.resolve(jsonOk(UNTOUCHED_RECORD));
+    });
+    render(<PairProtocolCounterpartPage />);
+
+    await waitFor(() => screen.getByText('아직 정해지지 않음'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('합의된 규칙과 관측이 다릅니다. 확인해 보시겠어요?')).toBeNull();
   });
 });
