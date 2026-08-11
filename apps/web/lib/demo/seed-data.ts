@@ -15,6 +15,7 @@
  */
 import type { DiffPatternKey } from '@cross-border/core';
 import { classifyDiffPattern } from '@cross-border/core';
+import { computePairKey } from '../protocol/storage';
 
 // ---------------------------------------------------------------------------
 // 시드 대상 4인 식별자
@@ -252,15 +253,19 @@ export interface PairProtocolRow {
 }
 
 /**
- * `docs/Database.md:140` "두 식별자를 소문자화 후 정렬해 〈구분자〉로 연결"이라고만 적혀 있고
- * 구분자 문자 자체가 문서 렌더링에서 비어 있다(코드 스팬이 빈 채로 남음 — measured, 원문
- * 그대로 인용해도 문자가 없다). **T41(#24 규약 구현)이 아직 착수 전이라 실제 알고리즘이 코드에
- * 없다** — 이 함수는 T61이 임시로 고른 구분자(`::`)를 쓴다. **T41 착수 시 이 형식이 실제
- * 구현과 일치하는지 반드시 재확인해야 한다** — 다르면 이 시드 행을 `pair_key`로 조회하는 코드가
- * 이 행을 찾지 못한다.
+ * 🔴 **(2026-08-11, T62 수정 — 실제 구현과 불일치했던 버그)** T61이 T41 착수 전에 임시로 고른
+ * `::` 구분자를 그대로 두고 있었다 — 하지만 T41이 만든 실제 조회 경로
+ * (`apps/web/lib/protocol/storage.ts`의 `computePairKey()`)는 U+0001(SOH) 제어문자를 구분자로
+ * 쓴다(그 파일 헤더 주석 참조, `docs/Database.md:140`). 두 구분자가 다르면 이 시드가 만드는
+ * `pair_key`와 `fetchProtocol()`이 조회하는 `pair_key`가 서로 다른 문자열이 되어, **시드한
+ * 타나카·Michael 규약 행을 실제 앱이 영원히 찾지 못한다**(COMPARE-01 장면 전체가 조용히
+ * 깨지는 원인 — T62에서 실측으로 발견, `apps/web/lib/demo/seed-data.test.ts`가 이전에는 이
+ * 잘못된 `::` 형태를 스스로 재확인하는 순환 검증이라 잡지 못했다). 이제 실제 구현을 그대로
+ * 재사용해 두 계산이 물리적으로 하나가 되게 한다(T26/T27 "같은 계산 중복 회피" 선례와 같은
+ * 원칙) — 이 함수는 더 이상 별도 알고리즘을 갖지 않는다.
  */
 export function buildPairKey(identifierA: string, identifierB: string): string {
-  return [identifierA.toLowerCase(), identifierB.toLowerCase()].sort().join('::');
+  return computePairKey(identifierA, identifierB);
 }
 
 /** TestCases.md:239-244 "규약 시드 (4항목 = AC-037)" 표 그대로. */

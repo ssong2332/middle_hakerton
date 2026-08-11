@@ -14,6 +14,7 @@ import {
   MICHAEL_SELF_REPORT,
   TANAKA_SELF_REPORT,
 } from './seed-data';
+import { computePairKey } from '../protocol/storage';
 
 describe('buildProfileRow', () => {
   it('onboarding_state를 항상 completed로 만든다(AC-059, Planning Decision #85)', () => {
@@ -85,12 +86,16 @@ describe('buildPairKey', () => {
     expect(a).toBe(b);
   });
 
-  it('실제 시드 식별자(v1.8, "+" 서브어드레싱 포함)로도 정렬 순서가 흔들리지 않는다 — "+"(0x2B)가 "."(0x2E)보다 ASCII상 앞서지만, 두 이메일 로컬파트의 첫 글자(j/y, j/m)에서 이미 순서가 갈려 "+" 위치까지 비교가 내려가지 않는다', () => {
+  // T62(2026-08-11) — 이전에는 이 테스트가 seed-data.ts 자신의 `::` 구분자를 그대로 재확인하는
+  // 순환 검증이라, T61의 임시 구분자가 T41의 실제 `computePairKey()`(U+0001 구분자)와 달라도
+  // 잡지 못했다(seed된 규약 행을 실제 앱이 영원히 못 찾는 버그). 이제 실제 구현과의 일치를
+  // 직접 단언한다 — `buildPairKey`가 다시 갈라지면(예: 다른 사람이 실수로 재구현) 즉시 fail한다.
+  it('실제 조회 경로(protocol/storage.ts computePairKey)와 동일한 값을 만든다', () => {
     expect(buildPairKey(DEMO_IDENTIFIERS.jihoon, DEMO_IDENTIFIERS.tanaka)).toBe(
-      `${DEMO_IDENTIFIERS.jihoon.toLowerCase()}::${DEMO_IDENTIFIERS.tanaka.toLowerCase()}`,
+      computePairKey(DEMO_IDENTIFIERS.jihoon, DEMO_IDENTIFIERS.tanaka),
     );
     expect(buildPairKey(DEMO_IDENTIFIERS.jihoon, DEMO_IDENTIFIERS.michael)).toBe(
-      `${DEMO_IDENTIFIERS.jihoon.toLowerCase()}::${DEMO_IDENTIFIERS.michael.toLowerCase()}`,
+      computePairKey(DEMO_IDENTIFIERS.jihoon, DEMO_IDENTIFIERS.michael),
     );
   });
 });
