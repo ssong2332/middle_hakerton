@@ -34,12 +34,14 @@
  * "Absent-not-disabled controls" 패턴, `docs/UX.md:929`) — 그 경우 이전과 동일하게 recipient는
  * `null`로 남아 AC-066①④가 그대로 성립한다.
  */
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { computeIndicatorDeltas, LENGTH_COUNTER_SHOW_AT, SOFT_LENGTH_CAP } from '@cross-border/core';
 import type { MediationResult } from '@cross-border/core';
 import { addSample, callMediationApi, fetchKnownCounterparts } from '../shared/api';
 import { getStoredToken } from '../shared/token-storage';
 import { NON_LIVE_NOTICE } from '../shared/non-live-notice';
+import { computeClampedPosition } from './selection';
+import { getLayer1ColorScheme, getLayer1Theme, subscribeLayer1ThemeChange, type Layer1Theme } from './theme';
 import type { Layer2Adapter } from './registry';
 
 export interface MediationPanelProps {
@@ -53,6 +55,12 @@ export interface MediationPanelProps {
    * 해제되면 함께 사라져야 detached 노드를 붙들지 않는다(모듈 전역에 담지 않는다).
    */
   origin?: HTMLElement | null;
+  /**
+   * 🔴 (2026-08-12, T81) `SelectionPayload.rect` — 패널을 선택 위치 옆에 놓기 위한 앵커.
+   * `panel-mount.tsx`가 그대로 전달한다. 없으면(구버전 호출자·테스트) 기존 우상단 고정
+   * 위치로 폴백한다 — 이 prop을 생략해도 깨지지 않는다.
+   */
+  anchorRect?: DOMRect | null;
 }
 
 type Status = 'checkingAuth' | 'notLoggedIn' | 'idle' | 'loading' | 'success' | 'error';
@@ -89,7 +97,19 @@ export function MediationPanel({
   onClose,
   adapter = null,
   origin = null,
+  anchorRect = null,
 }: MediationPanelProps) {
+  // 🔴 (2026-08-12, T81) 다크모드 — host 페이지가 아니라 OS/브라우저 신호를 읽는다(`theme.ts`
+  // 헤더 주석 참조). 패널은 버튼보다 오래 열려 있을 수 있어(LLM 호출 대기 등) 실시간 전환도
+  // 구독한다.
+  const [theme, setTheme] = useState<Layer1Theme>(() => getLayer1Theme());
+  useEffect(() => subscribeLayer1ThemeChange(() => setTheme(getLayer1Theme())), []);
+
+  // 🔴 (2026-08-12, T81) `anchorRect`가 있으면 선택 위치 옆에, 없으면 기존 우상단 고정 위치로
+  // 폴백한다. 버튼과 같은 clamp 로직(`computeClampedPosition`)을 재사용해 뷰포트를 벗어나지
+  // 않는다 — `docs/UX.md`가 이미 이 패널에 대해 "opens next to a text selection"이라고 밝힌
+  // 요구를 실제로 구현한다(그동안 `payload.rect`가 `panel-mount.tsx`에서 버려지고 있었다).
+  const [anchoredPos, setAnchoredPos] = useState<{ top: number; left: number } | null>(null);
   const [status, setStatus] = useState<Status>('checkingAuth');
   const [text, setText] = useState(initialText);
   const [result, setResult] = useState<MediationResult | null>(null);
@@ -142,6 +162,17 @@ export function MediationPanel({
   useEffect(() => {
     panelRef.current?.focus();
   }, []);
+
+  // 🔴 (2026-08-12, T81) 마운트 직후(레이아웃 커밋 후) 패널 실제 크기를 측정해 anchorRect 옆으로
+  // clamp한다 — `selection.ts`의 버튼 위치 계산과 같은 이유로 useLayoutEffect를 쓴다(측정은
+  // DOM에 붙은 뒤에만 가능하다). `anchorRect`가 없으면 아무 것도 하지 않고 기본 우상단 고정
+  // 위치(`panelStyle`)를 그대로 쓴다.
+  useLayoutEffect(() => {
+    if (!anchorRect || !panelRef.current) return;
+    const size = panelRef.current.getBoundingClientRect();
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    setAnchoredPos(computeClampedPosition(anchorRect, { width: size.width, height: size.height }, viewport));
+  }, [anchorRect]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') onClose();
@@ -262,7 +293,7 @@ export function MediationPanel({
       aria-label="중재 패널"
       tabIndex={-1}
       onKeyDown={handleKeyDown}
-      style={panelStyle}
+      style={buildPanelStyle(theme, anchoredPos)}
     >
       <div style={headerStyle}>
         <span>중재 패널</span>
@@ -275,7 +306,9 @@ export function MediationPanel({
 
       {status === 'notLoggedIn' && (
         <div>
-          <p role="alert">로그인이 필요합니다. 웹앱에서 먼저 확장을 연결해 주세요.</p>
+          <p role="alert" style={alertTextStyle(theme)}>
+            로그인이 필요합니다. 웹앱에서 먼저 확장을 연결해 주세요.
+          </p>
           {APP_ORIGIN && (
             <a href={`${APP_ORIGIN}/extension/connect`} target="_blank" rel="noopener noreferrer">
               {APP_ORIGIN}/extension/connect 열기
@@ -296,6 +329,7 @@ export function MediationPanel({
             onChange={(event) => setText(event.target.value)}
             disabled={status === 'loading'}
             aria-describedby={text.length >= LENGTH_COUNTER_SHOW_AT ? 'cbm-panel-text-counter' : undefined}
+            style={fieldStyle(theme)}
           />
           {/* AC-061 — 하드 차단 아님(②), 자문 전용. `docs/UX.md` v6.2 고정 문구·접근성(키
               입력마다 announce하지 않고 aria-describedby로만 연결) — 웹앱 SenderPanel과 동일. */}
@@ -344,6 +378,7 @@ export function MediationPanel({
                     id="cbm-panel-recipient"
                     value={recipient ?? ''}
                     onChange={(event) => setRecipient(event.target.value === '' ? null : event.target.value)}
+                    style={fieldStyle(theme)}
                   >
                     <option value="">미지정</option>
                     {counterparts.map((counterpart) => (
@@ -358,12 +393,17 @@ export function MediationPanel({
                 type="button"
                 onClick={() => void runMediation()}
                 disabled={text.trim() === '' || status === 'loading'}
+                style={actionButtonStyle(theme, 'primary')}
               >
                 {status === 'error' ? '다시 시도' : '중재 실행'}
               </button>
 
               {status === 'loading' && <p role="status">분류 중 → 변환 중 → 역번역 중</p>}
-              {status === 'error' && errorMessage && <p role="alert">{errorMessage}</p>}
+              {status === 'error' && errorMessage && (
+                <p role="alert" style={alertTextStyle(theme)}>
+                  {errorMessage}
+                </p>
+              )}
 
               {status === 'success' && result && (
                 <div>
@@ -383,6 +423,7 @@ export function MediationPanel({
                       setCopyError(null);
                       setInsertStatus('idle');
                     }}
+                    style={fieldStyle(theme)}
                   />
 
                   <p>역번역: {result.backTranslation}</p>
@@ -399,6 +440,7 @@ export function MediationPanel({
                   type="button"
                   onClick={() => void handleCopy()}
                   disabled={finalText.trim() === ''}
+                  style={actionButtonStyle(theme, 'secondary')}
                 >
                   클립보드에 복사
                 </button>
@@ -407,16 +449,21 @@ export function MediationPanel({
                     type="button"
                     onClick={handleInsert}
                     disabled={finalText.trim() === ''}
+                    style={actionButtonStyle(theme, 'secondary')}
                   >
                     입력창에 삽입
                   </button>
                 )}
               </div>
               {copied && <p role="status">복사됨</p>}
-              {copyError && <p role="alert">{copyError}</p>}
+              {copyError && (
+                <p role="alert" style={alertTextStyle(theme)}>
+                  {copyError}
+                </p>
+              )}
               {insertStatus === 'inserted' && <p role="status">삽입됨</p>}
               {insertStatus === 'failed' && (
-                <p role="alert">
+                <p role="alert" style={alertTextStyle(theme)}>
                   입력창에 삽입하지 못했습니다. 대상 사이트의 화면 구조가 바뀌었을 수 있습니다 —
                   클립보드 복사를 이용해 주세요.
                 </p>
@@ -440,17 +487,21 @@ export function MediationPanel({
                   setMarkStatus('idle');
                 }}
                 placeholder="상대의 이메일 등 식별자"
+                style={fieldStyle(theme)}
               />
               <button
                 type="button"
                 onClick={() => void handleAddSample()}
                 disabled={markCounterpart.trim() === '' || markStatus === 'confirming'}
+                style={actionButtonStyle(theme, 'primary')}
               >
                 표본에 추가
               </button>
               {markStatus === 'success' && <p role="status">표본에 추가됨</p>}
               {markStatus === 'error' && (
-                <p role="alert">저장에 실패했습니다. 다시 시도해 주세요.</p>
+                <p role="alert" style={alertTextStyle(theme)}>
+                  저장에 실패했습니다. 다시 시도해 주세요.
+                </p>
               )}
             </>
           )}
@@ -460,23 +511,33 @@ export function MediationPanel({
   );
 }
 
-const panelStyle: React.CSSProperties = {
-  position: 'fixed',
-  top: '16px',
-  right: '16px',
-  width: '360px',
-  maxHeight: '80vh',
-  overflowY: 'auto',
-  background: '#fff',
-  color: '#111',
-  border: '1px solid #ccc',
-  borderRadius: '8px',
-  boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-  padding: '12px',
-  fontSize: '13px',
-  fontFamily: 'system-ui, sans-serif',
-  zIndex: 2147483647,
-};
+// 🔴 (2026-08-12, T81) — 하드코딩 리터럴(#fff/#111/#ccc)을 `theme.ts` 토큰으로 교체하고, 위치를
+// `anchoredPos`가 있으면 그쪽으로, 없으면 기존 우상단 고정으로 폴백한다(사용자 요청 ①②: 다크모드
+// 대응 + 선택 위치 근처 배치). `colorScheme`은 버튼과 같은 이유로 명시한다(`theme.ts` 참조).
+function buildPanelStyle(
+  theme: Layer1Theme,
+  anchoredPos: { top: number; left: number } | null,
+): React.CSSProperties {
+  return {
+    position: 'fixed',
+    top: anchoredPos ? `${anchoredPos.top}px` : '16px',
+    left: anchoredPos ? `${anchoredPos.left}px` : undefined,
+    right: anchoredPos ? undefined : '16px',
+    width: '360px',
+    maxHeight: '80vh',
+    overflowY: 'auto',
+    background: theme.bg,
+    color: theme.text,
+    border: `1px solid ${theme.border}`,
+    borderRadius: '8px',
+    boxShadow: `0 4px 16px ${theme.shadow}`,
+    padding: '12px',
+    fontSize: '13px',
+    fontFamily: 'system-ui, sans-serif',
+    zIndex: 2147483647,
+    colorScheme: getLayer1ColorScheme(),
+  };
+}
 
 const headerStyle: React.CSSProperties = {
   display: 'flex',
@@ -494,3 +555,40 @@ const closeButtonStyle: React.CSSProperties = {
   fontSize: '18px',
   cursor: 'pointer',
 };
+
+// 🔴 (2026-08-12, T81) 사용자 요청 ② "통일성" — 지금까지 패널 안의 버튼/입력/셀렉트가 브라우저
+// 기본 스타일 그대로였다(테두리·배경·크기가 제각각). 이 세 헬퍼로 패널 안 모든 상호작용
+// 요소가 같은 토큰을 쓴다. `primary`는 이 세션의 핵심 동작(중재 실행/확정/표본에 추가) 하나에만
+// 쓴다 — 여러 버튼이 동시에 accent로 칠해지면 "이게 기본 액션"이라는 신호가 무의미해진다
+// (`apps/web/app/globals.css`의 accent 사용 원칙과 같은 이유).
+function actionButtonStyle(theme: Layer1Theme, variant: 'primary' | 'secondary' = 'secondary'): React.CSSProperties {
+  const isPrimary = variant === 'primary';
+  return {
+    font: '600 12px system-ui, sans-serif',
+    padding: '7px 12px',
+    borderRadius: '4px',
+    border: `1px solid ${isPrimary ? theme.accent : theme.border}`,
+    background: isPrimary ? theme.accent : 'transparent',
+    color: isPrimary ? theme.accentText : theme.text,
+    cursor: 'pointer',
+    minHeight: '32px',
+  };
+}
+
+function fieldStyle(theme: Layer1Theme): React.CSSProperties {
+  return {
+    font: 'inherit',
+    fontSize: '13px',
+    padding: '6px 8px',
+    borderRadius: '4px',
+    border: `1px solid ${theme.border}`,
+    background: theme.surface,
+    color: theme.text,
+    width: '100%',
+    boxSizing: 'border-box',
+  };
+}
+
+function alertTextStyle(theme: Layer1Theme): React.CSSProperties {
+  return { color: theme.danger, fontWeight: 600 };
+}

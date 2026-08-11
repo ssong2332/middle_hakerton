@@ -517,6 +517,100 @@ describe('MediationPanel', () => {
   });
 });
 
+// 🔴 (2026-08-12, T81) 사용자 요청 ② — 패널이 항상 우상단 고정 위치에 떴고 선택 위치와 무관했다.
+// `panel-mount.tsx`가 갖고 있던 `payload.rect`를 버리지 않고 `anchorRect` prop으로 넘기게
+// 고쳤다 — 이 describe는 그 prop이 실제로 위치 계산(`computeClampedPosition` 재사용)에
+// 쓰이는지, 그리고 prop이 없을 때는 기존 동작(우상단 고정)이 그대로 유지되는지 검증한다.
+describe('MediationPanel — T81 anchorRect positioning', () => {
+  beforeEach(() => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function fakeRect(overrides: Partial<DOMRect>): DOMRect {
+    return {
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: 0,
+      x: 0,
+      y: 0,
+      toJSON() {
+        return this;
+      },
+      ...overrides,
+    } as DOMRect;
+  }
+
+  it('positions near the anchorRect instead of the default top-right corner', async () => {
+    const anchorRect = fakeRect({ top: 100, bottom: 120, left: 50, right: 150 });
+    render(<MediationPanel initialText="x" onClose={vi.fn()} anchorRect={anchorRect} />);
+
+    const panel = await screen.findByRole('dialog');
+    // jsdom은 실제 레이아웃 엔진이 없어 패널 크기가 0×0으로 측정된다 — selection.test.ts와
+    // 같은 제약(파일 상단 주석 참조). computeClampedPosition(anchorRect, {0,0}, jsdom 기본
+    // 뷰포트)의 순수 산술 결과만 검증한다: below = 120+4 = 124(오버플로 없음), left = 50.
+    expect(panel.style.top).toBe('124px');
+    expect(panel.style.left).toBe('50px');
+    expect(panel.style.right).toBe('');
+  });
+
+  it('falls back to the default top-right position when no anchorRect is given', async () => {
+    render(<MediationPanel initialText="x" onClose={vi.fn()} />);
+
+    const panel = await screen.findByRole('dialog');
+    expect(panel.style.top).toBe('16px');
+    expect(panel.style.right).toBe('16px');
+    expect(panel.style.left).toBe('');
+  });
+});
+
+// 🔴 (2026-08-12, T81) 사용자 요청 ① — 다크모드에서 패널 텍스트가 제대로 보이지 않았다(host
+// 페이지 CSS를 상속하지 않는 Shadow DOM인데도 배경/텍스트가 하드코딩 라이트 팔레트 고정이었다).
+// 실제 색상값이 아니라 "OS/브라우저가 다크를 선호하면 라이트 렌더와 다른 팔레트를 쓴다"는
+// 구조적 사실만 검증한다(정확한 hex는 `theme.test.ts`가 이미 커버).
+describe('MediationPanel — T81 dark mode', () => {
+  const originalMatchMedia = window.matchMedia;
+
+  beforeEach(() => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    vi.clearAllMocks();
+  });
+
+  function mockPrefersDark(matches: boolean) {
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }) as unknown as typeof window.matchMedia;
+  }
+
+  it('renders a different background/text color when the OS/browser prefers dark', async () => {
+    mockPrefersDark(false);
+    const { unmount } = render(<MediationPanel initialText="x" onClose={vi.fn()} />);
+    const lightPanel = await screen.findByRole('dialog');
+    const lightBg = lightPanel.style.background;
+    unmount();
+
+    mockPrefersDark(true);
+    render(<MediationPanel initialText="x" onClose={vi.fn()} />);
+    const darkPanel = await screen.findByRole('dialog');
+
+    expect(darkPanel.style.background).not.toBe(lightBg);
+  });
+});
+
 // T71(AC-080/081) — Mark 모드. 기본 모드는 여전히 "중재"(위 기존 테스트 전부가 이 기본값에
 // 의존하므로 바꾸지 않는다) — 라디오로 "상대가 쓴 것으로 표시"를 선택해야 Mark UI가 나온다.
 describe('MediationPanel — T71 Mark 모드', () => {

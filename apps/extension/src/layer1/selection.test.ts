@@ -600,6 +600,101 @@ describe('initSelectionOverlay — scroll does not dismiss the button (M-3)', ()
   });
 });
 
+// 🔴 (2026-08-12, T81) 사용자 실측 발견 — 선택 후 페이지를 스크롤하면 버튼이 원래 선택 위치를
+// 벗어나 화면 좌표에 고정된 채 남았다. M-3(위)은 "지우지 않는다"만 검증했지 "위치가 갱신된다"는
+// 검증하지 않았다 — 이 describe가 그 gap을 메운다. `document.dispatchEvent(new
+// Event('scroll'))`을 쓴다(리스너가 `document`에 `capture:true`로 걸려 중첩 스크롤 컨테이너의
+// 버블 스크롤도 잡아야 하므로 `document` 레벨에서 발동시켜야 실제 배선을 검증한다).
+describe('initSelectionOverlay — scroll repositions the button to match the selection (T81)', () => {
+  let cleanup: () => void;
+  let originalGetBoundingClientRect: typeof Range.prototype.getBoundingClientRect | undefined;
+
+  beforeEach(() => {
+    originalGetBoundingClientRect = Range.prototype.getBoundingClientRect;
+    Range.prototype.getBoundingClientRect = vi.fn(() => FAKE_RECT);
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    if (originalGetBoundingClientRect) {
+      Range.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    } else {
+      delete (Range.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+    }
+    document.body.innerHTML = '';
+    window.getSelection()?.removeAllRanges();
+  });
+
+  it('recomputes the button position from the current selection rect on scroll', () => {
+    const content = renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+
+    selectTextIn(content);
+    fireMouseUp();
+    const button = getButton();
+    expect(button).not.toBeNull();
+    expect(button!.style.left).toBe(`${FAKE_RECT.left}px`);
+    expect(button!.style.top).toBe(`${FAKE_RECT.bottom + 4}px`);
+
+    // 스크롤 후 같은 selection Range가 새 뷰포트 기준 좌표를 반환한다고 가정(실브라우저 동작).
+    // 뷰포트 안쪽 값을 써서(clamp가 개입하지 않는 범위) 산술 결과를 그대로 검증한다.
+    const SCROLLED_RECT: DOMRect = { ...FAKE_RECT, top: 200, bottom: 220, left: 200, right: 300 };
+    Range.prototype.getBoundingClientRect = vi.fn(() => SCROLLED_RECT);
+
+    document.dispatchEvent(new Event('scroll'));
+
+    expect(button!.style.left).toBe(`${SCROLLED_RECT.left}px`);
+    expect(button!.style.top).toBe(`${SCROLLED_RECT.bottom + 4}px`);
+  });
+
+  it('does nothing when no button exists (scroll before any selection)', () => {
+    renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+
+    expect(() => document.dispatchEvent(new Event('scroll'))).not.toThrow();
+    expect(getButton()).toBeNull();
+  });
+});
+
+// 🔴 (2026-08-12, T81) 사용자 요청 ① — "중재하기" 텍스트를 아이콘 단독으로 바꾸지 않는다
+// (`docs/UX.md` 기존 icon+text 원칙, T77 Decision Log와 같은 결). 대신 accent 배경의 "M"
+// 모노그램 배지 + 기존 텍스트를 함께 렌더한다 — 이 테스트는 그 구조와 접근 가능한 이름이 여전히
+// "중재하기"임을 확인한다(스크린리더 사용자에게는 badge의 "M"이 aria-hidden이라 영향 없음).
+describe('initSelectionOverlay — floating button keeps an accessible text label alongside the logo mark (T81)', () => {
+  let cleanup: () => void;
+  let originalGetBoundingClientRect: typeof Range.prototype.getBoundingClientRect | undefined;
+
+  beforeEach(() => {
+    originalGetBoundingClientRect = Range.prototype.getBoundingClientRect;
+    Range.prototype.getBoundingClientRect = vi.fn(() => FAKE_RECT);
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    if (originalGetBoundingClientRect) {
+      Range.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    } else {
+      delete (Range.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+    }
+    document.body.innerHTML = '';
+    window.getSelection()?.removeAllRanges();
+  });
+
+  it('renders a decorative logo mark plus the "중재하기" text (icon-alone is not used)', () => {
+    const content = renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+
+    selectTextIn(content);
+    fireMouseUp();
+
+    const button = getButton()!;
+    expect(button.textContent).toContain('중재하기');
+    const mark = button.querySelector('span[aria-hidden="true"]');
+    expect(mark).not.toBeNull();
+    expect(mark!.textContent).toBe('M');
+  });
+});
+
 // M-A (QA, Major) — `handleSelectionChange`의 제거 조건이 `handleMouseUp`의 생성 조건보다 좁았다.
 // 생성은 `getSelectionPayload()`(문서 selection **또는** 폼 컨트롤 selection)를 쓰지만, 제거는
 // `window.getSelection()`만 봤다. 폼 컨트롤 selection이 있으면 `window.getSelection()`은 설계상
