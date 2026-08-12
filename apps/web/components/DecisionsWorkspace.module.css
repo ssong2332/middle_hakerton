@@ -1,5 +1,12 @@
+/* v8.0/T84 — 사이(SAI) 브랜드 리디자인. 클래스 이름·구조는 DecisionsWorkspace.tsx가 참조하는
+   그대로 유지하고 시각(카드·라운드)만 목업 언어로 바꾼다. */
 .fieldGroup {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.fieldGroup label {
+  display: block;
+  margin-bottom: 8px;
 }
 
 .textarea {
@@ -9,28 +16,29 @@
 
 .generateButton {
   min-height: 44px;
-  padding: 10px 16px;
+  height: 50px;
+  padding: 0 24px;
+  border-radius: var(--radius-md);
   background: var(--color-accent);
-  color: var(--color-surface);
-  border: 1px solid var(--color-accent);
-  font: 800 13px var(--font-sans);
+  color: #fff;
+  border: none;
+  font: 700 15px var(--font-sans);
   margin-bottom: 16px;
 }
 
 .generateButton:disabled {
-  background: var(--color-surface);
-  color: var(--text-muted-75);
-  border-color: var(--border-strong);
+  background: var(--border-thin-alt);
+  color: var(--text-muted-60);
 }
 
 .emptyHint {
-  font: 400 12px var(--font-sans);
-  color: var(--text-muted-75);
+  font: 400 13px var(--font-sans);
+  color: var(--text-muted-60);
 }
 
 .loadingText,
 .errorText {
-  font: 400 12px var(--font-sans);
+  font: 400 13px var(--font-sans);
   margin-bottom: 12px;
 }
 
@@ -40,67 +48,75 @@
 }
 
 .nonLiveNotice {
-  font: 600 10px var(--font-mono);
-  letter-spacing: 0.06em;
-  color: var(--color-accent);
-  margin-bottom: 12px;
+  display: inline-block;
+  font: 700 11px var(--font-sans);
+  letter-spacing: 0.02em;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  margin-bottom: 16px;
 }
 
 .table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: 0 1px 2px var(--shadow-color-frame);
   margin-bottom: 20px;
 }
 
 .table th,
 .table td {
-  border: 1px solid var(--border-strong);
-  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-thin);
+  padding: 12px 14px;
   text-align: left;
-  font: 400 12px var(--font-sans);
+  font: 400 13px var(--font-sans);
 }
 
 .table th {
-  font-weight: 800;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-muted-75);
 }
 
 .authorityValue {
-  font: 700 12px var(--font-sans);
+  font: 700 13px var(--font-sans);
 }
 
 .authorityEvidence {
-  font: 400 11px var(--font-sans);
+  font: 400 12px var(--font-sans);
   color: var(--text-muted-75);
   margin-top: 4px;
 }
 
 .decisionsEmpty {
-  font: 400 12px var(--font-sans);
+  font: 400 13px var(--font-sans);
   color: var(--text-muted-75);
   margin-bottom: 20px;
 }
 
 .unresolvedSection {
-  border: 1px solid var(--border-strong);
-  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-danger-bg);
+  padding: 20px 22px;
 }
 
 .sectionHeading {
-  font: 800 11px var(--font-sans);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 700 14px var(--font-sans);
   margin-bottom: 8px;
 }
 
 .unresolvedEmpty {
-  font: 400 12px var(--font-sans);
+  font: 400 13px var(--font-sans);
   color: var(--text-muted-75);
 }
 
 .unresolvedList {
-  font: 400 12px var(--font-sans);
+  font: 400 13px var(--font-sans);
+  color: var(--color-danger-text);
   padding-left: 18px;
 }

@@ -1,3 +1,5 @@
+/* v8.0/T84 — 사이(SAI) 브랜드 리디자인 목업의 로그인 카드 스타일. Login(`login.module.css`)과
+   Signup(이 파일 직접 사용) 양쪽이 이 공유 클래스를 쓴다. */
 .page {
   max-width: 420px;
   margin: 0 auto;
@@ -5,13 +7,13 @@
 }
 
 .title {
-  font: 800 24px var(--font-sans);
-  letter-spacing: -0.01em;
-  margin-bottom: 20px;
+  font: 700 30px var(--font-sans);
+  letter-spacing: -0.03em;
+  margin-bottom: 10px;
 }
 
 .banner {
-  border: 2px solid var(--color-focus);
+  border-radius: var(--radius-md);
   background: var(--color-danger-bg);
   color: var(--color-danger-text);
   padding: 10px 12px;
@@ -26,15 +28,15 @@
 .retryButton {
   min-height: 44px;
   padding: 6px 10px;
+  border-radius: var(--radius-md);
   background: var(--color-accent);
-  color: var(--color-surface);
-  border: 1px solid var(--color-accent);
-  font: 800 11px var(--font-sans);
+  color: #fff;
+  border: none;
+  font: 700 12px var(--font-sans);
 }
 
 .retryButton:hover {
   background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
 }
 
 .statusText {
@@ -45,16 +47,29 @@
 
 .form {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .field {
   display: grid;
-  gap: 5px;
+  gap: 8px;
+}
+
+.field label {
+  font: 600 13px var(--font-sans);
+  color: var(--text-muted-75);
 }
 
 .field input {
   width: 100%;
+  height: 54px;
+  padding: 0 16px;
+  font: 400 15px var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+  border: none;
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
 }
 
 .fieldRow {
@@ -71,18 +86,20 @@
   min-height: 44px;
   min-width: 44px;
   padding: 6px 9px;
+  border-radius: var(--radius-md);
   background: transparent;
-  border: 1px solid var(--border-strong);
-  font: 700 10px var(--font-sans);
+  border: 1px solid var(--border-thin-alt);
+  color: var(--text-muted-75);
+  font: 700 11px var(--font-sans);
 }
 
 .hint {
-  font: 400 11px var(--font-sans);
-  color: var(--text-muted-75);
+  font: 400 12px var(--font-sans);
+  color: var(--text-muted-60);
 }
 
 .fieldError {
-  font: 400 11px var(--font-sans);
+  font: 400 12px var(--font-sans);
   color: var(--color-danger-text);
 }
 
@@ -92,25 +109,29 @@
   justify-content: center;
   width: 100%;
   min-height: 44px;
+  height: 56px;
   padding: 10px 12px;
-  margin-top: 4px;
+  margin-top: 10px;
   background: var(--color-accent);
-  color: var(--color-surface);
-  border: 1px solid var(--color-accent);
-  font: 800 13px var(--font-sans);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font: 700 16px var(--font-sans);
 }
 
 .submit:hover:not(:disabled) {
   background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
 }
 
 .submit:disabled {
-  opacity: 0.45;
+  background: var(--border-thin-alt);
+  color: var(--text-muted-60);
 }
 
 .bottomLink {
   display: block;
-  margin-top: 18px;
-  font: 600 12px var(--font-sans);
+  margin-top: 24px;
+  font: 600 14px var(--font-sans);
+  color: var(--text-muted-75);
+  text-align: center;
 }
