@@ -1,11 +1,17 @@
+/* v8.0/T84 — MEDIATE 리디자인.dc.html의 sticky/반투명 헤더. `position:sticky`는 시각 효과일 뿐 —
+   내비게이션 항목 목록·모바일 접힘 로직(T77/UX.md v6.8)은 아래에서 전혀 건드리지 않는다. */
 .nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 10px 24px;
-  border-bottom: 2px solid var(--border-strong);
-  background: var(--color-bg);
+  border-bottom: 1px solid var(--border-thin);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+  backdrop-filter: blur(12px);
 }
 
 /* v8.0 — docs/UX.md Information Architecture "Brand identity": 로고 마크 + "사이" + 옅은 "SAI"
@@ -36,13 +42,19 @@
 }
 
 .list a {
-  font: 600 12px var(--font-sans);
-  color: var(--color-text);
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  font: 600 14px var(--font-sans);
+  color: var(--text-muted-60);
   text-decoration: none;
 }
 
 .list a:hover {
-  text-decoration: underline;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
 }
 
 /* T77/UX.md v6.8 — 트리거는 Desktop/Tablet(≥768px)에서 숨긴다(가로 목록을 그대로 쓴다). */
@@ -93,9 +105,10 @@
     min-height: 44px;
     min-width: 44px;
     padding: 6px 10px;
+    border-radius: var(--radius-md);
     background: transparent;
     color: var(--color-text);
-    border: 1px solid var(--border-strong);
+    border: 1px solid var(--border-thin-alt);
     font: 700 12px var(--font-sans);
     order: 1;
   }

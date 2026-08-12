@@ -51,24 +51,26 @@
 .runButton {
   display: flex;
   align-items: center;
+  justify-content: center;
   width: 100%;
   min-height: 44px;
+  height: 52px;
   padding: 10px 12px;
   margin-top: 4px;
   background: var(--color-accent);
-  color: var(--color-surface);
-  border: 1px solid var(--color-accent);
-  font: 800 13px var(--font-sans);
-  text-align: left;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font: 700 15px var(--font-sans);
 }
 
 .runButton:hover:not(:disabled) {
   background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
 }
 
 .runButton:disabled {
-  opacity: 0.45;
+  background: var(--border-thin-alt);
+  color: var(--text-muted-60);
 }
 
 .loadingText {
@@ -86,15 +88,16 @@
 .resultBlock {
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 2px solid var(--border-rule);
+  border-top: 1px solid var(--border-thin);
   display: grid;
   gap: 14px;
 }
 
 .personalizationNote {
-  font: 400 11px var(--font-sans);
+  font: 400 12px var(--font-sans);
   color: var(--text-muted-75);
   padding: 8px 10px;
+  border-radius: var(--radius-md);
   background: var(--color-surface-alt);
-  border: 1px solid var(--border-thin-alt);
+  border: none;
 }

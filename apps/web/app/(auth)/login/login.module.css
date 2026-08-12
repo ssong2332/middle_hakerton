@@ -1,0 +1,179 @@
+/* v8.0/T84 — MEDIATE 리디자인.dc.html의 로그인 분할화면(사용자 승인 목업). 오른쪽 프리뷰 패널은
+   순수 장식(마케팅 카피 + 정적 미리보기 카드)이며 어떤 상태도 소유하지 않는다 — LoginForm.tsx의
+   실제 로그인 로직(폼 검증·에러 배너·리다이렉트)은 왼쪽 패널 안에서 전혀 바뀌지 않았다. v8.1
+   목업 개정으로 고정 1.05fr/1fr 비율 대신 auto-fit/minmax를 써서, 좁은 뷰포트에서는 프리뷰
+   패널이 아래로 자연히 스택된다(별도 미디어쿼리 없이 그리드 자체의 동작). */
+
+.splitPage {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+}
+
+.formSide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(28px, 6vw, 64px) clamp(20px, 5vw, 40px);
+  background: var(--color-surface);
+}
+
+.formInner {
+  width: 100%;
+  max-width: 400px;
+}
+
+.brandRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 44px;
+}
+
+.brandName {
+  font: 800 15px var(--font-sans);
+  letter-spacing: 0.04em;
+}
+
+.brandCaption {
+  font-size: 0.8em;
+  font-weight: 700;
+  color: var(--text-muted-60);
+  letter-spacing: 0.08em;
+}
+
+.subtitle {
+  margin: 0 0 36px;
+  font: 400 15px var(--font-sans);
+  color: var(--text-muted-60);
+  line-height: 1.6;
+}
+
+.forgotLink {
+  font: 600 13px var(--font-sans);
+  color: var(--text-muted-60);
+}
+
+.fieldTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 26px 0;
+}
+
+.dividerLine {
+  flex: 1;
+  height: 1px;
+  background: var(--border-rule);
+}
+
+.dividerText {
+  font-size: 12px;
+  color: var(--text-muted-60);
+}
+
+.ssoButton {
+  width: 100%;
+  height: 52px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-thin-alt);
+  background: var(--color-surface);
+  font: 600 15px var(--font-sans);
+  color: var(--text-muted-75);
+  cursor: pointer;
+}
+
+.ssoButton:hover {
+  background: var(--color-bg);
+}
+
+/* 프리뷰 패널 — 순수 장식, 상태 없음. */
+.previewSide {
+  background: var(--color-surface-alt);
+  padding: clamp(28px, 6vw, 64px) clamp(20px, 5vw, 56px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
+}
+
+.previewInner {
+  max-width: 420px;
+}
+
+.previewEyebrow {
+  margin: 0 0 20px;
+  font: 700 13px var(--font-sans);
+  color: #c24400;
+  letter-spacing: 0.02em;
+}
+
+.previewHeading {
+  margin: 0 0 14px;
+  font: 700 26px var(--font-sans);
+  line-height: 1.45;
+  letter-spacing: -0.03em;
+}
+
+.previewBody {
+  margin: 0;
+  font: 400 15px var(--font-sans);
+  color: var(--text-muted-75);
+  line-height: 1.7;
+}
+
+.previewCard {
+  max-width: 420px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: 0 8px 30px var(--shadow-color-frame);
+}
+
+.previewCardLabel {
+  font: 700 12px var(--font-sans);
+  color: var(--text-muted-60);
+  margin-bottom: 10px;
+}
+
+.previewCardBefore {
+  font: 400 14px var(--font-sans);
+  color: var(--text-muted-60);
+  line-height: 1.6;
+  text-decoration: line-through;
+  margin-bottom: 10px;
+}
+
+.previewCardAfter {
+  font: 500 15px var(--font-sans);
+  color: var(--color-text);
+  line-height: 1.65;
+}
+
+.previewTags {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.previewTag {
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  font: 700 11px var(--font-sans);
+}
+
+.previewTagPositive {
+  background: #e6f5ec;
+  color: #007a4d;
+}
+
+.previewTagNeutral {
+  background: var(--color-surface-alt);
+  color: var(--text-muted-75);
+}

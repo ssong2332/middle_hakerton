@@ -1,6 +1,6 @@
 .panel {
-  border: 1px solid var(--border-strong);
-  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
   padding: 11px 12px;
 }
 
@@ -19,11 +19,12 @@
 
 .badge {
   display: inline-block;
-  padding: 2px 7px;
-  background: var(--border-strong);
-  color: var(--color-surface);
-  font: 800 10px var(--font-sans);
-  letter-spacing: 0.08em;
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-tint);
+  color: #c24400;
+  font: 700 11px var(--font-sans);
+  letter-spacing: 0.04em;
 }
 
 .reason {

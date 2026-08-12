@@ -1,36 +1,28 @@
-/* UX-004 2패널 중재 워크스페이스 — 목업 "frame" 패턴(굵은 프레임 테두리 + 좌우 분할). */
+/* UX-004 2패널 중재 워크스페이스. v8.0/T84 — MEDIATE 리디자인.dc.html의 카드 패턴(굵은 프레임
+   대신 개별 카드 + 은은한 그림자, gap으로 분리). auto-fit/minmax라 좁은 화면에서는 별도
+   미디어쿼리 없이 자연히 세로 스택된다(v8.1 목업 반응형 개정과 같은 기법, docs/UX.md 참조). */
 
 .frame {
-  border: 2px solid var(--border-strong);
-  background: var(--color-bg);
-  box-shadow: 0 3px 10px var(--shadow-color-frame);
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 40px) clamp(16px, 4vw, 28px) 88px;
 }
 
 .twoPanel {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  align-items: start;
 }
 
 .column {
-  flex: 1 1 0%;
   min-width: 0;
-  padding: 18px;
+  padding: 24px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px var(--shadow-color-frame);
 }
 
-/* 수신자(우측) 패널 — 목업: 굵은 좌측 경계선 + 대비되는 배경. */
 .columnRecipient {
-  border-left: 2px solid var(--border-strong);
-  background: var(--color-surface-alt);
-}
-
-/* UX-004 세로 스택(Tablet/Mobile) — 목업 420 브레이크포인트를 근사한다. */
-@media (max-width: 900px) {
-  .twoPanel {
-    flex-direction: column;
-  }
-
-  .columnRecipient {
-    border-left: none;
-    border-top: 2px solid var(--border-strong);
-  }
+  background: var(--color-surface);
 }

@@ -131,13 +131,14 @@ button,
 select {
   font-family: inherit;
   color: var(--color-text);
-  border-radius: 0;
 }
 
 button {
   font-size: 13px;
 }
 
+/* v8.0/T84 — 목업의 필드 스타일: 테두리 없이 채운 필(pill) 배경. 각 화면의 CSS Module이
+   명시한 height/min-height(예: textarea `.message`)는 이 규칙 위에 그대로 얹힌다. */
 input,
 textarea,
 select {
@@ -146,8 +147,9 @@ select {
      막는다 — 버튼은 "타이핑 대상"이 아니라 이 문제와 무관해 위에서 별도로 13px을 유지한다. */
   font-size: 16px;
   padding: 7px 9px;
-  background: var(--color-surface);
-  border: 1px solid var(--border-strong);
+  background: var(--color-surface-alt);
+  border: none;
+  border-radius: var(--radius-md);
 }
 
 textarea {
@@ -157,6 +159,7 @@ textarea {
 
 button {
   cursor: pointer;
+  border-radius: var(--radius-md);
 }
 
 button:disabled {
@@ -165,5 +168,6 @@ button:disabled {
 
 label {
   font-weight: 600;
-  font-size: 11px;
+  font-size: 13px;
+  color: var(--text-muted-75);
 }
