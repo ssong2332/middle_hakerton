@@ -571,6 +571,78 @@ describe('MediationPanel — T81 anchorRect positioning', () => {
   });
 });
 
+// 🔴 (2026-08-12, T82) 사용자 재신고 — "패널이 드래그(스크롤) 시 여전히 고정돼 있다." T81은
+// anchorRect로 마운트 시점 1회만 위치를 잡았고 스크롤을 반영하지 않았다. 이 describe는 스크롤 후
+// 뷰포트 좌표가 문서 좌표 기준으로 다시 계산되는지 검증한다 — `window.scrollY`를 바꾼 뒤 scroll
+// 이벤트를 쏴서 위치가 그만큼 갱신되는지 확인한다(jsdom은 `scrollX`/`scrollY`가 읽기 전용
+// getter라 `Object.defineProperty`로 덮어쓴다 — `selection.test.ts`의 `innerWidth`/`innerHeight`
+// 스텁과 같은 패턴).
+describe('MediationPanel — T82 panel tracks scroll after opening', () => {
+  let originalScrollX: number;
+  let originalScrollY: number;
+
+  beforeEach(() => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
+    originalScrollX = window.scrollX;
+    originalScrollY = window.scrollY;
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, 'scrollX', { value: originalScrollX, configurable: true });
+    Object.defineProperty(window, 'scrollY', { value: originalScrollY, configurable: true });
+    vi.clearAllMocks();
+  });
+
+  function fakeRect(overrides: Partial<DOMRect>): DOMRect {
+    return {
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: 0,
+      x: 0,
+      y: 0,
+      toJSON() {
+        return this;
+      },
+      ...overrides,
+    } as DOMRect;
+  }
+
+  it('repositions to follow the original selection point when the page scrolls', async () => {
+    // 클램프(0 이하로 내려가지 않음)에 걸리지 않도록 뷰포트 안쪽 값을 쓴다 — 이 테스트의
+    // 목적은 스크롤 추적 산술 자체이지 clamp 경계 동작이 아니다(clamp 자체는
+    // `computeClampedPosition`의 기존 단위 테스트가 이미 커버한다).
+    const anchorRect = fakeRect({ top: 300, bottom: 320, left: 50, right: 150 });
+    render(<MediationPanel initialText="x" onClose={vi.fn()} anchorRect={anchorRect} />);
+    const panel = await screen.findByRole('dialog');
+    expect(panel.style.top).toBe('324px');
+
+    // 페이지가 아래로 100px 스크롤됐다고 가정 — 같은 문서상 지점은 뷰포트에서 100px 위로
+    // 올라간 것처럼 보여야 한다. React state를 통해 갱신되므로(버튼의 직접 DOM 조작과 달리)
+    // `waitFor`로 리렌더를 기다린다.
+    Object.defineProperty(window, 'scrollY', { value: 100, configurable: true });
+    document.dispatchEvent(new Event('scroll'));
+
+    await waitFor(() => {
+      expect(panel.style.top).toBe(`${324 - 100}px`);
+    });
+  });
+
+  it('does nothing when no anchorRect was given (default corner position is not scroll-tracked)', async () => {
+    render(<MediationPanel initialText="x" onClose={vi.fn()} />);
+    const panel = await screen.findByRole('dialog');
+    expect(panel.style.top).toBe('16px');
+
+    Object.defineProperty(window, 'scrollY', { value: 200, configurable: true });
+    expect(() => document.dispatchEvent(new Event('scroll'))).not.toThrow();
+
+    expect(panel.style.top).toBe('16px');
+  });
+});
+
 // 🔴 (2026-08-12, T81) 사용자 요청 ① — 다크모드에서 패널 텍스트가 제대로 보이지 않았다(host
 // 페이지 CSS를 상속하지 않는 Shadow DOM인데도 배경/텍스트가 하드코딩 라이트 팔레트 고정이었다).
 // 실제 색상값이 아니라 "OS/브라우저가 다크를 선호하면 라이트 렌더와 다른 팔레트를 쓴다"는

@@ -3,9 +3,27 @@
 //    이 파일은 현재 페이지 주소를 읽어 분기하지 않는다 — 읽으면 위반(`docs/CodingRules.md`
 //    Directory Rules `apps/extension/src/layer1` 행, 검증: `selection.test.ts`).
 
-import { getLayer1ColorScheme, getLayer1Theme } from './theme';
+import { getLayer1ColorScheme, getLayer1Theme, type Layer1Theme } from './theme';
 
 const BUTTON_ID = 'cbm-layer1-selection-button';
+
+/**
+ * MEDIATE "SHIFT" 로고 마크 — 사용자가 제공한 Claude Design 프로젝트
+ * `MEDIATE 로고 03 SHIFT 전개.dc.html`의 원본 SVG를 그대로 옮긴다(좌표·비율을 임의로 바꾸지
+ * 않는다). 원문의 "축소 한계" 섹션이 20×10(viewBox 0 0 188 96 그대로 스케일)을 이미 검증된
+ * 최소 크기 중 하나로 명시했다 — 여기서는 그 크기를 기본값으로 쓴다. 다크모드 대응도 원문 그대로:
+ * 어긋난 두 바(위 두 개)는 배경 대비에 따라 반전(`theme.text` 재사용), 정렬된 결과 바(아래,
+ * 넓은 바)는 원문이 다크 변형에서도 고정해 둔 브랜드 레드 `#ec3013`을 그대로 쓴다(테마 무관).
+ */
+function shiftMarkSvg(theme: Layer1Theme, width: number, height: number): string {
+  return (
+    `<svg width="${width}" height="${height}" viewBox="0 0 188 96" role="img" aria-hidden="true" focusable="false">` +
+    `<rect x="14" y="20" width="118" height="16" fill="${theme.text}"/>` +
+    `<rect x="56" y="44" width="118" height="16" fill="${theme.text}"/>` +
+    `<rect x="14" y="68" width="160" height="16" fill="#ec3013"/>` +
+    `</svg>`
+  );
+}
 
 export interface SelectionPayload {
   text: string;
@@ -136,33 +154,23 @@ function createFloatingButton(
   button.id = BUTTON_ID;
   button.type = 'button';
 
-  // 🔴 (2026-08-12, T81) "중재하기" 텍스트를 아이콘 단독으로 바꾸지 않는다 — `docs/UX.md`
-  // Accessibility "Error Messaging"·T77 Decision Log("existing icon+text convention... a nav
-  // toggle is no exception")가 이미 확정한 아이콘 단독 금지 원칙을 그대로 따른다. 대신 웹앱
-  // 브랜드(`PrimaryNav.module.css`의 "MEDIATE" 워드마크, 별도 픽토그램 없음)와 통일되게 accent
-  // 배경의 작은 "M" 모노그램 배지 + 기존 "중재하기" 텍스트를 함께 둔다(새 픽토그램을 지어내지
-  // 않고 기존 브랜드 정체성을 재사용 — 이 프로젝트의 "지어내지 않는다" 원칙과 같은 결).
+  // 🔴 (2026-08-12, T81) "중재하기" 텍스트를 처음엔 아이콘 단독으로 바꾸지 않았다 — `docs/UX.md`
+  // Accessibility "Error Messaging"·T77 Decision Log의 아이콘 단독 금지 원칙 때문에 "M" 모노그램
+  // 배지 + 텍스트를 함께 뒀다. 🔴 (2026-08-12, T82) 사용자가 실제 로고(SHIFT 마크, Claude Design
+  // 프로젝트 `MEDIATE 로고 03 SHIFT 전개.dc.html`)를 제공하며 **아이콘 단독**을 명시적으로
+  // 요청했다 — 이 컨트롤(선택 시 잠깐 뜨는 액션 트리거)에 한해 그 지시를 따르되, 시각적으로
+  // 텍스트가 없어도 스크린리더 사용자가 배제되지 않도록 `aria-label`로 접근 가능한 이름은
+  // 유지한다(아이콘 단독 버튼에 `aria-label`을 다는 것은 WCAG 4.1.2 충족의 표준 패턴이며,
+  // 기존 원칙이 막던 것은 "텍스트 대안이 어디에도 없는" 상태다 — T77의 내비 토글처럼 상시
+  // 노출되는 신호와 달리 이건 사용자가 만든 일회성 트리거라는 점도 다르다).
+  // 마크 자체는 디자인 원문의 "축소 한계" 표(30/20/14px)에서 이미 검증된 20px 폭 버전을
+  // 그대로 쓴다(임의로 재스케일하지 않는다) — 두 어긋난 바는 배경 대비에 맞춰 반전되고(라이트:
+  // 짙은색 / 다크: 밝은색, `theme.text` 재사용), 세 번째(합쳐진 결과) 바는 디자인 원문이 다크
+  // 변형에서도 고정해 둔 브랜드 레드 `#ec3013`을 테마와 무관하게 그대로 쓴다.
   const theme = getLayer1Theme();
-  const mark = document.createElement('span');
-  mark.setAttribute('aria-hidden', 'true');
-  Object.assign(mark.style, {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '14px',
-    height: '14px',
-    borderRadius: '3px',
-    background: theme.accent,
-    color: theme.accentText,
-    fontWeight: '800',
-    fontSize: '9px',
-    lineHeight: '1',
-    flexShrink: '0',
-  });
-  mark.textContent = 'M';
-  const label = document.createElement('span');
-  label.textContent = '중재하기';
-  button.append(mark, label);
+  button.innerHTML = shiftMarkSvg(theme, 20, 10);
+  button.setAttribute('aria-label', '중재하기');
+  button.title = '중재하기';
 
   // position: fixed — getBoundingClientRect()가 이미 뷰포트 기준 좌표라 스크롤 오프셋 보정이
   // 필요 없다. top/left는 DOM에 붙인 뒤 실제 버튼 크기를 측정해서 계산한다(clamp 근거는
@@ -177,14 +185,13 @@ function createFloatingButton(
     zIndex: '2147483647',
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '4px',
-    padding: '4px 10px',
-    fontSize: '12px',
-    lineHeight: '1.4',
+    justifyContent: 'center',
+    // 🔴 (2026-08-12, T82) 아이콘 단독으로 바뀌며 좌우 여백을 동일하게 맞춘다(이전엔 텍스트
+    // 옆의 비대칭 여백 4px/10px였다).
+    padding: '6px',
     borderRadius: '4px',
     border: `1px solid ${theme.border}`,
     background: theme.bg,
-    color: theme.text,
     boxShadow: `0 1px 4px ${theme.shadow}`,
     cursor: 'pointer',
     colorScheme: getLayer1ColorScheme(),

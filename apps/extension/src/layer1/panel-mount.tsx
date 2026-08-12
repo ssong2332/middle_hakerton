@@ -15,7 +15,7 @@ import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { MediationPanel } from './MediationPanel';
 import type { Layer2Adapter } from './registry';
-import { focusFloatingButtonIfPresent, type SelectionPayload } from './selection';
+import { focusFloatingButtonIfPresent, removeFloatingButton, type SelectionPayload } from './selection';
 
 const HOST_ID = 'cbm-layer1-panel-host';
 
@@ -40,6 +40,16 @@ export function openMediationPanel(
 ): void {
   closeMediationPanel();
   if (!document.body) return;
+
+  // 🔴 (2026-08-12, T82) 사용자 신고 — 패널이 열려도 트리거 버튼("중재하기")이 화면에 계속
+  // 남아 있어 둘이 동시에 떠 있는 것처럼 보였다. 패널이 곧 그 버튼이 하던 역할(선택 텍스트로
+  // 무엇을 할지 고르는 UI)을 이어받으므로 버튼은 숨긴다. ⚠️ 이 호출로 인해 M-7이 원래 의도한
+  // "닫을 때 트리거 버튼으로 포커스 복귀"는 열기 시점에 버튼이 사라지므로 실질적으로 항상
+  // no-op이 된다 — 다만 그 접근성 요구는 이미 다른 두 경로(패널 안 요소 클릭이 selection을
+  // collapse시킴, Escape의 document 버블 순서)로 인해 사실상 항상 깨져 있었다(아래
+  // `closeMediationPanel` 헤더 주석, `panel-focus-return.test.tsx` 참조) — 이 변경이 새로
+  // 깨뜨리는 경로는 없고, 이미 문서화된 한계를 한 지점으로 통합할 뿐이다.
+  removeFloatingButton();
 
   const host = document.createElement('div');
   host.id = HOST_ID;
@@ -78,6 +88,13 @@ export function openMediationPanel(
  * document까지 버블돼 곧바로 지워진다(즉시 Escape 경로도 포함) — 현재 어떤 경로로도 포커스가
  * 실제로 되돌아가지 않는다. 자세한 근거는 `selection.ts`의 `focusFloatingButtonIfPresent()`
  * 헤더 주석과 `panel-focus-return.test.tsx` 참조.
+ *
+ * 🔴 (2026-08-12, T82) 위 두 경로에 세 번째가 더해졌다 — `openMediationPanel()`이 이제 열릴 때
+ * 버튼을 바로 지운다(사용자 요청, 위 주석 참조). 이 함수 자신은 여전히 `focusFloatingButtonIfPresent()`를
+ * 호출한다 — 만약 패널이 열려 있는 동안 사용자가 페이지의 다른 곳을 다시 선택해 버튼이 새로
+ * 생겼다면(드문 경우, `handleMouseUp`이 이전 버튼을 대체) 그 버튼으로 포커스를 옮기는 것이
+ * 여전히 올바른 동작이기 때문이다 — 무조건 no-op은 아니다(`panel-mount.test.tsx` "returns focus
+ * to a floating button if one exists at close time" 참조).
  */
 export function closeMediationPanel(): void {
   activeRoot?.unmount();
