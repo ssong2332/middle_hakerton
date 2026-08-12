@@ -1,11 +1,14 @@
+/* v8.0/T84·T85 후속 수정 — max-width/padding은 여기(바깥 .page) 한 곳에만 둔다.
+   MediationWorkspace.module.css의 .frame이 같은 값을 중복으로 갖고 있던 버그를 함께 고친다
+   (이중 래핑으로 폭·여백이 두 번 적용되던 문제). */
 .page {
-  max-width: 1180px;
+  max-width: 1160px;
   margin: 0 auto;
-  padding: 32px 24px 64px;
+  padding: clamp(24px, 5vw, 40px) clamp(16px, 4vw, 28px) 88px;
 }
 
 .title {
-  font: 800 24px var(--font-sans);
-  letter-spacing: -0.01em;
-  margin-bottom: 20px;
+  font: 700 26px var(--font-sans);
+  letter-spacing: -0.03em;
+  margin-bottom: 26px;
 }

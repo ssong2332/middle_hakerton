@@ -111,4 +111,11 @@
   color: #007a4d;
   padding: 12px 14px;
   font: 700 14px var(--font-sans);
+  animation: om-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .delivered {
+    animation: none;
+  }
 }
