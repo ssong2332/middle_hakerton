@@ -2,11 +2,10 @@
    대신 개별 카드 + 은은한 그림자, gap으로 분리). auto-fit/minmax라 좁은 화면에서는 별도
    미디어쿼리 없이 자연히 세로 스택된다(v8.1 목업 반응형 개정과 같은 기법, docs/UX.md 참조). */
 
-.frame {
-  max-width: 1160px;
-  margin: 0 auto;
-  padding: clamp(24px, 5vw, 40px) clamp(16px, 4vw, 28px) 88px;
-}
+/* v8.0/T85 후속 수정 — `.frame`이 갖던 max-width/padding을 삭제한다(`mediate.module.css`의
+   바깥 .page가 이미 같은 값을 갖고 있어 폭·여백이 두 번 적용되는 버그였다). `MediationWorkspace.tsx`의
+   `styles.frame` 참조는 그대로 둔다 — 정의되지 않은 CSS Module 클래스는 `undefined`가 되어
+   className이 비는 것과 같다(안전, 별도 .tsx 수정 불필요). */
 
 .twoPanel {
   display: grid;

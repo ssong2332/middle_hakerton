@@ -99,6 +99,46 @@ h4 {
   margin: 0;
 }
 
+/* v8.0/T84·T85 후속 — 목업의 om-in(입장 페이드+슬라이드)/om-pop(성공 팝) 애니메이션. 지금까지
+   토큰/레이아웃만 옮기고 이 부분은 빠져 있었다(사용자 지적, 2026-08-12). `main`에 한 번만 걸어
+   화면마다 개별 섹션을 일일이 건드리지 않는다 — 목업은 섹션 단위로 걸지만, 이 앱의 각 화면은
+   섹션 수·구조가 다 달라 진입점 하나(각 화면의 루트 `<main>`)에 거는 쪽이 다루기 쉽고 회귀
+   위험도 낮다. `prefers-reduced-motion`을 존중한다(이 리포의 다른 접근성 기준과 같은 원칙). */
+@keyframes om-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes om-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  65% {
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+main {
+  animation: om-in 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  main {
+    animation: none;
+  }
+}
+
 p {
   margin: 0;
 }
@@ -160,6 +200,16 @@ textarea {
 button {
   cursor: pointer;
   border-radius: var(--radius-md);
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.12s ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 button:disabled {

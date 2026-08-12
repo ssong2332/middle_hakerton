@@ -75,6 +75,10 @@
 @media (max-width: 767px) {
   .nav {
     flex-wrap: wrap;
+    /* v8.0 후속(사용자 신고) — 기본 space-between이 브랜드/트리거/로그아웃 3개를 폭 전체에
+       고르게 흩어 놓아 트리거가 화면 한가운데 붕 떠 보였다. flex-start로 바꾸고 로그아웃만
+       margin-left:auto로 오른쪽 끝에 붙인다 — 브랜드 바로 옆에 트리거가 붙는다. */
+    justify-content: flex-start;
   }
 
   /* T77/UX.md v6.8 — 목록을 숨기고 트리거(☰+"메뉴")로 대체한다. 항상 목록 다음 줄에
@@ -115,5 +119,6 @@
 
   .logoutSlot {
     order: 2;
+    margin-left: auto;
   }
 }
