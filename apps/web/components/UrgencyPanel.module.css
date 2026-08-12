@@ -11,10 +11,10 @@
   margin-bottom: 6px;
 }
 
+/* v8.3 후속(T86 인접 정리) — 목업의 필드 레이블 스케일(12px/600, 무채색)로 정렬. */
 .badgeLabel {
-  font: 800 10px var(--font-sans);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font: 600 12px var(--font-sans);
+  color: var(--text-muted-75);
 }
 
 .badge {
@@ -35,8 +35,7 @@
 }
 
 .notice {
-  font: 600 10px var(--font-mono);
-  letter-spacing: 0.06em;
+  font: 600 11px var(--font-sans);
   color: var(--color-accent);
   margin-bottom: 6px;
 }
@@ -49,8 +48,7 @@
 
 .overrideLabel {
   display: block;
-  font: 600 10px var(--font-mono);
-  letter-spacing: 0.1em;
+  font: 600 12px var(--font-sans);
   color: var(--text-muted-75);
   margin-bottom: 5px;
 }

@@ -186,9 +186,16 @@ function createFloatingButton(
   // 🔴 (2026-08-12, T81) 다크모드: host 페이지가 아니라 OS/브라우저 신호(`theme.ts`)를 읽는다.
   // `colorScheme`을 명시해 브라우저의 강제 다크모드 재처리가 이미 테마 처리된 이 버튼을 다시
   // 건드리지 않게 한다(`docs/UX.md` "Selection-triggered floating button" 패턴, 다크모드 절 참조).
-  // 🔴 (v8.0) 크기/여백/그림자는 `사이 확장 패널.dc.html`의 트리거 버튼 스타일을 그대로 옮긴다
-  // (height 36px, radius 11px, gap 7px) — 임의 페이지 배경 위에서 잘 보여야 한다는 T83의
-  // 실사용 교훈은 유지하면서(1px 테두리 대신 여전히 명확한 테두리+그림자 조합을 쓴다).
+  // 🔴 (v8.0) 크기/여백은 `사이 확장 패널.dc.html`의 트리거 버튼 스타일을 그대로 옮긴다
+  // (height 36px, radius 11px, gap 7px).
+  // 🔴 (T86 인접 재대조) 배경·그림자 2건이 목업과 실제로 달랐다. ① 배경 — `theme.bg`(페이지
+  // 배경색)를 썼는데 목업은 "흰 배경"(카드/서피스색)이다, `theme.surface`로 교체. ② 그림자 —
+  // 목업은 두 레이어가 **서로 다른 고정 색**이다: `0 0 0 2px rgba(255,255,255,.55)`(항상 흰
+  // 링, 다크 페이지 위에서도 분리 시인성 확보가 목적이므로 우리 쪽 라이트/다크 테마와 무관하게
+  // 고정) + `0 6px 18px rgba(17,24,39,.35)`(항상 어두운 확산 그림자, 이 버튼은 임의 호스트
+  // 페이지 위에 얹히므로 우리 패널 내부 테마가 아니라 목업이 명시한 고정값을 그대로 쓴다) —
+  // 이전엔 두 레이어 모두 `theme.shadow`를 재사용해 라이트 테마에서 흰 링 자리가 어두운
+  // rgba(17,24,39,.24)로 렌더되고 있었다.
   Object.assign(button.style, {
     position: 'fixed',
     top: '0px',
@@ -201,11 +208,24 @@ function createFloatingButton(
     padding: '0 13px',
     borderRadius: '11px',
     border: `1px solid ${theme.border}`,
-    background: theme.bg,
-    boxShadow: `0 0 0 2px ${theme.shadow}, 0 6px 18px ${theme.shadow}`,
+    background: theme.surface,
+    boxShadow: '0 0 0 2px rgba(255,255,255,.55), 0 6px 18px rgba(17,24,39,.35)',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
     colorScheme: getLayer1ColorScheme(),
+  });
+
+  // 🔴 (T86 인접 재대조) 목업 hover: `background:#FFF1E8; borderColor:#FF6100`. 순수 DOM 버튼이라
+  // React의 style-prop hover가 없다 — mouseenter/leave로 직접 전환한다(패널의 `.cbm-icon-btn:hover`
+  // 처럼 CSS 클래스를 쓰지 못하는 이유는 이 버튼이 shadow root가 아니라 host 페이지 바디에 직접
+  // 붙기 때문 — 클래스 이름 충돌을 피하려 인라인 스타일 토글을 쓴다).
+  button.addEventListener('mouseenter', () => {
+    button.style.background = `${theme.accent}22`;
+    button.style.borderColor = theme.accent;
+  });
+  button.addEventListener('mouseleave', () => {
+    button.style.background = theme.surface;
+    button.style.borderColor = theme.border;
   });
 
   // M-1(reviewer): 실브라우저에서 host 페이지 어디든 mousedown하면 document selection이

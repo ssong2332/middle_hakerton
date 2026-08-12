@@ -7,9 +7,11 @@ Flow IDs and Screen IDs are immutable once assigned — never renumber existing 
 ## Overview
 | Item | Value |
 |---|---|
-| Document Version | 8.2 |
-| Based on PRD Version | v3.0 (2026-08-04, incorporating Planning Decisions #101–#112) — unchanged this pass |
+| Document Version | 8.3 |
+| Based on PRD Version | v4.9 (2026-08-12, incorporating Planning Decision #130/AC-090) |
 | Last Updated | 2026-08-12 |
+
+**v8.3 summary (2026-08-12)** — New screen pair **UX-020 (Forgot/Reset Password)**, added when the new design handoff's login mockup surfaced ADR-0002/Planning Decision #42/#62's cut of "로그인 고도화" (login enhancement). The user chose to un-cut password reset only (zero new external dependencies — Supabase Auth's built-in recovery flow) while keeping SSO cut (no real identity-provider credentials exist, PRD never requested social login). See Screen Catalog and the new Decision Log entry below for the full reasoning and what stays out of scope.
 
 **v8.2 summary (2026-08-12)** — Two corrections from the user actually using the rebuilt extension on a live dark-themed page. (1) **Layer 1 no longer auto-follows the OS/browser dark-mode signal** — v6.9's original design read `prefers-color-scheme` directly; the user asked for the opposite default ("기본적으로 흰색으로, 다크모드는 따로 설정을 통해") — always start light, and only switch to dark via an explicit in-panel toggle that persists across visits (`chrome.storage.local`). This is a full reversal of the v6.9 pattern (see the amendment below and the new Decision Log entry), not an extension of it. (2) **The mode selector (mediate / Mark) drops its native radio-input markup** — the visible radio circle was never in the user-supplied mockup (its `pill()` control is a plain button), and this document's own T71 accessibility requirement ("keyboard-operable choice control, active mode exposed as text") is already satisfied elsewhere in this codebase by a radio-free `aria-pressed` toggle-button-group pattern (`terminology/page.tsx`'s entry-type chooser) — this pass reuses that existing pattern instead of inventing a new one. No screen/flow/AC changes either way.
 
@@ -890,6 +892,25 @@ Every screen must use this template — do not vary the shape.
 | Expected Outputs | Updated aggregate indicator values (read next by UX-018's Stage 2/3) after a delete |
 | Assumptions | A sample record structure exists that keeps count/source/timestamp fields separate from any raw content field, so this screen can be built to physically never read the latter (architect's schema, must satisfy AC-081②) |
 
+### Forgot / Reset Password (Screen ID: UX-020, new v8.3)
+
+🔴 New screen pair, added when Planning Decision #130/AC-090 partially un-cut ADR-0002's "로그인 고도화" (login enhancement) cut-scope item — password reset only, not SSO or account management (still cut, no PRD requirement, no real external IdP credentials exist to wire it to).
+
+| Item | Value |
+|---|---|
+| Priority | P2 (post-hoc scope addition, not on M2's auth critical path — T45/T46's basic login/session is unaffected) |
+| Entry | "비밀번호 찾기" link on UX-001 (Login), next to the password field label — matches the sender-provided design handoff's login mockup placement |
+| States | **ForgotPassword-Empty**: email field, "재설정 링크 보내기" button (disabled until the email looks valid, `isValidEmailFormat` reused from UX-001/UX-002). **ForgotPassword-Submitting**: button shows a brief loading label, no other UI change. **ForgotPassword-Sent**: a single fixed confirmation sentence, shown **regardless of whether the email is actually registered** (no user-enumeration signal) — "등록된 이메일이면 재설정 링크를 보냈습니다" or equivalent, plus a link back to Login. **ForgotPassword-NetworkError**: generic retry banner (same pattern as UX-001 Failure) — this is the only branch that can reveal a *transport* failure, never an "email not found" branch (there isn't one). **ResetPassword-Ready**: reached only via the emailed link's redirect (a live Supabase recovery session) — new-password + confirm fields, submit button disabled until both match and meet the 8-char minimum (ADR-0002's password policy, reused verbatim — no new complexity rule). **ResetPassword-Success**: confirmation + link to Login (session is not auto-signed-in into the app past this point — user logs in normally with the new password, keeping this screen's blast radius to "change the password" only). **ResetPassword-InvalidSession**: reached when there's no live recovery session (direct navigation, expired/reused link) — explicit error message + link back to ForgotPassword-Empty, never a blank/dead form (AC-053②/AC-084⑥ principle, same as every other absent-not-disabled control in this document). |
+| Business Rules | Never confirms or denies whether a submitted email is a registered account (anti-enumeration, AC-090②). The 8-character password minimum is enforced client-side as a UX nicety only — the authoritative check is still Supabase Auth's own configured policy (ADR-0002 ③, "앱에 복잡도 검증을 만들지 않는다" — this screen does not duplicate that decision, it just avoids submitting an obviously-too-short value). |
+| Data Required | Email (ForgotPassword); new password + confirmation (ResetPassword) — nothing else. |
+| Data Operations | Supabase Auth `resetPasswordForEmail()` (ForgotPassword submit); Supabase Auth `updateUser({ password })` (ResetPassword submit) — no app-owned table is read or written by this screen pair. |
+| External Dependencies | Supabase Auth's built-in recovery email delivery — **not independently verified this round** (no live email was sent/received in this session); flagged as a live-verification follow-up, same pattern as this document's other "실브라우저/실계정 검증 대기" items. |
+| Permissions | Unauthenticated (both screens are pre-login, same route group as UX-001/UX-002) — ResetPassword additionally requires the one-time recovery session from the emailed link. |
+| Navigation Targets | Login (from ForgotPassword-Sent's link, and from ResetPassword-Success/InvalidSession) |
+| Events Emitted | None new — no analytics/event requirement exists elsewhere in this document for UX-001/UX-002 either, so this pair does not invent one. |
+| Expected Outputs | A changed Supabase Auth password, verifiable by the next normal login (UX-001) succeeding with the new value. |
+| Assumptions | Supabase project's recovery email template and SMTP delivery are already functional (Supabase-managed default, not something this project's code configures) — **unverified assumption**, first live test is on the user. |
+
 ## Deprecated
 
 ### Extension Mediation Overlay — GitHub, Slack & Gmail (Screen ID: UX-014)
@@ -907,7 +928,7 @@ UF-011, UF-012, and UF-014 (the GitHub/Slack/Gmail flows) are **not** deprecated
 **Brand identity (v8.0)** — The product's user-facing name/wordmark is **사이 (SAI)**, rendered as the logo mark (three-bar "SHIFT" mark, v7.0) followed by the text "사이" with a smaller, muted "SAI" caption beside it, per the user-supplied `MEDIATE 리디자인.dc.html` mockup. This replaces the plain "MEDIATE" text the nav bar (`apps/web/components/PrimaryNav.tsx`) previously rendered with no formal spec in this document — that was always an implementer placeholder, not a documented decision, so this is the first time the brand wordmark is pinned here. The internal project name (`docs/PRD.md`'s "크로스보더 협업 중재 서비스", repo/package names, task/AC prose) is unaffected — this is a **user-facing display name change only**.
 
 **Routes**
-- Unauthenticated: `/login` (UX-001), `/signup` (UX-002)
+- Unauthenticated: `/login` (UX-001), `/signup` (UX-002), **`/forgot-password` and `/reset-password` (UX-020, new v8.3)**
 - Authenticated: `/` or `/mediate` (UX-004, default landing), `/onboarding` (UX-003, shown once after first login until the user completes or explicitly skips it — no longer a permanent forced gate, AC-059), `/profile` (UX-009), `/terminology` (UX-010), `/pair-protocols` and `/pair-protocols/:counterpart` (UX-011), `/meeting-times` (UX-012), `/decisions` (UX-008), `/feedback` (UX-013), `/sent-messages` (UX-015), **`/observation-samples` and `/observation-samples/:counterpart` (UX-019, new v6.0)**. UX-018 (Recipient Public Profile Enrichment) has no distinct route — it's a modal opened from UX-004, mirroring UX-005/UX-006 (exact routing mechanism, e.g. `?enrich=<recipient>`, is architect's/implementer's choice).
 - Extension (no URL routing — content-script overlay, not a page): UX-016 (Universal Selection Mediation Panel, opened via the Layer 1 floating trigger button on any page — now also owns optional recipient-candidate selection (AC-067) and Mark-as-counterpart's-message mode (AC-080, new v6.0), with no separate route/screen for either), UX-017 (Privacy Notice, shown on first extension activation and again on a notice-content version increase — AC-076, no longer strictly "once ever" — gating access to UX-016)
 
@@ -1724,6 +1745,17 @@ Append-only — never rewrite or delete a past entry. If docs/PRD.md changes mak
 | Alternatives Considered | Visually hide the radio input (`opacity:0`/`sr-only`) while keeping it in the DOM for semantics — rejected: this still leaves radio-group semantics (which imply arrow-key navigation between options in most screen readers) attached to a control that doesn't behave like one, and adds CSS complexity for no visual or functional gain over just using the pattern already proven elsewhere in this codebase. |
 | Rejected Because | Keeping invisible-but-present radio semantics without arrow-key support is a worse screen-reader experience than a plain, correctly-labeled toggle-button group — it promises "radio group" semantics the implementation doesn't fully deliver. |
 | Impact | `apps/extension/src/layer1/MediationPanel.tsx` (mode selector markup), `MediationPanel.test.tsx` (`getByRole('radio', ...)` → `getByRole('button', ...)`). No AC, screen, or Flow ID changes. |
+| Status | Active |
+
+### New Screen UX-020 (Forgot/Reset Password) — Password Reset Un-Cut from ADR-0002, SSO Stays Cut (v8.3)
+
+| Item | Value |
+|---|---|
+| Decision | UX-001's "비밀번호 찾기" link is wired to a real new screen pair (UX-020: ForgotPassword/ResetPassword) using Supabase Auth's built-in recovery flow. The mockup's "회사 계정(SSO)으로 계속하기" button is **not** added — that control stays absent (not disabled), same as the T84-era decision this supersedes for the password-reset half only. |
+| Reason | The new design handoff's login mockup re-introduced both controls. Checking why they'd been left out (T84-era comment) surfaced ADR-0002/Planning Decision #42/#62, which explicitly cut "로그인 고도화" (password reset, account management) — the user was asked and chose to un-cut password reset (feasible with zero new external dependencies) while keeping SSO cut (no real IdP client credentials exist, and PRD never requested social login at all). |
+| Alternatives Considered | (a) Add both controls as inert visual decoration matching the mockup pixel-for-pixel — rejected, reintroduces the exact dead-control problem T84 avoided (AC-053②/AC-084⑥). (b) Build a real SSO integration now — rejected, requires an actual identity provider (Google Workspace/Okta/etc.) client ID+secret that does not exist and cannot be invented (`docs/CodingRules.md` Error Handling "don't fabricate missing values"); would also require a PRD amendment since social login was never a requirement. |
+| Rejected Because | See above — (a) violates this document's own dead-control precedent, (b) is blocked on external infrastructure this project does not have and was never scoped to build. |
+| Impact | New screen UX-020 (see Screen Catalog). `apps/web/app/(auth)/login/LoginForm.tsx` gains the "비밀번호 찾기" link (using `login.module.css`'s pre-existing but previously-unused `.forgotLink`/`.fieldTopRow` classes). New routes `apps/web/app/(auth)/forgot-password/` and `apps/web/app/(auth)/reset-password/`. No change to UX-001/UX-002's existing states, validation, or redirect logic. PRD gains AC-090; ADR-0002 gains a follow-up section (both append-only). |
 | Status | Active |
 
 ## Open Questions

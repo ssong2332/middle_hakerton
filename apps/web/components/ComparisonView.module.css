@@ -19,9 +19,7 @@
 }
 
 .column h3 {
-  font: 800 10px var(--font-mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font: 700 12px var(--font-sans);
   margin-bottom: 6px;
   color: var(--text-muted-75);
 }
@@ -31,9 +29,11 @@
   line-height: 1.6;
 }
 
+/* v8.3 후속(T86 인접 정리) — 굵은 검정 테두리 박스는 리브랜딩 이전 스타일이다. 목업의 결과
+   카드 언어(옅은 배경 + 라운드, 테두리 없음)로 맞춘다. */
 .transformedColumn {
-  border: 1px solid var(--border-strong);
-  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
   padding: 11px 12px;
 }
 
@@ -42,9 +42,7 @@
 }
 
 .preserved h4 {
-  font: 800 10px var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 700 11px var(--font-sans);
   margin-bottom: 4px;
   color: var(--text-muted-75);
 }
@@ -57,7 +55,6 @@
 
 .notice {
   margin-top: 8px;
-  font: 600 10px var(--font-mono);
-  letter-spacing: 0.06em;
+  font: 600 11px var(--font-sans);
   color: var(--color-accent);
 }
