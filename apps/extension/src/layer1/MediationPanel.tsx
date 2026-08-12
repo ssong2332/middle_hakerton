@@ -41,7 +41,14 @@ import { addSample, callMediationApi, fetchKnownCounterparts } from '../shared/a
 import { getStoredToken } from '../shared/token-storage';
 import { NON_LIVE_NOTICE } from '../shared/non-live-notice';
 import { computeClampedPosition, shiftMarkSvg } from './selection';
-import { getLayer1ColorScheme, getLayer1Theme, subscribeLayer1ThemeChange, type Layer1Theme } from './theme';
+import {
+  getLayer1ColorScheme,
+  getLayer1Theme,
+  getThemeMode,
+  subscribeLayer1ThemeChange,
+  toggleThemeMode,
+  type Layer1Theme,
+} from './theme';
 import type { Layer2Adapter } from './registry';
 
 export interface MediationPanelProps {
@@ -356,6 +363,17 @@ export function MediationPanel({
       onKeyDown={handleKeyDown}
       style={buildPanelStyle(theme, anchoredPos)}
     >
+      {/* v8.0 후속(사용자 지적 — 로딩 표시가 밋밋하다) — 이 패널은 인라인 style만 쓰고 별도
+          스타일시트가 없어 keyframes를 CSS Module로 둘 수 없다. Shadow DOM 안에 <style> 태그를
+          한 번 심어 이 서브트리 안에서만 유효한 keyframes를 정의하고, 아래 요소들은 인라인
+          `animation` 프로퍼티로 이름만 참조한다(웹앱 globals.css의 om-spin/om-bar와 같은 정의). */}
+      <style>{`
+        @keyframes om-spin { to { transform: rotate(360deg); } }
+        @keyframes om-bar { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
+        @media (prefers-reduced-motion: reduce) {
+          .cbm-spinner, .cbm-progress-fill { animation: none !important; }
+        }
+      `}</style>
       <div style={headerStyle}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
           <span
@@ -366,9 +384,23 @@ export function MediationPanel({
           <span style={{ fontWeight: 800 }}>사이</span>
           <span style={{ fontWeight: 600, fontSize: '12px', color: theme.text + 'aa' }}>중재 패널</span>
         </span>
-        <button type="button" onClick={onClose} aria-label="닫기" style={closeButtonStyle}>
-          ×
-        </button>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+          {/* v8.0 후속(사용자 요청) — "기본은 라이트, 다크는 별도 설정으로". OS 신호를 더는
+              자동으로 안 따르므로(`theme.ts` 헤더 주석) 직접 전환할 수단이 필요하다. 토글은
+              `chrome.storage.local`에 저장되어 다음 방문에도 유지된다. */}
+          <button
+            type="button"
+            onClick={() => toggleThemeMode()}
+            aria-label={getThemeMode() === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+            title={getThemeMode() === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+            style={{ ...closeButtonStyle, fontSize: '15px' }}
+          >
+            {getThemeMode() === 'dark' ? '☀️' : '🌙'}
+          </button>
+          <button type="button" onClick={onClose} aria-label="닫기" style={closeButtonStyle}>
+            ×
+          </button>
+        </span>
       </div>
 
       {status === 'checkingAuth' && <p role="status">확인 중…</p>}
@@ -409,14 +441,19 @@ export function MediationPanel({
           )}
           {/* 🔴 T71/`docs/UX.md:766` Accessibility — "The mode selector (mediate / Interpret /
               Mark-as-counterpart's) is a keyboard-operable choice control, and the active mode
-              is exposed as text". 네이티브 radio 2개(키보드 조작 가능) + `aria-current`로 활성
-              모드를 텍스트로도 노출한다. Interpret(T59)은 아직 없어 두 값뿐이다.
-              v8.0 후속(사용자 지적 — "그냥 비율만 바뀌었을 뿐") — 목업의 세그먼트 필(pill)
-              토글처럼 보이도록 레이블을 칩으로 감싼다. 네이티브 radio는 지우지 않는다(숨기면
-              키보드 포커스 링도 함께 사라져 접근성이 나빠진다) — 대신 작게 두고 칩 배경/글자
-              굵기로 활성 상태를 표시한다. */}
-          <fieldset style={{ border: 'none', padding: '3px', margin: '4px 0', background: theme.surface, borderRadius: '11px', display: 'flex', gap: '5px' }}>
-            <legend style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0,0,0,0)' }}>모드</legend>
+              is exposed as text". Interpret(T59)은 아직 없어 두 값뿐이다.
+              v8.0 후속(사용자 지적, 2026-08-12 — "왜 전반적으로 UI가 다르지, 체크박스도 그렇고")
+              — 목업(`사이 확장 패널.dc.html`)의 `pill()` 헬퍼는 순수 `<button>`이고 라디오 원
+              표시가 아예 없다. 이전에 네이티브 radio를 남겨둔 건 이 컴포넌트만의 임의 선택이었고
+              접근성상 필수도 아니었다 — 이 리포의 `terminology/page.tsx`(`typeButton`/
+              `typeButtonActive`, `aria-pressed`)가 이미 "라디오 없는 토글 버튼 그룹" 패턴을 쓰고
+              있다(키보드 포커스는 `<button>` 자체가 받는다, Tab으로 순회·Enter/Space로 토글 —
+              별도 방향키 규약이 필요 없는 그룹). 그 기존 패턴을 그대로 재사용해 목업과 일치시킨다. */}
+          <div
+            role="group"
+            aria-label="모드"
+            style={{ padding: '3px', margin: '4px 0', background: theme.surface, borderRadius: '11px', display: 'flex', gap: '5px' }}
+          >
             {(
               [
                 { value: 'mediate' as const, label: '중재' },
@@ -425,14 +462,14 @@ export function MediationPanel({
             ).map((option) => {
               const active = mode === option.value;
               return (
-                <label
+                <button
                   key={option.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setMode(option.value)}
                   style={{
                     flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
+                    border: 'none',
                     height: '36px',
                     padding: '0 8px',
                     borderRadius: '9px',
@@ -442,22 +479,13 @@ export function MediationPanel({
                     fontWeight: 600,
                     color: active ? theme.text : theme.text + '99',
                     cursor: 'pointer',
-                    textAlign: 'center',
                   }}
                 >
-                  <input
-                    type="radio"
-                    name="cbm-panel-mode"
-                    checked={active}
-                    onChange={() => setMode(option.value)}
-                    aria-current={active ? 'true' : undefined}
-                    style={{ width: '13px', height: '13px', flexShrink: 0 }}
-                  />
                   {option.label}
-                </label>
+                </button>
               );
             })}
-          </fieldset>
+          </div>
 
           {mode === 'mediate' && (
             <>
@@ -501,10 +529,45 @@ export function MediationPanel({
                     disabled={text.trim() === '' || status === 'loading'}
                     style={actionButtonStyle(theme, 'primary')}
                   >
+                    {status === 'loading' && (
+                      <span
+                        aria-hidden="true"
+                        className="cbm-spinner"
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '999px',
+                          border: '2px solid rgba(255,255,255,.35)',
+                          borderTopColor: '#fff',
+                          display: 'inline-block',
+                          marginRight: '8px',
+                          animation: 'om-spin 0.7s linear infinite',
+                        }}
+                      />
+                    )}
                     {status === 'error' ? '다시 시도' : '중재 실행'}
                   </button>
 
-                  {status === 'loading' && <p role="status">분류 중 → 변환 중 → 역번역 중</p>}
+                  {status === 'loading' && (
+                    <>
+                      <div
+                        aria-hidden="true"
+                        style={{ height: '4px', borderRadius: '999px', background: theme.border + '55', overflow: 'hidden' }}
+                      >
+                        <div
+                          className="cbm-progress-fill"
+                          style={{
+                            width: '32%',
+                            height: '100%',
+                            borderRadius: '999px',
+                            background: theme.accent,
+                            animation: 'om-bar 1.3s ease-in-out infinite',
+                          }}
+                        />
+                      </div>
+                      <p role="status">분류 중 → 변환 중 → 역번역 중</p>
+                    </>
+                  )}
                   {status === 'error' && errorMessage && (
                     <p role="alert" style={alertTextStyle(theme)}>
                       {errorMessage}
