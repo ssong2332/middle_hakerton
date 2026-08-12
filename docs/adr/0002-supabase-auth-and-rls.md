@@ -55,3 +55,16 @@ USING (auth.jwt()->>'email' IN (party_a, party_b))
   2. **T45**: 연속 로그인 실패 10회를 시도해 Supabase 기본 rate limit 동작을 관찰·기록한다(Security 절의 추정 항목).
   3. **T18**: 마이그레이션 0001에 **전 테이블 RLS ENABLE + 정책**을 포함하고, **계정 2개로 교차 확인**한 0행 조회 출력을 AC-039 근거로 첨부한다.
   4. **T3**: `SUPABASE_SERVICE_ROLE_KEY` 사용처를 `llm_cache`·`llm_call_log` **2곳으로 제한**하고, 그 외에서 서비스 롤 클라이언트를 만들지 않는다(RLS 우회 키이므로).
+
+## Follow-up (2026-08-12) — "로그인 고도화" 컷 범위를 비밀번호 재설정만 부분적으로 되돌린다
+
+- **Status**: accepted — 사용자 결정 2026-08-12 (PRD Planning Decision #130, AC-090)
+- 본문의 Planning Decision #42/#62 인용("로그인 고도화가 컷 대상") **원문은 수정하지 않는다** — 이 절은 그 컷 범위 중 한 조각만 좁히는 후속 결정이다.
+
+**결정**: 새 디자인 handoff 로그인 목업을 실제 구현과 대조하다 이 컷 결정을 다시 발견했다. 사용자에게 확인한 결과:
+- **비밀번호 재설정**: 지금 구현한다. Supabase Auth 내장 기능(`resetPasswordForEmail()` / `updateUser({ password })`)만으로 완결되고, 새 외부 의존성·자격증명이 필요 없다 — ①의 "인증은 Supabase Auth를 쓰고 자체 구현하지 않는다" 원칙을 그대로 따르는 범위 확장이며, 이 ADR이 채택한 옵션(Supabase Auth + RLS)의 경계를 벗어나지 않는다.
+- **SSO(회사 계정으로 계속하기)**: 계속 제외한다. 실제 외부 ID 공급자(Google Workspace/Okta 등) 클라이언트 ID·시크릿이 없고, 이 ADR의 Option 비교표가 이미 "소셜 로그인은 PRD에 없다"고 명시했다 — PRD 자체를 먼저 개정하고 실제 IdP를 계약하지 않는 한 착수할 수 없다.
+
+**최소 비밀번호 길이**: ①에서 아직 "추정"으로 남겨둔 8자 하한(`⚠️ Consequences` 행)을 이번 절이 확정한 것은 아니다 — `/reset-password`의 클라이언트 검증은 그 추정치(8자)를 그대로 재사용하되, Supabase 대시보드 실제 설정값과의 일치 여부는 여전히 별도 follow-up(위 Follow-ups required 1번)에 속한다.
+
+**영향받지 않는 것**: RLS 정책, 세션 관리(`@supabase/ssr`), 가입/로그인/로그아웃 로직 — 전부 이 절 이전과 동일하다.

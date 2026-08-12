@@ -32,15 +32,35 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-/** `docs/UX.md` Information Architecture "Routes" — Unauthenticated 목록과 정확히 일치시킨다. */
-const PUBLIC_ROUTES = ['/login', '/signup'];
+/** `docs/UX.md` Information Architecture "Routes" — Unauthenticated 목록과 정확히 일치시킨다.
+ * (T86/UX-020) `/forgot-password`·`/reset-password` 추가 — 둘 다 로그인 세션 없이 접근돼야 한다. */
+const PUBLIC_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password'];
+
+/**
+ * 🔴 (T86/UX-020) `/reset-password`는 `PUBLIC_ROUTES`에 있지만 아래 "인증된 사용자가 공개 경로에
+ * 접근하면 기본 랜딩으로 보낸다" 규칙 대상에서 **제외**해야 한다 — Supabase의 비밀번호 재설정
+ * 이메일 링크는 클릭하는 순간 실제 인증 세션(`auth.getUser()`가 사람을 반환하는 상태)을 만든다.
+ * `/login`·`/signup`과 똑같이 취급하면 그 세션이 서버에 반영되자마자 `/mediate`로 튕겨나가
+ * 새 비밀번호를 입력할 기회 자체가 사라진다. `/forgot-password`는 이 문제가 없지만(이메일만
+ * 입력하는 화면, 세션을 만들지 않는다) 대칭을 위해 같이 제외한다 — 로그인 상태에서 실수로
+ * 열어도 그냥 폼이 보일 뿐 해가 없다.
+ */
+const REDIRECT_AWAY_IF_AUTHENTICATED_ROUTES = ['/login', '/signup'];
 
 /** UX-004(중재 워크스페이스) 기본 랜딩 — `docs/UX.md` "Routes": "/` 또는 `/mediate`". `/`는 아직
  * 스캐폴드가 없어(T2/T12/T13 범위) `/mediate`로 고정한다. */
 const DEFAULT_AUTHENTICATED_ROUTE = '/mediate';
 
+function matchesRoute(pathname: string, routes: string[]): boolean {
+  return routes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
 function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+  return matchesRoute(pathname, PUBLIC_ROUTES);
+}
+
+function redirectsAwayIfAuthenticated(pathname: string): boolean {
+  return matchesRoute(pathname, REDIRECT_AWAY_IF_AUTHENTICATED_ROUTES);
 }
 
 /**
@@ -116,7 +136,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (user && publicRoute) {
+  if (user && redirectsAwayIfAuthenticated(pathname)) {
     return NextResponse.redirect(new URL(DEFAULT_AUTHENTICATED_ROUTE, request.url));
   }
 

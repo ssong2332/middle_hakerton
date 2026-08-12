@@ -5,10 +5,9 @@
   margin-bottom: 14px;
 }
 
+/* v8.3 후속(T86 인접 정리) — SenderPanel.module.css와 같은 이유·같은 값. */
 .title {
-  font: 800 10px var(--font-sans);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font: 700 15px var(--font-sans);
 }
 
 .emptyState {

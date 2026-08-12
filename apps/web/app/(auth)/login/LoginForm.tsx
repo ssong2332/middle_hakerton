@@ -139,7 +139,14 @@ export function LoginForm() {
               )}
             </div>
             <div className={styles.field}>
-              <label htmlFor="login-password">비밀번호</label>
+              <div className={split.fieldTopRow}>
+                <label htmlFor="login-password">비밀번호</label>
+                {/* UX-020/AC-090 — ADR-0002 Follow-up(2026-08-12)이 "로그인 고도화" 컷 항목 중
+                    비밀번호 재설정만 되돌려 실제로 구현했다(SSO는 계속 제외 — IdP 자격증명 없음). */}
+                <a href="/forgot-password" className={split.forgotLink}>
+                  비밀번호 찾기
+                </a>
+              </div>
               <input
                 id="login-password"
                 type="password"
@@ -153,10 +160,12 @@ export function LoginForm() {
             </button>
           </form>
 
-          {/* v8.0/T84 — 목업의 "회사 계정(SSO)으로 계속하기" 버튼은 넣지 않는다. 이 앱은
-              이메일/비밀번호 로그인만 구현돼 있다(SSO 코드 경로 부재) — 클릭해도 아무 일도
-              일어나지 않는 장식용 버튼은 이 리포가 다른 곳에서 이미 지키는 "미구현 기능의
-              비활성/장식 버튼을 두지 않는다" 원칙(AC-053②·AC-084⑥과 같은 정신)과 어긋난다. */}
+          {/* v8.0/T84, 재확인 T86(2026-08-12) — 목업의 "회사 계정(SSO)으로 계속하기" 버튼은
+              여전히 넣지 않는다. T84 당시 이유("SSO 코드 경로 부재, 장식 버튼 금지 원칙")는
+              그대로 유효할 뿐 아니라, T86에서 ADR-0002를 재확인한 결과 실제 외부 ID 공급자
+              (Google Workspace/Okta 등) 클라이언트 자격증명이 없어 지어낼 수 없고, PRD에도
+              소셜 로그인 요구사항 자체가 없다(ADR-0002 Option 비교 "소셜 로그인은 PRD에
+              없다"). `docs/UX.md` UX-020 Decision Log 참조 — 비밀번호 찾기만 실제 구현했다. */}
 
           <a href="/signup" className={styles.bottomLink}>
             처음이신가요? 회원가입

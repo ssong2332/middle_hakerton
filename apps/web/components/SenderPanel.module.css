@@ -1,7 +1,8 @@
+/* v8.3 후속(T86 인접 정리) — 목업 어디에도 없는 대문자·모노 마이크로 라벨 스타일이 리브랜딩
+   두 라운드(T84/T85)에서 빠져 있었다(그 두 라운드는 카드 껍데기만 만지고 리프 컴포넌트 내부
+   타이포는 건드리지 않았다). 목업의 카드 제목 스케일(15-16px/700)로 맞춘다. */
 .title {
-  font: 800 10px var(--font-sans);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font: 700 15px var(--font-sans);
   margin-bottom: 14px;
 }
 
