@@ -103,7 +103,14 @@ export function PrimaryNav() {
       aria-label="주 내비게이션"
       onKeyDown={handleKeyDown}
     >
-      <span className={styles.brand}>MEDIATE</span>
+      <span className={styles.brand}>
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="2" y="5" width="14" height="4" rx="2" fill="#191f28" />
+          <rect x="8" y="10" width="14" height="4" rx="2" fill="#191f28" />
+          <rect x="2" y="15" width="20" height="4" rx="2" fill="#ff6100" />
+        </svg>
+        사이<span className={styles.brandCaption}>SAI</span>
+      </span>
       <button
         ref={triggerRef}
         type="button"

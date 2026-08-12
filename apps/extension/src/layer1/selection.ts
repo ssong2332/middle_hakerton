@@ -8,22 +8,20 @@ import { getLayer1ColorScheme, getLayer1Theme, type Layer1Theme } from './theme'
 const BUTTON_ID = 'cbm-layer1-selection-button';
 
 /**
- * MEDIATE "SHIFT" 로고 마크 — 사용자가 제공한 Claude Design 프로젝트
- * `MEDIATE 로고 03 SHIFT 전개.dc.html`의 원본 SVG를 그대로 옮긴다(좌표·비율(188:96)을 임의로
- * 바꾸지 않는다 — width/height는 호출부가 지정, 종횡비만 고정). 🔴 (T83) 원문의 "축소 한계"
- * 섹션이 명시한 20/30/14px는 파비콘 등 다른 시각 요소가 이미 주의를 끄는 맥락의 최소 판독
- * 한계였지, 임의 페이지 위에 홀로 떠서 그 자체로 눈에 띄어야 하는 플로팅 트리거의 권장 크기가
- * 아니었다 — 실사용 신고(가독성 저하) 후 24px 높이로 올렸다(`createFloatingButton` 호출부
- * 참조). 다크모드 대응은 원문 그대로: 어긋난 두 바(위 두 개)는 배경 대비에 따라 반전
- * (`theme.text` 재사용), 정렬된 결과 바(아래, 넓은 바)는 원문이 다크 변형에서도 고정해 둔
- * 브랜드 레드 `#ec3013`을 그대로 쓴다(테마 무관).
+ * 사이(SAI) "SHIFT" 로고 마크. 🔴 (v8.0) 사용자가 제공한 두 번째 Claude Design 목업
+ * (`MEDIATE 리디자인.dc.html` / `사이 확장 패널.dc.html`, 같은 프로젝트)이 이 마크를 24×24
+ * 정사각 viewBox·둥근 모서리(rx=2) 버전으로 다시 그려 웹앱 nav 로고와 확장 양쪽에서 동일하게
+ * 쓴다 — v7.0/T82~T83이 썼던 188:96 비율의 원본 SHIFT 마크(하드코딩 레드 `#ec3013`)는 이
+ * 목업으로 대체됐다(모양 계열은 같다: 어긋난 두 바 + 정렬된 결과 바). 세 번째 바는 이제
+ * `theme.accent`를 쓴다(하드코딩 색 고정 안 함) — 라이트/다크 모두 브랜드 accent와 함께
+ * 움직여야 목업의 "로고 3번째 바 = accent" 관례와 일치한다.
  */
-function shiftMarkSvg(theme: Layer1Theme, width: number, height: number): string {
+export function shiftMarkSvg(theme: Layer1Theme, width: number, height: number): string {
   return (
-    `<svg width="${width}" height="${height}" viewBox="0 0 188 96" role="img" aria-hidden="true" focusable="false">` +
-    `<rect x="14" y="20" width="118" height="16" fill="${theme.text}"/>` +
-    `<rect x="56" y="44" width="118" height="16" fill="${theme.text}"/>` +
-    `<rect x="14" y="68" width="160" height="16" fill="#ec3013"/>` +
+    `<svg width="${width}" height="${height}" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false">` +
+    `<rect x="2" y="5" width="14" height="4" rx="2" fill="${theme.text}"/>` +
+    `<rect x="8" y="10" width="14" height="4" rx="2" fill="${theme.text}"/>` +
+    `<rect x="2" y="15" width="20" height="4" rx="2" fill="${theme.accent}"/>` +
     `</svg>`
   );
 }
@@ -159,23 +157,26 @@ function createFloatingButton(
 
   // 🔴 (2026-08-12, T81) "중재하기" 텍스트를 처음엔 아이콘 단독으로 바꾸지 않았다 — `docs/UX.md`
   // Accessibility "Error Messaging"·T77 Decision Log의 아이콘 단독 금지 원칙 때문에 "M" 모노그램
-  // 배지 + 텍스트를 함께 뒀다. 🔴 (2026-08-12, T82) 사용자가 실제 로고(SHIFT 마크, Claude Design
-  // 프로젝트 `MEDIATE 로고 03 SHIFT 전개.dc.html`)를 제공하며 **아이콘 단독**을 명시적으로
-  // 요청했다 — 이 컨트롤(선택 시 잠깐 뜨는 액션 트리거)에 한해 그 지시를 따르되, 시각적으로
-  // 텍스트가 없어도 스크린리더 사용자가 배제되지 않도록 `aria-label`로 접근 가능한 이름은
-  // 유지한다(아이콘 단독 버튼에 `aria-label`을 다는 것은 WCAG 4.1.2 충족의 표준 패턴이며,
-  // 기존 원칙이 막던 것은 "텍스트 대안이 어디에도 없는" 상태다 — T77의 내비 토글처럼 상시
-  // 노출되는 신호와 달리 이건 사용자가 만든 일회성 트리거라는 점도 다르다).
-  // 🔴 (2026-08-12, T83) 사용자 재신고 — "로고가 가독성이 안 좋다, DeepL 옆에서도 눈에 안
-  // 띈다." 원인은 크기였다: 디자인 원문의 "축소 한계" 표가 검증한 가장 작은 폭(20px)을 그대로
-  // 썼는데, 그 표의 세 값(30/20/14px)은 **파비콘 등 이미 다른 시각적 맥락이 주의를 끄는
-  // 자리**에서의 최소 판독 한계이지, 임의 페이지 위에 새로 떠서 그 자체로 눈에 띄어야 하는
-  // 플로팅 트리거의 권장 크기가 아니다. 바 높이가 실제로 1px 안팎이 되어 세 바가 뭉개져
-  // 보였다. 명시적 "권장" 크기가 원문에 없어 실측 가독성 기준(DeepL 아이콘과 나란히 놓아도
-  // 밀리지 않을 크기)으로 implementer가 정한다 — 마크의 종횡비(188:96)는 원문 그대로 유지하고
-  // 높이만 24px로 올린다(20px 폭 대비 118% 확대, 형태·색상 규칙은 변경 없음).
+  // 배지 + 텍스트를 함께 뒀다. 🔴 (2026-08-12, T82) 사용자가 실제 로고(SHIFT 마크)를 제공하며
+  // **아이콘 단독**을 명시적으로 요청해 그렇게 바꿨었다(T83까지 유지). 🔴 (2026-08-12, v8.0)
+  // 사용자가 두 번째 목업(`사이 확장 패널.dc.html`)에서 아이콘 옆에 "중재" 텍스트를 다시
+  // 명시했다 — icon-only 예외를 되돌리고 이 문서 전반의 아이콘+텍스트 관례로 복귀한다
+  // (`docs/UX.md` "Layer 1 dark mode & logo mark" v8.0 각주). `aria-label`은 시각적 텍스트와
+  // 별개로 계속 유지한다(중복이지만 유지 비용이 낮고 스크린리더 접근성 이름이 텍스트 변경에
+  // 흔들리지 않게 고정한다).
   const theme = getLayer1Theme();
-  button.innerHTML = shiftMarkSvg(theme, 47, 24);
+  const icon = document.createElement('span');
+  icon.innerHTML = shiftMarkSvg(theme, 15, 15);
+  icon.style.display = 'inline-flex';
+  const label = document.createElement('span');
+  label.textContent = '중재';
+  Object.assign(label.style, {
+    fontSize: '13px',
+    fontWeight: '800',
+    color: theme.text,
+    fontFamily: 'system-ui, sans-serif',
+  });
+  button.append(icon, label);
   button.setAttribute('aria-label', '중재하기');
   button.title = '중재하기';
 
@@ -185,6 +186,9 @@ function createFloatingButton(
   // 🔴 (2026-08-12, T81) 다크모드: host 페이지가 아니라 OS/브라우저 신호(`theme.ts`)를 읽는다.
   // `colorScheme`을 명시해 브라우저의 강제 다크모드 재처리가 이미 테마 처리된 이 버튼을 다시
   // 건드리지 않게 한다(`docs/UX.md` "Selection-triggered floating button" 패턴, 다크모드 절 참조).
+  // 🔴 (v8.0) 크기/여백/그림자는 `사이 확장 패널.dc.html`의 트리거 버튼 스타일을 그대로 옮긴다
+  // (height 36px, radius 11px, gap 7px) — 임의 페이지 배경 위에서 잘 보여야 한다는 T83의
+  // 실사용 교훈은 유지하면서(1px 테두리 대신 여전히 명확한 테두리+그림자 조합을 쓴다).
   Object.assign(button.style, {
     position: 'fixed',
     top: '0px',
@@ -192,16 +196,15 @@ function createFloatingButton(
     zIndex: '2147483647',
     display: 'inline-flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    // 🔴 (2026-08-12, T82) 아이콘 단독으로 바뀌며 좌우 여백을 동일하게 맞춘다(이전엔 텍스트
-    // 옆의 비대칭 여백 4px/10px였다). 🔴 (T83) 마크 확대(24px)에 맞춰 여백도 키우고, 임의
-    // 페이지 배경 위에서 더 또렷이 보이도록 테두리를 2px로, 그림자를 더 짙게 조정했다.
-    padding: '8px',
-    borderRadius: '4px',
-    border: `2px solid ${theme.border}`,
+    gap: '7px',
+    height: '36px',
+    padding: '0 13px',
+    borderRadius: '11px',
+    border: `1px solid ${theme.border}`,
     background: theme.bg,
-    boxShadow: `0 2px 8px ${theme.shadow}`,
+    boxShadow: `0 0 0 2px ${theme.shadow}, 0 6px 18px ${theme.shadow}`,
     cursor: 'pointer',
+    whiteSpace: 'nowrap',
     colorScheme: getLayer1ColorScheme(),
   });
 

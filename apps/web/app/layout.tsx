@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Archivo, IBM_Plex_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 
 export const metadata = {
@@ -27,6 +28,20 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 /**
+ * docs/UX.md v8.0 — 브랜드 리디자인 폰트(Pretendard). Google Fonts에 없어 `next/font/google`을
+ * 못 쓴다 — 목업 원문은 jsdelivr CDN `<link>`를 썼지만, M-6이 이미 "외부 런타임 요청 금지, 빌드타임
+ * self-host"를 이 프로젝트의 폰트 로딩 원칙으로 확정했다(위 주석) — 그 원칙을 그대로 따라
+ * `next/font/local` + `pretendard` npm 패키지(정적 파일만 포함, 런타임 네트워크 요청 없음)로
+ * self-host한다. 가변 폰트 단일 파일이라 weight 배열이 아니라 axes 범위로 지정한다.
+ */
+const pretendard = localFont({
+  src: '../../../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2',
+  variable: '--font-pretendard',
+  display: 'swap',
+  weight: '45 920',
+});
+
+/**
  * 🔴 Major 5(reviewer REJECTED → 수정) — `LogoutButton`을 여기(모든 화면에 걸리는 루트 레이아웃,
  * 미인증 UX-001/UX-002 포함)에서 뺐다. `docs/UX.md` Information Architecture "Navigation"은
  * 상시 내비게이션(Log out 포함)을 "present on every **authenticated** screen"으로 한정한다 —
@@ -37,7 +52,7 @@ const ibmPlexMono = IBM_Plex_Mono({
  */
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ko" className={`${archivo.variable} ${ibmPlexMono.variable}`}>
+    <html lang="ko" className={`${archivo.variable} ${ibmPlexMono.variable} ${pretendard.variable}`}>
       <body>{children}</body>
     </html>
   );

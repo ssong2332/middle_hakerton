@@ -1,5 +1,6 @@
 /**
- * 층 1(선택 오버레이) 다크모드 대응 + 웹앱 디자인 토큰 통일 (신규 2026-08-12, T81).
+ * 층 1(선택 오버레이) 다크모드 대응 + 웹앱 디자인 토큰 통일 (신규 2026-08-12, T81; 팔레트 값
+ * v8.0 브랜드 리디자인으로 교체, docs/UX.md Design Tokens 참조).
  *
  * `panel-mount.tsx`가 이미 밝혔듯 패널/버튼은 Shadow DOM(또는 버튼은 host 라이트 DOM 안이지만
  * host 페이지 CSS를 참조하지 않는 인라인 style)이라 host 페이지의 다크모드 여부를 상속받지
@@ -7,12 +8,16 @@
  * 설정을 직접 읽는다. 이 신호는 host 페이지와 무관하다(host가 다크든 라이트든 우리 UI는 사용자의
  * 실제 선호를 따른다).
  *
- * light 팔레트 값은 `apps/web/app/globals.css`의 기존 토큰과 동일하게 맞춘다(웹앱과의 시각적
- * 통일성). dark 팔레트는 이 리포에 선례가 없어(웹앱 자체가 다크모드를 구현하지 않음) 이번에
- * 새로 정했다 — 각 텍스트/배경 쌍은 WCAG 2.1 상대휘도 공식으로 대비를 계산해 AA(텍스트 4.5:1,
- * UI 컴포넌트 3:1)를 만족하는 값만 채택했다(`docs/UX.md` Accessibility "Color Contrast" —
- * 정확한 색상값은 ux-design 범위 밖, implementer가 검증). 계산 결과: text/bg ≈14.7:1,
- * accent/bg(양방향) ≈6.4:1, accentText/accent ≈6.4:1, border/bg ≈3.65:1 — 전부 기준 통과.
+ * light 팔레트 값은 `apps/web/app/globals.css`의 v8.0 토큰과 동일하게 맞춘다(웹앱과의 시각적
+ * 통일성). dark 팔레트는 이 리포에 선례가 없어 이번에도 새로 정했다 — WCAG 2.1 상대휘도 공식으로
+ * 재계산한 결과: text/bg ≈14.7:1, accent/bg(양방향) ≈7.05:1, accentText/accent ≈7.05:1,
+ * border/bg ≈4.49:1, danger/bg ≈8.94:1 — 전부 AA 기준 통과.
+ * 🔴 **알려진 예외(측정값, 숨기지 않음)**: light 팔레트의 accentText(#fff)/accent(#ff6100)는
+ * ≈3.02:1로 일반 텍스트 AA(4.5:1) 미달, UI 컴포넌트 기준(3:1)만 충족한다 — 사용자가 제공한
+ * Claude Design 목업(`사이 확장 패널.dc.html`)이 이 정확한 조합(흰 텍스트 + 주황 버튼 배경)을
+ * 명시했고, 버튼 라벨은 볼드지만 large-text 임계값(18.66px)보다 작아 엄밀히는 AA 미달이다.
+ * 채도 높은 주황 계열의 흔한 트레이드오프이며(예: 다수의 실서비스가 같은 조합을 쓴다) 사용자
+ * 승인을 받은 브랜드 색상을 임의로 어둡게 바꾸지 않았다 — 값을 바꾸려면 별도 논의가 필요하다.
  */
 
 export interface Layer1Theme {
@@ -28,26 +33,26 @@ export interface Layer1Theme {
 }
 
 const LIGHT: Layer1Theme = {
-  bg: '#f8f4f4', // apps/web globals.css --color-surface
-  surface: '#eae9e9', // --color-surface-alt
-  text: '#201e1d', // --color-text
-  border: '#201e1d', // --border-strong
-  accent: '#ae1800', // --color-accent
-  accentHover: '#8a1400', // --color-accent-hover
-  accentText: '#f8f4f4',
-  danger: '#7c1405', // --color-danger-text
-  shadow: 'rgba(45, 43, 43, 0.35)',
+  bg: '#F9FAFB', // apps/web globals.css --color-bg
+  surface: '#FFFFFF', // --color-surface
+  text: '#191F28', // --color-text
+  border: '#E5E8EB', // --border-thin-alt
+  accent: '#FF6100', // --color-accent
+  accentHover: '#E85700', // --color-accent-hover
+  accentText: '#FFFFFF',
+  danger: '#C40029', // --color-danger-text
+  shadow: 'rgba(17, 24, 39, 0.24)', // --shadow-elevated
 };
 
 const DARK: Layer1Theme = {
   bg: '#211f1e',
   surface: '#2c2a29',
   text: '#f3f2f2',
-  border: '#7a7673',
-  accent: '#ff7a5c',
-  accentHover: '#ff967c',
+  border: '#8a857f',
+  accent: '#ff8a54',
+  accentHover: '#ffa374',
   accentText: '#211f1e',
-  danger: '#ff9d85',
+  danger: '#ffab8a',
   shadow: 'rgba(0, 0, 0, 0.55)',
 };
 

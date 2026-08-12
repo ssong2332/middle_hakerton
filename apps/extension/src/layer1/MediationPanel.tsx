@@ -40,7 +40,7 @@ import type { MediationResult } from '@cross-border/core';
 import { addSample, callMediationApi, fetchKnownCounterparts } from '../shared/api';
 import { getStoredToken } from '../shared/token-storage';
 import { NON_LIVE_NOTICE } from '../shared/non-live-notice';
-import { computeClampedPosition } from './selection';
+import { computeClampedPosition, shiftMarkSvg } from './selection';
 import { getLayer1ColorScheme, getLayer1Theme, subscribeLayer1ThemeChange, type Layer1Theme } from './theme';
 import type { Layer2Adapter } from './registry';
 
@@ -357,7 +357,15 @@ export function MediationPanel({
       style={buildPanelStyle(theme, anchoredPos)}
     >
       <div style={headerStyle}>
-        <span>중재 패널</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          <span
+            aria-hidden="true"
+            style={{ display: 'inline-flex' }}
+            dangerouslySetInnerHTML={{ __html: shiftMarkSvg(theme, 16, 16) }}
+          />
+          <span style={{ fontWeight: 800 }}>사이</span>
+          <span style={{ fontWeight: 600, fontSize: '12px', color: theme.text + 'aa' }}>중재 패널</span>
+        </span>
         <button type="button" onClick={onClose} aria-label="닫기" style={closeButtonStyle}>
           ×
         </button>
@@ -429,108 +437,136 @@ export function MediationPanel({
 
           {mode === 'mediate' && (
             <>
-              {/* T66(AC-067①, docs/UX.md v6.7 RecipientKnownCounterparts) — 규약이 0건이면 아예
-                  렌더하지 않는다(비활성 아님). 페이지 맥락 자동 감지는 스트레치로 이월됐으므로
-                  여기서는 목록 선택만 한다. */}
-              {counterparts.length > 0 && (
-                <div>
-                  <label htmlFor="cbm-panel-recipient">받는 사람 (선택)</label>
-                  <select
-                    id="cbm-panel-recipient"
-                    value={recipient ?? ''}
-                    onChange={(event) => setRecipient(event.target.value === '' ? null : event.target.value)}
-                    style={fieldStyle(theme)}
-                  >
-                    <option value="">미지정</option>
-                    {counterparts.map((counterpart) => (
-                      <option key={counterpart} value={counterpart}>
-                        {counterpart}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => void runMediation()}
-                disabled={text.trim() === '' || status === 'loading'}
-                style={actionButtonStyle(theme, 'primary')}
-              >
-                {status === 'error' ? '다시 시도' : '중재 실행'}
-              </button>
-
-              {status === 'loading' && <p role="status">분류 중 → 변환 중 → 역번역 중</p>}
-              {status === 'error' && errorMessage && (
-                <p role="alert" style={alertTextStyle(theme)}>
-                  {errorMessage}
-                </p>
-              )}
-
-              {status === 'success' && result && (
-                <div>
-                  <p role="status">긴급도: {result.urgency}</p>
-                  {result.personalizationApplied === false && (
-                    <p role="status">개인화 미적용 — 기본 변환만 적용되었습니다</p>
+              {/* v8.0 — 사이 확장 패널.dc.html이 이 영역을 반응형 2열로 그린다(왼쪽: 입력/실행,
+                  오른쪽: 결과 — 결과가 없으면 왼쪽만 전체 폭). flex-wrap이라 좁은 창에서는
+                  자동으로 세로 스택된다(모바일 브레이크포인트를 별도로 코딩하지 않는다 —
+                  `docs/UX.md` Responsive Behavior "확장은 별도 반응형 처리 없음"과 모순되지
+                  않는다: 이건 미디어쿼리가 아니라 flex-wrap 자체의 기본 동작이다). */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px' }}>
+                <div style={{ flex: '1 1 240px', minWidth: 0, display: 'grid', gap: '10px' }}>
+                  {/* T66(AC-067①, docs/UX.md v6.7 RecipientKnownCounterparts) — 규약이 0건이면
+                      아예 렌더하지 않는다(비활성 아님). 페이지 맥락 자동 감지는 스트레치로
+                      이월됐으므로 여기서는 목록 선택만 한다. */}
+                  {counterparts.length > 0 && (
+                    <div>
+                      <label htmlFor="cbm-panel-recipient">받는 사람 (선택)</label>
+                      <select
+                        id="cbm-panel-recipient"
+                        value={recipient ?? ''}
+                        onChange={(event) => setRecipient(event.target.value === '' ? null : event.target.value)}
+                        style={fieldStyle(theme)}
+                      >
+                        <option value="">미지정</option>
+                        {counterparts.map((counterpart) => (
+                          <option key={counterpart} value={counterpart}>
+                            {counterpart}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   )}
-                  {showFallbackNotice && <p role="status">{NON_LIVE_NOTICE}</p>}
-
-                  <label htmlFor="cbm-panel-final-text">변환된 메시지</label>
-                  <textarea
-                    id="cbm-panel-final-text"
-                    value={finalText}
-                    onChange={(event) => {
-                      setFinalText(event.target.value);
-                      setCopied(false);
-                      setCopyError(null);
-                      setInsertStatus('idle');
-                    }}
-                    style={fieldStyle(theme)}
-                  />
-
-                  <p>역번역: {result.backTranslation}</p>
-                  <p style={{ fontSize: '11px' }}>
-                    완전한 검증이 아니라 큰 오역을 걸러내는 1차 안전장치입니다.
-                  </p>
-
-                  <div>
-                    {/* AC-053①②③④ — Copy는 결과가 있을 때만 활성화된다. Insert는 `adapter`가
-                        `null`인 한(현재 사이트에 매칭되는 층 2 모듈이 없음) 아예 렌더되지 않는다 —
-                        회색 비활성 버튼을 두지 않는다(`docs/UX.md:929` Absent-not-disabled
-                    controls). `adapter`가 있으면 실제로 클릭 가능한 버튼으로 렌더된다. */}
-                <button
-                  type="button"
-                  onClick={() => void handleCopy()}
-                  disabled={finalText.trim() === ''}
-                  style={actionButtonStyle(theme, 'secondary')}
-                >
-                  클립보드에 복사
-                </button>
-                {adapter && (
                   <button
                     type="button"
-                    onClick={handleInsert}
-                    disabled={finalText.trim() === ''}
-                    style={actionButtonStyle(theme, 'secondary')}
+                    onClick={() => void runMediation()}
+                    disabled={text.trim() === '' || status === 'loading'}
+                    style={actionButtonStyle(theme, 'primary')}
                   >
-                    입력창에 삽입
+                    {status === 'error' ? '다시 시도' : '중재 실행'}
                   </button>
+
+                  {status === 'loading' && <p role="status">분류 중 → 변환 중 → 역번역 중</p>}
+                  {status === 'error' && errorMessage && (
+                    <p role="alert" style={alertTextStyle(theme)}>
+                      {errorMessage}
+                    </p>
+                  )}
+                </div>
+
+                {status === 'success' && result && (
+                  <div
+                    style={{
+                      flex: '1 1 220px',
+                      minWidth: 0,
+                      display: 'grid',
+                      gap: '10px',
+                      borderLeft: `1px solid ${theme.border}`,
+                      paddingLeft: '14px',
+                    }}
+                  >
+                    <div>
+                      <span role="status" style={badgeStyle(theme, 'neutral')}>
+                        긴급도: {result.urgency}
+                      </span>
+                      {result.personalizationApplied === false && (
+                        <span role="status" style={badgeStyle(theme, 'warn')}>
+                          개인화 미적용 — 기본 변환만 적용되었습니다
+                        </span>
+                      )}
+                      {showFallbackNotice && (
+                        <span role="status" style={badgeStyle(theme, 'warn')}>
+                          {NON_LIVE_NOTICE}
+                        </span>
+                      )}
+                    </div>
+
+                    <label htmlFor="cbm-panel-final-text">변환된 메시지</label>
+                    <textarea
+                      id="cbm-panel-final-text"
+                      value={finalText}
+                      onChange={(event) => {
+                        setFinalText(event.target.value);
+                        setCopied(false);
+                        setCopyError(null);
+                        setInsertStatus('idle');
+                      }}
+                      style={fieldStyle(theme)}
+                    />
+
+                    <p>역번역: {result.backTranslation}</p>
+                    <p style={{ fontSize: '11px' }}>
+                      완전한 검증이 아니라 큰 오역을 걸러내는 1차 안전장치입니다.
+                    </p>
+
+                    <div>
+                      {/* AC-053①②③④ — Copy는 결과가 있을 때만 활성화된다. Insert는 `adapter`가
+                          `null`인 한(현재 사이트에 매칭되는 층 2 모듈이 없음) 아예 렌더되지 않는다
+                          — 회색 비활성 버튼을 두지 않는다(`docs/UX.md:929` Absent-not-disabled
+                          controls). `adapter`가 있으면 실제로 클릭 가능한 버튼으로 렌더된다. */}
+                      <button
+                        type="button"
+                        onClick={() => void handleCopy()}
+                        disabled={finalText.trim() === ''}
+                        style={actionButtonStyle(theme, 'secondary')}
+                      >
+                        클립보드에 복사
+                      </button>
+                      {adapter && (
+                        <button
+                          type="button"
+                          onClick={handleInsert}
+                          disabled={finalText.trim() === ''}
+                          style={actionButtonStyle(theme, 'secondary')}
+                        >
+                          입력창에 삽입
+                        </button>
+                      )}
+                    </div>
+                    {copied && <p role="status">복사됨</p>}
+                    {copyError && (
+                      <p role="alert" style={alertTextStyle(theme)}>
+                        {copyError}
+                      </p>
+                    )}
+                    {insertStatus === 'inserted' && <p role="status">삽입됨</p>}
+                    {insertStatus === 'failed' && (
+                      <p role="alert" style={alertTextStyle(theme)}>
+                        입력창에 삽입하지 못했습니다. 대상 사이트의 화면 구조가 바뀌었을 수 있습니다
+                        — 클립보드 복사를 이용해 주세요.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
-              {copied && <p role="status">복사됨</p>}
-              {copyError && (
-                <p role="alert" style={alertTextStyle(theme)}>
-                  {copyError}
-                </p>
-              )}
-              {insertStatus === 'inserted' && <p role="status">삽입됨</p>}
-              {insertStatus === 'failed' && (
-                <p role="alert" style={alertTextStyle(theme)}>
-                  입력창에 삽입하지 못했습니다. 대상 사이트의 화면 구조가 바뀌었을 수 있습니다 —
-                  클립보드 복사를 이용해 주세요.
-                </p>
-              )}
-            </div>
-          )}
             </>
           )}
 
@@ -584,14 +620,18 @@ function buildPanelStyle(
     top: anchoredPos ? `${anchoredPos.top}px` : '16px',
     left: anchoredPos ? `${anchoredPos.left}px` : undefined,
     right: anchoredPos ? undefined : '16px',
-    width: '360px',
+    // v8.0 — 결과가 뜨면 2열이 되므로(위 렌더 로직) 기존 360px 고정폭은 너무 좁다. 목업의
+    // `min(692px, calc(100vw - 40px))`를 그대로 쓰되, 확장 패널은 항상 이 최대폭까지 필요하진
+    // 않아 실측 여유를 두고 560px로 상한을 낮춘다(임의 페이지 위에 뜨는 오버레이라 원본보다
+    // 보수적으로 잡는다) — 뷰포트가 좁으면 flex-wrap이 자동으로 세로 스택한다.
+    width: 'min(560px, calc(100vw - 32px))',
     maxHeight: '80vh',
     overflowY: 'auto',
     background: theme.bg,
     color: theme.text,
     border: `1px solid ${theme.border}`,
-    borderRadius: '8px',
-    boxShadow: `0 4px 16px ${theme.shadow}`,
+    borderRadius: '20px', // v8.0 — docs/UX.md --radius-lg, 사이 확장 패널.dc.html 패널 카드
+    boxShadow: `0 24px 60px ${theme.shadow}`,
     padding: '12px',
     fontSize: '13px',
     fontFamily: 'system-ui, sans-serif',
@@ -625,9 +665,9 @@ const closeButtonStyle: React.CSSProperties = {
 function actionButtonStyle(theme: Layer1Theme, variant: 'primary' | 'secondary' = 'secondary'): React.CSSProperties {
   const isPrimary = variant === 'primary';
   return {
-    font: '600 12px system-ui, sans-serif',
+    font: '700 13px system-ui, sans-serif', // v8.0 — 사이 확장 패널.dc.html btn() 헬퍼
     padding: '7px 12px',
-    borderRadius: '4px',
+    borderRadius: '13px',
     border: `1px solid ${isPrimary ? theme.accent : theme.border}`,
     background: isPrimary ? theme.accent : 'transparent',
     color: isPrimary ? theme.accentText : theme.text,
@@ -641,7 +681,7 @@ function fieldStyle(theme: Layer1Theme): React.CSSProperties {
     font: 'inherit',
     fontSize: '13px',
     padding: '6px 8px',
-    borderRadius: '4px',
+    borderRadius: '12px', // v8.0 — docs/UX.md --radius-md
     border: `1px solid ${theme.border}`,
     background: theme.surface,
     color: theme.text,
@@ -652,4 +692,26 @@ function fieldStyle(theme: Layer1Theme): React.CSSProperties {
 
 function alertTextStyle(theme: Layer1Theme): React.CSSProperties {
   return { color: theme.danger, fontWeight: 600 };
+}
+
+/**
+ * v8.0 — 사이 확장 패널.dc.html이 긴급도/개인화 미적용/폴백 응답을 알약(pill) 배지로 그린다.
+ * 기존엔 셋 다 밋밋한 `<p role="status">` 텍스트 줄이었다 — 시각만 바꾸고 `role="status"`(스크린
+ * 리더 알림)와 텍스트 내용은 그대로 유지한다(AC-066③/AC-041/urgency 값 자체는 변경 대상이 아님,
+ * `docs/UX.md` Decision Log "Full Visual Rebrand" 참조 — 스타일 패스일 뿐 동작 변경이 아니다).
+ * `tone`은 목업의 두 배지 색 계열을 재사용한다: neutral(긴급도, 정보성) / warn(개인화 미적용·
+ * 폴백 응답, 눈에 띄어야 하는 상태 결손).
+ */
+function badgeStyle(theme: Layer1Theme, tone: 'neutral' | 'warn'): React.CSSProperties {
+  return {
+    display: 'inline-block',
+    padding: '5px 10px',
+    borderRadius: '999px',
+    fontSize: '11px',
+    fontWeight: 700,
+    background: tone === 'warn' ? theme.danger + '22' : theme.surface,
+    color: tone === 'warn' ? theme.danger : theme.text,
+    marginRight: '6px',
+    marginBottom: '6px',
+  };
 }

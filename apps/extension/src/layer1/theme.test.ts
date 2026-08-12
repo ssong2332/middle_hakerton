@@ -22,8 +22,8 @@ describe('getLayer1Theme', () => {
   it('returns the light palette when the OS/browser does not prefer dark', () => {
     mockMatchMedia(false);
     const theme = getLayer1Theme();
-    expect(theme.bg).toBe('#f8f4f4');
-    expect(theme.text).toBe('#201e1d');
+    expect(theme.bg).toBe('#F9FAFB');
+    expect(theme.text).toBe('#191F28');
   });
 
   it('returns the dark palette when the OS/browser prefers dark', () => {

@@ -656,12 +656,12 @@ describe('initSelectionOverlay — scroll repositions the button to match the se
   });
 });
 
-// 🔴 (2026-08-12, T81→T82) T81은 "M" 모노그램 배지 + 텍스트를 함께 렌더했다. T82에서 사용자가
-// 실제 로고(SHIFT 마크)를 제공하며 아이콘 단독을 명시적으로 요청해 텍스트 라벨을 제거했다 —
-// 대신 `aria-label`로 접근 가능한 이름은 유지한다(WCAG 4.1.2 표준 패턴). 이 테스트는 ① 화면에
-// 보이는 텍스트가 없고(아이콘 단독) ② 그럼에도 접근 가능한 이름은 여전히 "중재하기"이며 ③ 실제
-// SVG 마크가 렌더되는지 확인한다.
-describe('initSelectionOverlay — floating button is icon-only with an aria-label accessible name (T82)', () => {
+// 🔴 (2026-08-12, T81→T82→v8.0) T81은 "M" 모노그램 배지 + 텍스트, T82는 사용자 요청으로 아이콘
+// 단독, v8.0은 두 번째 목업(`사이 확장 패널.dc.html`)에서 사용자가 다시 아이콘+"중재" 텍스트를
+// 명시해 되돌렸다(`docs/UX.md` "Layer 1 dark mode & logo mark" v8.0 각주). 이 테스트는 ① 화면에
+// "중재" 텍스트가 보이고 ② 접근 가능한 이름도 `aria-label`로 "중재하기"이며 ③ 실제 SVG 마크가
+// 렌더되는지 확인한다.
+describe('initSelectionOverlay — floating button shows icon + "중재" text with an aria-label accessible name (v8.0)', () => {
   let cleanup: () => void;
   let originalGetBoundingClientRect: typeof Range.prototype.getBoundingClientRect | undefined;
 
@@ -681,7 +681,7 @@ describe('initSelectionOverlay — floating button is icon-only with an aria-lab
     window.getSelection()?.removeAllRanges();
   });
 
-  it('has no visible text content but exposes "중재하기" as its accessible name via aria-label', () => {
+  it('shows visible "중재" text and exposes "중재하기" as its accessible name via aria-label', () => {
     const content = renderGenericSiteA();
     cleanup = initSelectionOverlay();
 
@@ -689,7 +689,7 @@ describe('initSelectionOverlay — floating button is icon-only with an aria-lab
     fireMouseUp();
 
     const button = getButton()!;
-    expect(button.textContent?.trim()).toBe('');
+    expect(button.textContent?.trim()).toBe('중재');
     expect(button.getAttribute('aria-label')).toBe('중재하기');
   });
 

@@ -1,7 +1,7 @@
 /*
- * 전역 스타일시트 — `docs/design-mockups/중재 워크스페이스 목업.dc.html`의 <style> 블록과
- * 인라인 스타일에서 뽑은 디자인 토큰을 기준으로 한다(그 파일 자체는 Claude Design canvas
- * 렌더링 산출물이라 그대로 복사하지 않는다 — 토큰만 재사용).
+ * 전역 스타일시트 — docs/UX.md v8.0 "Design Tokens" 표를 그대로 옮긴다. 표의 값은 사용자가 제공한
+ * Claude Design 목업(`MEDIATE 리디자인.dc.html`)에서 나왔다(그 파일 자체는 Claude Design canvas
+ * 렌더링 산출물이라 그대로 복사하지 않는다 — 토큰 값만 재사용).
  *
  * 범위: 이 파일은 기본 리셋 + 디자인 토큰(CSS 커스텀 프로퍼티) + 폼 요소 기본값만 다룬다.
  * 화면별 레이아웃은 각 컴포넌트의 CSS Module이 담당한다.
@@ -12,58 +12,61 @@
  * `next/font/google`(빌드타임 self-host, 새 의존성 추가 없음)로 옮겼다. 실제 `@font-face` 주입과
  * CSS 변수(`--font-archivo-family`/`--font-mono-family`) 정의는 `apps/web/app/layout.tsx`가
  * `variable` 옵션으로 `<html>`에 부여한다 — 아래 `--font-sans`/`--font-mono`는 그 변수를 참조한다.
+ * (v8.0) Pretendard도 같은 원칙(self-host, 외부 런타임 요청 없음)으로 `next/font/local` +
+ * `pretendard` npm 패키지를 추가해 붙였다 — CDN `<link>`(목업 원문)는 쓰지 않는다.
  */
 
 :root {
-  /* 배경/텍스트 */
-  --color-bg: #f3f2f2;
-  --color-text: #201e1d;
+  /* 배경/텍스트 (v8.0) */
+  --color-bg: #f9fafb;
+  --color-text: #191f28;
 
-  /* 표면(패널·입력 배경) */
-  --color-surface: #f8f4f4;
-  --color-surface-alt: #eae9e9;
+  /* 표면(패널·입력 배경) (v8.0 — surface는 카드용 흰색, surface-alt는 입력 필드용 회색으로 분리) */
+  --color-surface: #ffffff;
+  --color-surface-alt: #f2f4f6;
 
-  /* 포인트 컬러 */
-  --color-accent: #ae1800;
-  /* 리뷰 M-1: #dd2b0f는 #f8f4f4 위에서 4.35:1로 WCAG AA(4.5:1) 미달 — accent(#ae1800)보다 어두운
-     값으로 교체해 hover 상태에서도 항상 AA를 통과하도록 한다(#8a1400 vs #f8f4f4 ≈ 8.8:1). */
-  --color-accent-hover: #8a1400;
-  /* T76(리뷰어 Minor, 목업 원본값 이월분) — 이전 값 #ec3013은 --color-accent(#ae1800)와 같은
-     붉은 계열이라 "포커스 중"과 "이게 기본 액션(CTA)"이 시각적으로 구분되지 않는다는 지적을
-     받았다. 파란 계열로 바꿔 완전히 다른 색상축으로 분리한다 — :focus-visible 아웃라인 전용이라
-     (버튼 채움색으로 쓰지 않는다는 기존 제약은 그대로) 3:1(비텍스트) 기준만 충족하면 되고,
-     #1a56db는 #f8f4f4 위에서 훨씬 여유 있게 통과한다. */
+  /* 포인트 컬러 (v8.0 — 브랜드 리디자인, docs/UX.md Decision Log "Full Visual Rebrand") */
+  --color-accent: #ff6100;
+  --color-accent-hover: #e85700;
+  /* v6.5(리뷰어 Minor)에서 accent와 다른 색상축(파랑)으로 분리한 이유가 유지된다 — accent가
+     주황으로 바뀌어도 focus는 그대로 파랑(#1a56db)에 남긴다. 목업 원문은 accent 톤(주황) 포커스
+     링을 쓰지만, "포커스"와 "기본 액션"을 다른 색상축으로 분리해야 한다는 기존 접근성 판단이
+     목업의 원시 CSS보다 우선한다(docs/UX.md Design Tokens 표의 v8.0 각주 참조). */
   --color-focus: #1a56db;
-  --color-danger-bg: #fff2ef;
-  --color-danger-text: #7c1405;
-  /* T76(리뷰어 Minor) — `LogoutButton.module.css`가 갖고 있던 하드코딩 hover 배경(#ffe0d9)을
-     토큰으로 승격. accent 계열의 옅은 틴트(danger-bg보다 살짝 진함, hover 강조용). */
-  --color-accent-tint: #ffe0d9;
+  --color-danger-bg: #fdedf0;
+  --color-danger-text: #c40029;
+  --color-accent-tint: #fff1e8;
 
-  /* 테두리 */
-  --border-thin: rgba(32, 30, 29, 0.25);
-  --border-thin-alt: rgba(32, 30, 29, 0.3);
-  --border-strong: #201e1d;
-  --border-rule: rgba(32, 30, 29, 0.4);
+  /* 라운드 (v8.0 신설 — 목업이 기존보다 훨씬 둥근 스케일을 쓴다) */
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
 
-  /* 텍스트 보조 톤(불투명도 계열) */
-  --text-muted-75: rgba(32, 30, 29, 0.75);
-  --text-muted-60: rgba(32, 30, 29, 0.6);
-  --text-muted-55: rgba(32, 30, 29, 0.55);
-  --text-muted-45: rgba(32, 30, 29, 0.45);
+  /* 테두리 (v8.0) */
+  --border-thin: #eef1f4;
+  --border-thin-alt: #e5e8eb;
+  --border-strong: #191f28;
+  --border-rule: #eaedf0;
 
-  /* T76(리뷰어 Minor) — 아래 두 값은 각각 `MediationWorkspace.module.css`(box-shadow)·전역
-     ::selection 규칙이 하드코딩 리터럴로 갖고 있던 것을 토큰으로 승격했다(리터럴 값은 그대로
-     보존 — 시각 변경 없음, 정의 위치만 1곳으로 모음). */
-  --shadow-color-frame: rgba(45, 43, 43, 0.16);
-  --color-selection-bg: rgba(174, 24, 0, 0.3);
+  /* 텍스트 보조 톤 (v8.0 — 불투명도 계열에서 목업의 고정 회색 스케일로 교체) */
+  --text-muted-75: #6b7684;
+  --text-muted-60: #8b95a1;
+  --text-muted-55: #8b95a1;
+  --text-muted-45: #d1d6db;
 
-  /* 폰트 — next/font/google이 --font-archivo/--font-mono(각 폰트의 실제 family)를
-     layout.tsx에서 <html>에 주입한다. 여기서는 폴백 스택만 덧붙인다. */
-  --font-sans: var(--font-archivo), system-ui, sans-serif;
+  /* 그림자 (v8.0 — 카드용/플로팅용 2단계로 분리, docs/UX.md Design Tokens 표 참조) */
+  --shadow-color-frame: rgba(17, 24, 39, 0.06);
+  --shadow-elevated: rgba(17, 24, 39, 0.24);
+  --color-selection-bg: rgba(255, 97, 0, 0.18);
+
+  /* 폰트 — next/font/google·next/font/local이 --font-archivo/--font-mono/--font-pretendard를
+     layout.tsx에서 <html>에 주입한다. 여기서는 폴백 스택만 덧붙인다.
+     (v8.0) 본문/UI 서체를 Archivo → Pretendard로 교체(한국어 최적화 가변 폰트). */
+  --font-sans: var(--font-pretendard), system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 
-  /* 라벨(대문자 + 넓은 자간 모노스페이스) 공통 값 */
+  /* 라벨(대문자 + 넓은 자간 모노스페이스) 공통 값 — v8.0에서 목업이 이 값을 뒤집을 근거를 주지
+     않아 그대로 유지(docs/UX.md Design Tokens 표 각주). */
   --label-letter-spacing: 0.1em;
 }
 

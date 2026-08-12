@@ -8,10 +8,21 @@
   background: var(--color-bg);
 }
 
+/* v8.0 — docs/UX.md Information Architecture "Brand identity": 로고 마크 + "사이" + 옅은 "SAI"
+   캡션. 이전 값(800 13px, 0.14em 대문자 "MEDIATE" 텍스트)은 문서화된 적 없는 임시값이었다. */
 .brand {
-  font: 800 13px var(--font-sans);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 800 15px var(--font-sans);
+  letter-spacing: 0.02em;
+}
+
+.brandCaption {
+  margin-left: 4px;
+  font: 700 0.7em var(--font-sans);
+  color: var(--text-muted-60);
+  letter-spacing: 0.06em;
 }
 
 .list {
