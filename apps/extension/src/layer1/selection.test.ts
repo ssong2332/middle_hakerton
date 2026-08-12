@@ -600,6 +600,114 @@ describe('initSelectionOverlay — scroll does not dismiss the button (M-3)', ()
   });
 });
 
+// 🔴 (2026-08-12, T81) 사용자 실측 발견 — 선택 후 페이지를 스크롤하면 버튼이 원래 선택 위치를
+// 벗어나 화면 좌표에 고정된 채 남았다. M-3(위)은 "지우지 않는다"만 검증했지 "위치가 갱신된다"는
+// 검증하지 않았다 — 이 describe가 그 gap을 메운다. `document.dispatchEvent(new
+// Event('scroll'))`을 쓴다(리스너가 `document`에 `capture:true`로 걸려 중첩 스크롤 컨테이너의
+// 버블 스크롤도 잡아야 하므로 `document` 레벨에서 발동시켜야 실제 배선을 검증한다).
+describe('initSelectionOverlay — scroll repositions the button to match the selection (T81)', () => {
+  let cleanup: () => void;
+  let originalGetBoundingClientRect: typeof Range.prototype.getBoundingClientRect | undefined;
+
+  beforeEach(() => {
+    originalGetBoundingClientRect = Range.prototype.getBoundingClientRect;
+    Range.prototype.getBoundingClientRect = vi.fn(() => FAKE_RECT);
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    if (originalGetBoundingClientRect) {
+      Range.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    } else {
+      delete (Range.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+    }
+    document.body.innerHTML = '';
+    window.getSelection()?.removeAllRanges();
+  });
+
+  it('recomputes the button position from the current selection rect on scroll', () => {
+    const content = renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+
+    selectTextIn(content);
+    fireMouseUp();
+    const button = getButton();
+    expect(button).not.toBeNull();
+    expect(button!.style.left).toBe(`${FAKE_RECT.left}px`);
+    expect(button!.style.top).toBe(`${FAKE_RECT.bottom + 4}px`);
+
+    // 스크롤 후 같은 selection Range가 새 뷰포트 기준 좌표를 반환한다고 가정(실브라우저 동작).
+    // 뷰포트 안쪽 값을 써서(clamp가 개입하지 않는 범위) 산술 결과를 그대로 검증한다.
+    const SCROLLED_RECT: DOMRect = { ...FAKE_RECT, top: 200, bottom: 220, left: 200, right: 300 };
+    Range.prototype.getBoundingClientRect = vi.fn(() => SCROLLED_RECT);
+
+    document.dispatchEvent(new Event('scroll'));
+
+    expect(button!.style.left).toBe(`${SCROLLED_RECT.left}px`);
+    expect(button!.style.top).toBe(`${SCROLLED_RECT.bottom + 4}px`);
+  });
+
+  it('does nothing when no button exists (scroll before any selection)', () => {
+    renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+
+    expect(() => document.dispatchEvent(new Event('scroll'))).not.toThrow();
+    expect(getButton()).toBeNull();
+  });
+});
+
+// 🔴 (2026-08-12, T81→T82→v8.0) T81은 "M" 모노그램 배지 + 텍스트, T82는 사용자 요청으로 아이콘
+// 단독, v8.0은 두 번째 목업(`사이 확장 패널.dc.html`)에서 사용자가 다시 아이콘+"중재" 텍스트를
+// 명시해 되돌렸다(`docs/UX.md` "Layer 1 dark mode & logo mark" v8.0 각주). 이 테스트는 ① 화면에
+// "중재" 텍스트가 보이고 ② 접근 가능한 이름도 `aria-label`로 "중재하기"이며 ③ 실제 SVG 마크가
+// 렌더되는지 확인한다.
+describe('initSelectionOverlay — floating button shows icon + "중재" text with an aria-label accessible name (v8.0)', () => {
+  let cleanup: () => void;
+  let originalGetBoundingClientRect: typeof Range.prototype.getBoundingClientRect | undefined;
+
+  beforeEach(() => {
+    originalGetBoundingClientRect = Range.prototype.getBoundingClientRect;
+    Range.prototype.getBoundingClientRect = vi.fn(() => FAKE_RECT);
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    if (originalGetBoundingClientRect) {
+      Range.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    } else {
+      delete (Range.prototype as { getBoundingClientRect?: unknown }).getBoundingClientRect;
+    }
+    document.body.innerHTML = '';
+    window.getSelection()?.removeAllRanges();
+  });
+
+  it('shows visible "중재" text and exposes "중재하기" as its accessible name via aria-label', () => {
+    const content = renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+
+    selectTextIn(content);
+    fireMouseUp();
+
+    const button = getButton()!;
+    expect(button.textContent?.trim()).toBe('중재');
+    expect(button.getAttribute('aria-label')).toBe('중재하기');
+  });
+
+  it('renders the SHIFT logo mark as an SVG', () => {
+    const content = renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+
+    selectTextIn(content);
+    fireMouseUp();
+
+    const button = getButton()!;
+    const svg = button.querySelector('svg');
+    expect(svg).not.toBeNull();
+    expect(svg!.getAttribute('aria-hidden')).toBe('true');
+    expect(button.querySelectorAll('rect').length).toBe(3);
+  });
+});
+
 // M-A (QA, Major) — `handleSelectionChange`의 제거 조건이 `handleMouseUp`의 생성 조건보다 좁았다.
 // 생성은 `getSelectionPayload()`(문서 selection **또는** 폼 컨트롤 selection)를 쓰지만, 제거는
 // `window.getSelection()`만 봤다. 폼 컨트롤 selection이 있으면 `window.getSelection()`은 설계상

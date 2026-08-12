@@ -7,6 +7,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // `MediationPanel` was actually rendered with (identity check, not just truthiness) —
 // see the "passes the origin element through" test below.
 let receivedOrigin: HTMLElement | null | undefined;
+// 🔴 (2026-08-12, T81) `receivedAnchorRect` — same pattern for `payload.rect`, which used to be
+// silently dropped (never passed to MediationPanel at all, so the panel could never position
+// itself near the selection). See "passes the payload rect through as anchorRect" below.
+let receivedAnchorRect: DOMRect | null | undefined;
 
 vi.mock('./MediationPanel', () => ({
   MediationPanel: ({
@@ -14,13 +18,16 @@ vi.mock('./MediationPanel', () => ({
     onClose,
     adapter,
     origin,
+    anchorRect,
   }: {
     initialText: string;
     onClose: () => void;
     adapter?: { id: string } | null;
     origin?: HTMLElement | null;
+    anchorRect?: DOMRect | null;
   }) => {
     receivedOrigin = origin;
+    receivedAnchorRect = anchorRect;
     return (
       <div data-testid="mock-panel">
         <span>{initialText}</span>
@@ -43,6 +50,7 @@ describe('panel-mount', () => {
     closeMediationPanel();
     document.body.innerHTML = '';
     receivedOrigin = undefined;
+    receivedAnchorRect = undefined;
   });
 
   it('mounts the panel inside a shadow root host attached to document.body', () => {
@@ -82,15 +90,32 @@ describe('panel-mount', () => {
     expect(document.getElementById('cbm-layer1-panel-host')).toBeNull();
   });
 
-  // M-7(reviewer) — UX-016 Accessibility: 닫을 때 포커스가 트리거 버튼으로 돌아간다. 버튼이
-  // (여전히) DOM에 있으면 그쪽으로 포커스가 이동해야 한다 — `selection.ts`의
-  // `focusFloatingButtonIfPresent`로 위임한다는 계약을 여기서 확인한다.
-  it('returns focus to the triggering floating button on close, when it still exists', () => {
+  // 🔴 (2026-08-12, T82) 사용자 신고 — 패널이 열려도 트리거 버튼이 화면에 남아 둘이 동시에
+  // 보였다. 패널이 열리면 버튼은 바로 사라져야 한다.
+  it('hides the floating trigger button as soon as the panel opens (both are never shown at once)', () => {
     const triggerButton = document.createElement('button');
     triggerButton.id = 'cbm-layer1-selection-button';
     document.body.appendChild(triggerButton);
 
     openMediationPanel({ text: 'selected text', rect: FAKE_RECT, origin: null });
+
+    expect(document.getElementById('cbm-layer1-selection-button')).toBeNull();
+  });
+
+  // M-7(reviewer) — UX-016 Accessibility: 닫을 때 포커스가 트리거 버튼으로 돌아간다. 버튼이
+  // 열려 있는 동안(위 테스트대로) 사라지므로, 이 경로는 이제 "패널이 열린 사이 다른 곳을 다시
+  // 선택해 버튼이 새로 생긴" 드문 경우에만 의미가 있다 — `closeMediationPanel`이 그 버튼을 향해
+  // `focusFloatingButtonIfPresent`를 여전히 호출한다는 배선 자체는 계속 검증한다(무조건 no-op이
+  // 아니다).
+  it('returns focus to a floating button if one exists at close time', () => {
+    openMediationPanel({ text: 'selected text', rect: FAKE_RECT, origin: null });
+
+    // 패널이 열려 있는 동안 새 버튼이 생긴 상황을 흉내낸다(위 테스트가 확인했듯 open 시점의
+    // 버튼은 이미 지워졌다).
+    const triggerButton = document.createElement('button');
+    triggerButton.id = 'cbm-layer1-selection-button';
+    document.body.appendChild(triggerButton);
+
     closeMediationPanel();
 
     expect(document.activeElement).toBe(triggerButton);
@@ -144,5 +169,16 @@ describe('panel-mount', () => {
     openMediationPanel({ text: 'x', rect: FAKE_RECT, origin: originEl });
 
     expect(receivedOrigin).toBe(originEl);
+  });
+
+  // 🔴 (2026-08-12, T81) Red evidence — before wiring `anchorRect={payload.rect}` in
+  // `panel-mount.tsx`, this test failed with `expected undefined to be { top: 5, ... }`
+  // (`payload.rect` was received here but never forwarded). Confirms the panel now has what it
+  // needs to position itself near the selection instead of always defaulting to the corner.
+  it('passes the payload rect through as anchorRect to MediationPanel', () => {
+    const rect = { top: 5, bottom: 25, left: 15, right: 115 } as DOMRect;
+    openMediationPanel({ text: 'x', rect, origin: null });
+
+    expect(receivedAnchorRect).toBe(rect);
   });
 });

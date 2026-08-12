@@ -64,11 +64,16 @@ export function ComparisonView({
         <h3>변환문</h3>
         <p>{transformed}</p>
         {preserved.length > 0 && (
+          // v8.3(T86 인접, 사용자 결정 — 결과 카드는 목업으로 진행) — 목업의 태그 칩(존댓말
+          // 정렬/이모지 제거 등) 시각을 재현한다. 목업은 고정 데모 문자열이지만 이 리스트는
+          // 실제 `PreservedItem[]` 데이터다 — 새 분류를 지어내지 않고 있는 데이터를 칩
+          // 모양으로만 바꾼다. 굵게+"(보존됨)" 라벨(`docs/UX.md` UX-004 Accessibility)은
+          // 그대로 유지한다.
           <div aria-label="보존된 항목" className={styles.preserved}>
             <h4>보존된 항목</h4>
-            <ul>
+            <ul className={styles.preservedList}>
               {preserved.map((item, index) => (
-                <li key={`${item.kind}-${index}`}>
+                <li key={`${item.kind}-${index}`} className={styles.preservedTag}>
                   <strong>{item.transformedText}</strong> (보존됨)
                 </li>
               ))}

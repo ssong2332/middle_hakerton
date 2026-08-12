@@ -1,19 +1,21 @@
+/* v8.0/T84 — 사이(SAI) 브랜드 리디자인. 클래스 이름·구조는 page.tsx가 참조하는 그대로 유지하고
+   시각(카드·라운드·배지·세그먼트 토글)만 목업 언어로 바꾼다. */
 .page {
-  max-width: 640px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 56px 24px;
 }
 
 .title {
-  font: 800 24px var(--font-sans);
-  letter-spacing: -0.01em;
-  margin-bottom: 10px;
+  font: 700 26px var(--font-sans);
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
 }
 
 .lead {
-  font: 400 13px var(--font-sans);
-  color: var(--text-muted-75);
-  margin-bottom: 24px;
+  font: 400 15px var(--font-sans);
+  color: var(--text-muted-60);
+  margin-bottom: 26px;
 }
 
 .skeleton {
@@ -23,12 +25,12 @@
 
 .skeletonRow {
   height: 48px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface-alt);
-  border: 1px solid var(--border-thin);
 }
 
 .banner {
-  border: 2px solid var(--color-focus);
+  border-radius: var(--radius-md);
   background: var(--color-danger-bg);
   color: var(--color-danger-text);
   padding: 10px 12px;
@@ -43,82 +45,92 @@
 .retryButton {
   min-height: 44px;
   padding: 6px 10px;
+  border-radius: var(--radius-md);
   background: var(--color-accent);
-  color: var(--color-surface);
-  border: 1px solid var(--color-accent);
-  font: 800 11px var(--font-sans);
+  color: #fff;
+  border: none;
+  font: 700 12px var(--font-sans);
 }
 
 .retryButton:hover {
   background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
 }
 
 .addSection {
-  border: 1px solid var(--border-thin);
-  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: 0 1px 2px var(--shadow-color-frame);
+  padding: 24px;
   display: grid;
   gap: 14px;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
 }
 
 .sectionTitle {
-  font: 700 13px var(--font-sans);
+  font: 700 14px var(--font-sans);
   margin-bottom: 10px;
 }
 
 .typeChoice {
-  display: flex;
-  gap: 8px;
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  width: fit-content;
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-md);
 }
 
 .typeButton {
   min-height: 44px;
-  padding: 6px 14px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 9px;
   background: transparent;
-  border: 1px solid var(--border-strong);
-  font: 700 12px var(--font-sans);
+  border: none;
+  color: var(--text-muted-60);
+  font: 600 13px var(--font-sans);
 }
 
 .typeButtonActive {
-  background: var(--color-accent);
-  color: var(--color-surface);
-  border-color: var(--color-accent);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 1px 3px rgba(17, 24, 39, 0.1);
 }
 
 .field {
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .field label {
-  font: 700 11px var(--font-sans);
+  font: 600 13px var(--font-sans);
+  color: var(--text-muted-75);
 }
 
 .field input {
   min-height: 44px;
-  padding: 6px 10px;
-  border: 1px solid var(--border-thin);
-  font: 400 13px var(--font-sans);
+  height: 44px;
 }
 
 .addButton {
   min-height: 44px;
-  padding: 10px 16px;
+  height: 44px;
+  padding: 0 22px;
+  border-radius: var(--radius-md);
   background: var(--color-accent);
-  color: var(--color-surface);
-  border: 1px solid var(--color-accent);
-  font: 800 12px var(--font-sans);
+  color: #fff;
+  border: none;
+  font: 700 14px var(--font-sans);
   justify-self: start;
 }
 
 .addButton:hover {
   background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
 }
 
 .addButton:disabled {
-  opacity: 0.45;
+  background: var(--border-thin-alt);
+  color: var(--text-muted-60);
 }
 
 .section {
@@ -132,7 +144,7 @@
 
 .list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -141,8 +153,10 @@
 .item {
   display: grid;
   gap: 6px;
-  border: 1px solid var(--border-thin);
-  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: 0 1px 2px var(--shadow-color-frame);
+  padding: 18px 22px;
 }
 
 .itemHeader {
@@ -153,18 +167,20 @@
 }
 
 .itemLabel {
-  font: 700 12px var(--font-sans);
+  font: 700 15px var(--font-sans);
 }
 
 .tag {
-  font: 700 10px var(--font-sans);
-  padding: 2px 6px;
-  border: 1px solid var(--border-thin);
-  color: var(--text-muted-75);
+  font: 700 11px var(--font-sans);
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-tint);
+  color: #c24400;
 }
 
 .itemValue {
-  font: 400 13px var(--font-sans);
+  font: 400 14px var(--font-sans);
+  color: var(--text-muted-75);
 }
 
 .itemActions {
@@ -176,14 +192,23 @@
 .editButton,
 .deleteButton {
   min-height: 44px;
-  padding: 4px 10px;
-  background: transparent;
-  border: 1px solid var(--border-strong);
-  font: 700 11px var(--font-sans);
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+  border: none;
+  color: var(--text-muted-75);
+  font: 600 13px var(--font-sans);
 }
 
-.editButton:disabled {
-  opacity: 0.45;
+.editButton:disabled,
+.deleteButton:disabled {
+  opacity: 0.5;
+}
+
+.editButton:hover:not(:disabled),
+.deleteButton:hover:not(:disabled) {
+  background: var(--border-thin-alt);
 }
 
 .editForm {
@@ -199,28 +224,35 @@
 
 .saveButton {
   min-height: 44px;
-  padding: 4px 10px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
   background: var(--color-accent);
-  color: var(--color-surface);
-  border: 1px solid var(--color-accent);
-  font: 700 11px var(--font-sans);
+  color: #fff;
+  border: none;
+  font: 700 13px var(--font-sans);
 }
 
 .saveButton:disabled {
-  opacity: 0.45;
+  background: var(--border-thin-alt);
+  color: var(--text-muted-60);
 }
 
 .cancelButton {
   min-height: 44px;
-  padding: 4px 10px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
   background: transparent;
-  border: 1px solid var(--border-thin);
-  font: 700 11px var(--font-sans);
+  border: 1px solid var(--border-thin-alt);
+  color: var(--text-muted-75);
+  font: 600 13px var(--font-sans);
 }
 
 .confirmBox {
-  border: 1px solid var(--color-focus);
-  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-danger-bg);
+  padding: 10px 12px;
   margin-top: 4px;
   display: grid;
   gap: 8px;
@@ -233,14 +265,16 @@
 
 .confirmDeleteButton {
   min-height: 44px;
-  padding: 4px 10px;
-  background: var(--color-accent);
-  color: var(--color-surface);
-  border: 1px solid var(--color-accent);
-  font: 700 11px var(--font-sans);
+  height: 38px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-danger-text);
+  color: #fff;
+  border: none;
+  font: 700 13px var(--font-sans);
 }
 
 .errorText {
-  font: 400 11px var(--font-sans);
+  font: 400 12px var(--font-sans);
   color: var(--color-danger-text);
 }

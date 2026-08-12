@@ -1,5 +1,7 @@
+/* v8.3(T86 인접) — 이제 `SenderPanel.module.css`의 `.resultCard`(surface-alt, 회색) 안에
+   중첩된다 — 같은 톤이면 안 보이므로 흰색으로 뒤집어 안쪽 강조 박스처럼 보이게 한다. */
 .panel {
-  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   padding: 11px 12px;
 }
@@ -11,19 +13,20 @@
   margin-bottom: 6px;
 }
 
+/* v8.3 후속(T86 인접 정리) — 목업의 필드 레이블 스케일(12px/600, 무채색)로 정렬. */
 .badgeLabel {
-  font: 800 10px var(--font-sans);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font: 600 12px var(--font-sans);
+  color: var(--text-muted-75);
 }
 
 .badge {
   display: inline-block;
-  padding: 2px 7px;
-  background: var(--border-strong);
-  color: var(--color-surface);
-  font: 800 10px var(--font-sans);
-  letter-spacing: 0.08em;
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-tint);
+  color: #c24400;
+  font: 700 11px var(--font-sans);
+  letter-spacing: 0.04em;
 }
 
 .reason {
@@ -34,8 +37,7 @@
 }
 
 .notice {
-  font: 600 10px var(--font-mono);
-  letter-spacing: 0.06em;
+  font: 600 11px var(--font-sans);
   color: var(--color-accent);
   margin-bottom: 6px;
 }
@@ -48,8 +50,7 @@
 
 .overrideLabel {
   display: block;
-  font: 600 10px var(--font-mono);
-  letter-spacing: 0.1em;
+  font: 600 12px var(--font-sans);
   color: var(--text-muted-75);
   margin-bottom: 5px;
 }

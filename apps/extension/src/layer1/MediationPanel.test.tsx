@@ -16,6 +16,7 @@ vi.mock('../shared/api', () => ({
 import { getStoredToken } from '../shared/token-storage';
 import { addSample, callMediationApi, fetchKnownCounterparts } from '../shared/api';
 import { MediationPanel } from './MediationPanel';
+import { setThemeMode } from './theme';
 import type { Layer2Adapter } from './registry';
 
 const mockedGetStoredToken = vi.mocked(getStoredToken);
@@ -517,8 +518,179 @@ describe('MediationPanel', () => {
   });
 });
 
+// 🔴 (2026-08-12, T81) 사용자 요청 ② — 패널이 항상 우상단 고정 위치에 떴고 선택 위치와 무관했다.
+// `panel-mount.tsx`가 갖고 있던 `payload.rect`를 버리지 않고 `anchorRect` prop으로 넘기게
+// 고쳤다 — 이 describe는 그 prop이 실제로 위치 계산(`computeClampedPosition` 재사용)에
+// 쓰이는지, 그리고 prop이 없을 때는 기존 동작(우상단 고정)이 그대로 유지되는지 검증한다.
+describe('MediationPanel — T81 anchorRect positioning', () => {
+  beforeEach(() => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function fakeRect(overrides: Partial<DOMRect>): DOMRect {
+    return {
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: 0,
+      x: 0,
+      y: 0,
+      toJSON() {
+        return this;
+      },
+      ...overrides,
+    } as DOMRect;
+  }
+
+  it('positions near the anchorRect instead of the default top-right corner', async () => {
+    const anchorRect = fakeRect({ top: 100, bottom: 120, left: 50, right: 150 });
+    render(<MediationPanel initialText="x" onClose={vi.fn()} anchorRect={anchorRect} />);
+
+    const panel = await screen.findByRole('dialog');
+    // jsdom은 실제 레이아웃 엔진이 없어 패널 크기가 0×0으로 측정된다 — selection.test.ts와
+    // 같은 제약(파일 상단 주석 참조). computeClampedPosition(anchorRect, {0,0}, jsdom 기본
+    // 뷰포트)의 순수 산술 결과만 검증한다: below = 120+4 = 124(오버플로 없음), left = 50.
+    expect(panel.style.top).toBe('124px');
+    expect(panel.style.left).toBe('50px');
+    expect(panel.style.right).toBe('');
+  });
+
+  it('falls back to the default top-right position when no anchorRect is given', async () => {
+    render(<MediationPanel initialText="x" onClose={vi.fn()} />);
+
+    const panel = await screen.findByRole('dialog');
+    expect(panel.style.top).toBe('16px');
+    expect(panel.style.right).toBe('16px');
+    expect(panel.style.left).toBe('');
+  });
+});
+
+// 🔴 (2026-08-12, T82) 사용자 재신고 — "패널이 드래그(스크롤) 시 여전히 고정돼 있다." T81은
+// anchorRect로 마운트 시점 1회만 위치를 잡았고 스크롤을 반영하지 않았다.
+//
+// 🔴 (2026-08-12, T83) 첫 수정(`window.scrollY` 기반)이 중첩 스크롤 컨테이너에서 또 실패해
+// `origin` 엘리먼트의 `getBoundingClientRect()` 델타 방식으로 교체했다 — 이 describe는
+// `window.scrollY`가 **전혀 바뀌지 않아도**(중첩 컨테이너 스크롤을 흉내낸다) origin 엘리먼트의
+// 측정값이 달라지면 패널이 그만큼 따라 움직이는지 검증한다. `getBoundingClientRect`는 jsdom에서
+// 항상 0을 반환하므로(레이아웃 엔진 없음 — `selection.test.ts`와 같은 제약) 호출마다 다른 값을
+// 주도록 스텁한다(1회차=마운트 시 측정, 2회차=스크롤 후 측정).
+describe('MediationPanel — T82/T83 panel tracks scroll after opening', () => {
+  function fakeRect(overrides: Partial<DOMRect>): DOMRect {
+    return {
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: 0,
+      x: 0,
+      y: 0,
+      toJSON() {
+        return this;
+      },
+      ...overrides,
+    } as DOMRect;
+  }
+
+  beforeEach(() => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
+
+  it('repositions to follow the origin element even when window.scrollY never changes (nested scroll container)', async () => {
+    const originEl = document.createElement('div');
+    document.body.appendChild(originEl);
+    // 마운트 시 origin을 두 번 읽는다(useLayoutEffect의 기준점 측정 1회 + 그 안에서 곧바로
+    // 부르는 repositionNearAnchor()의 델타 계산용 측정 1회) — 둘 다 아직 스크롤 전이므로 같은
+    // 값(300)이어야 한다. 이후 컨테이너 스크롤로 100px 위로 이동했다고 가정(3회차부터 200).
+    const originRectSpy = vi
+      .spyOn(originEl, 'getBoundingClientRect')
+      .mockReturnValueOnce({ top: 300, left: 50 } as DOMRect)
+      .mockReturnValueOnce({ top: 300, left: 50 } as DOMRect)
+      .mockReturnValue({ top: 200, left: 50 } as DOMRect);
+
+    // 클램프(0 이하로 내려가지 않음)에 걸리지 않도록 뷰포트 안쪽 값을 쓴다 — 이 테스트의
+    // 목적은 스크롤 추적 산술 자체이지 clamp 경계 동작이 아니다(clamp 자체는
+    // `computeClampedPosition`의 기존 단위 테스트가 이미 커버한다).
+    const anchorRect = fakeRect({ top: 300, bottom: 320, left: 50, right: 150 });
+    render(
+      <MediationPanel initialText="x" onClose={vi.fn()} anchorRect={anchorRect} origin={originEl} />,
+    );
+    const panel = await screen.findByRole('dialog');
+    expect(panel.style.top).toBe('324px');
+
+    // window.scrollY는 건드리지 않는다 — 스크롤이 중첩 컨테이너 안에서 일어난 상황을 흉내낸다.
+    // origin 엘리먼트가 100px 위로 이동한 것으로 측정되면(위 spy 2회차) 패널도 그만큼 따라가야
+    // 한다. React state를 통해 갱신되므로(버튼의 직접 DOM 조작과 달리) `waitFor`로 리렌더를
+    // 기다린다.
+    document.dispatchEvent(new Event('scroll'));
+
+    await waitFor(() => {
+      expect(panel.style.top).toBe(`${324 - 100}px`);
+    });
+    expect(originRectSpy).toHaveBeenCalled();
+  });
+
+  it('does nothing when no anchorRect was given (default corner position is not scroll-tracked)', async () => {
+    render(<MediationPanel initialText="x" onClose={vi.fn()} />);
+    const panel = await screen.findByRole('dialog');
+    expect(panel.style.top).toBe('16px');
+
+    Object.defineProperty(window, 'scrollY', { value: 200, configurable: true });
+    expect(() => document.dispatchEvent(new Event('scroll'))).not.toThrow();
+
+    expect(panel.style.top).toBe('16px');
+  });
+});
+
+// 🔴 (2026-08-12, T81; 후속 2026-08-12) 사용자 요청 ① — 다크모드에서 패널 텍스트가 제대로 안
+// 보였다(host 페이지 CSS를 상속하지 않는 Shadow DOM인데도 배경/텍스트가 하드코딩 라이트 팔레트
+// 고정이었다). **후속 변경**: 이제 OS/브라우저 신호를 자동으로 안 따르고(사용자 요청 — "기본은
+// 라이트, 다크는 별도 설정") `setThemeMode()`로 명시 전환한 값만 반영한다 — `theme.ts` 헤더
+// 주석 참조. 실제 색상값이 아니라 "모드가 dark면 라이트 렌더와 다른 팔레트를 쓴다"는 구조적
+// 사실만 검증한다(정확한 hex는 `theme.test.ts`가 이미 커버).
+describe('MediationPanel — T81 dark mode', () => {
+  beforeEach(() => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
+  });
+
+  afterEach(() => {
+    setThemeMode('light'); // 모듈 레벨 상태를 기본값으로 되돌린다(테스트 간 순서 의존 방지).
+    vi.clearAllMocks();
+  });
+
+  it('renders a different background/text color when the mode is switched to dark', async () => {
+    setThemeMode('light');
+    const { unmount } = render(<MediationPanel initialText="x" onClose={vi.fn()} />);
+    const lightPanel = await screen.findByRole('dialog');
+    const lightBg = lightPanel.style.background;
+    unmount();
+
+    setThemeMode('dark');
+    render(<MediationPanel initialText="x" onClose={vi.fn()} />);
+    const darkPanel = await screen.findByRole('dialog');
+
+    expect(darkPanel.style.background).not.toBe(lightBg);
+  });
+});
+
 // T71(AC-080/081) — Mark 모드. 기본 모드는 여전히 "중재"(위 기존 테스트 전부가 이 기본값에
-// 의존하므로 바꾸지 않는다) — 라디오로 "상대가 쓴 것으로 표시"를 선택해야 Mark UI가 나온다.
+// 의존하므로 바꾸지 않는다) — 토글 버튼으로 "상대가 쓴 것으로 표시"를 선택해야 Mark UI가 나온다.
+// v8.0 후속(2026-08-12) — 모드 선택이 네이티브 radio에서 `aria-pressed` 토글 버튼으로 바뀌었다
+// (목업과 일치, `terminology/page.tsx`의 기존 패턴 재사용) — role이 'radio'에서 'button'으로.
 describe('MediationPanel — T71 Mark 모드', () => {
   beforeEach(() => {
     mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
@@ -529,7 +701,7 @@ describe('MediationPanel — T71 Mark 모드', () => {
   });
 
   function switchToMarkMode() {
-    fireEvent.click(screen.getByRole('radio', { name: '상대가 쓴 것으로 표시' }));
+    fireEvent.click(screen.getByRole('button', { name: '상대가 쓴 것으로 표시' }));
   }
 
   it('기본 모드는 중재다 — Mark UI(상대 식별자 입력)가 처음엔 보이지 않는다', async () => {

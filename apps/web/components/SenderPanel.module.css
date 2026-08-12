@@ -1,7 +1,8 @@
+/* v8.3 후속(T86 인접 정리) — 목업 어디에도 없는 대문자·모노 마이크로 라벨 스타일이 리브랜딩
+   두 라운드(T84/T85)에서 빠져 있었다(그 두 라운드는 카드 껍데기만 만지고 리프 컴포넌트 내부
+   타이포는 건드리지 않았다). 목업의 카드 제목 스케일(15-16px/700)로 맞춘다. */
 .title {
-  font: 800 10px var(--font-sans);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font: 700 15px var(--font-sans);
   margin-bottom: 14px;
 }
 
@@ -51,24 +52,43 @@
 .runButton {
   display: flex;
   align-items: center;
+  justify-content: center;
   width: 100%;
   min-height: 44px;
+  height: 52px;
   padding: 10px 12px;
   margin-top: 4px;
   background: var(--color-accent);
-  color: var(--color-surface);
-  border: 1px solid var(--color-accent);
-  font: 800 13px var(--font-sans);
-  text-align: left;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font: 700 15px var(--font-sans);
 }
 
 .runButton:hover:not(:disabled) {
   background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
 }
 
 .runButton:disabled {
-  opacity: 0.45;
+  background: var(--border-thin-alt);
+  color: var(--text-muted-60);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  display: inline-block;
+  margin-right: 8px;
+  animation: om-spin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
 }
 
 .loadingText {
@@ -77,24 +97,71 @@
   color: var(--text-muted-75);
 }
 
+/* v8.0 후속 — 목업의 om-bar 불확정 진행바. */
+.progressTrack {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.progressFill {
+  width: 32%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  animation: om-bar 1.3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    animation: none;
+    width: 100%;
+  }
+}
+
 .errorText {
   margin-top: 10px;
   font: 600 12px var(--font-sans);
   color: var(--color-danger-text);
 }
 
+/* v8.3(T86 인접, 사용자 지적 — "실행 시 애니메이션이 없다") — 목업은 결과가 나타날 때마다
+   om-in으로 등장한다(카드별 스태거). 이 블록 전체를 하나의 진입 단위로 애니메이션한다 —
+   `<main>`의 om-in(페이지 로드 1회성)과 달리 이건 상태 변화(실행 완료)마다 매번 다시 탄다. */
 .resultBlock {
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 2px solid var(--border-rule);
+  border-top: 1px solid var(--border-thin);
+  display: grid;
+  gap: 14px;
+  animation: om-in 0.28s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resultBlock {
+    animation: none;
+  }
+}
+
+/* v8.3(T86 인접, 사용자 결정 — 결과 카드 구조는 목업으로 진행) — 목업의 "상대가 읽을 문장" 카드
+   시각을 재현한다. `UrgencyPanel`/`ComparisonView`는 이미 이 카드 안에 있으므로(이 wrapper가
+   부모) `MediationWorkspace.module.css`의 `.column`(발신자 패널 전체 카드)과 같은 흰 배경을
+   쓰면 안 보인다 — 중첩 카드이므로 `--color-surface-alt`(옅은 회색)로 부모와 구분한다. */
+.resultCard {
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
   display: grid;
   gap: 14px;
 }
 
 .personalizationNote {
-  font: 400 11px var(--font-sans);
+  font: 400 12px var(--font-sans);
   color: var(--text-muted-75);
   padding: 8px 10px;
+  border-radius: var(--radius-md);
   background: var(--color-surface-alt);
-  border: 1px solid var(--border-thin-alt);
+  border: none;
 }

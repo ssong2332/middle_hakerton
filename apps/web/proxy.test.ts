@@ -118,4 +118,26 @@ describe('proxy — 세션 갱신 + 미인증 접근 처리', () => {
 
     expect(response.status).toBe(200);
   });
+
+  // T86/UX-020/AC-090 — /forgot-password·/reset-password는 미인증 상태로 접근 가능해야 한다.
+  it('미인증 상태로 /forgot-password·/reset-password에 접근하면 리다이렉트 없이 통과시킨다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key-placeholder');
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+
+    expect((await proxy(requestFor('/forgot-password'))).status).toBe(200);
+    expect((await proxy(requestFor('/reset-password'))).status).toBe(200);
+  });
+
+  // 🔴 T86/UX-020 — 이 테스트가 지키는 것: Supabase 비밀번호 재설정 이메일 링크를 클릭하면 그
+  // 순간 실제 인증 세션이 생긴다. /login·/signup과 똑같이 "인증되면 기본 랜딩으로 리다이렉트"를
+  // 적용하면 새 비밀번호를 입력하기도 전에 /mediate로 튕겨나가 이 화면 자체가 도달 불가능해진다.
+  it('인증된 사용자가 /reset-password·/forgot-password에 접근해도 리다이렉트하지 않는다(재설정 세션이 튕겨나가면 안 된다)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key-placeholder');
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } });
+
+    expect((await proxy(requestFor('/reset-password'))).status).toBe(200);
+    expect((await proxy(requestFor('/forgot-password'))).status).toBe(200);
+  });
 });

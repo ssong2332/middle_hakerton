@@ -157,6 +157,12 @@ describe('LoginPage (UX-001)', () => {
     });
   });
 
+  it('AC-090① — "비밀번호 찾기" 링크가 /forgot-password로 연결된다', () => {
+    render(<LoginPage />);
+    const link = screen.getByRole('link', { name: '비밀번호 찾기' }) as HTMLAnchorElement;
+    expect(link.getAttribute('href')).toBe('/forgot-password');
+  });
+
   it('네트워크 오류 시 재시도 배너를 보여주고 입력값을 유지한다', async () => {
     mockSignInWithPassword.mockRejectedValue(new Error('network down'));
     render(<LoginPage />);

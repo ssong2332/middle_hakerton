@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * 상시 내비게이션 바 — T73③(`docs/Tasks.md` T73 row), `docs/UX.md:893`. 항목 순서·문구는
  * `docs/UX.md:893`를 **그대로** 쓴다: Mediate | Profile | Terminology | Pair Protocols |
@@ -20,7 +22,16 @@
  * `(app)/onboarding`(UX-003)은 이 컴포넌트를 쓰는 `(app)/(with-nav)/layout.tsx`의 형제 라우트
  * 그룹 밖에 있어 이 내비가 렌더되지 않는다(`docs/UX.md:893` "except UX-003") — 회귀 테스트:
  * `apps/web/app/(app)/onboarding/route-composition.test.ts`.
+ *
+ * 🔴 **(2026-08-12, T77) 모바일 내비 접기** — `docs/UX.md` v6.8 "Mobile Nav Menu" 고정 스펙
+ * 그대로: `< 768px`에서 항목 목록이 트리거(☰ + "메뉴" 텍스트) 뒤로 숨고, 트리거를 누르면
+ * 트리거 바로 아래에 **인라인 disclosure**(모달 아님, 포커스 트랩 없음)로 펼쳐진다. 열릴 때
+ * 첫 항목으로 포커스 이동, **Escape로 닫고 트리거로 포커스 복귀**(이 리포의 다른 모달들과 같은
+ * close/focus-return 관례 재사용 — 단 이 위젯 자체는 dialog가 아니다). 항목 밖 클릭도 닫는다.
+ * Desktop/Tablet(`≥ 768px`)에서는 트리거를 숨기고 기존 가로 목록을 그대로 보여준다(CSS만
+ * 다르고 마크업은 항상 렌더 — `open` 상태가 CSS 쿼리 밖에서는 무시된다).
  */
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { LogoutButton } from './LogoutButton';
 import styles from './PrimaryNav.module.css';
@@ -31,31 +42,114 @@ interface NavItem {
   implemented: boolean;
 }
 
+/**
+ * 🔴 (T86 인접 발견, 2026-08-12 사용자 지적) 라벨이 영어("Mediate"/"Profile"/"Terminology"/
+ * "Decisions")와 한글("발송 내역"/"관측 표본")이 섞여 있었다 — 목업·나머지 화면 전체(각 화면의
+ * `<h1>`, 예: `mediate/page.tsx`의 "중재 워크스페이스", `profile/page.tsx`의 "프로필")가 모두
+ * 한글인데 이 nav만 영어 잔재가 남아 있었다. 각 화면 자신의 제목/기존 코드 주석이 이미 쓰는
+ * 한글 명칭을 그대로 가져온다(새 용어를 짓지 않는다): 중재(`mediate/page.tsx` h1), 프로필
+ * (`profile/page.tsx` h1), 용어사전(`terminology/page.tsx` h1), 쌍방 규약(`pair-protocols/page.tsx`
+ * h1, 이미 구현되어 있음), 결정 요약(`decisions/page.tsx`가 실제로 쓰는 "결정 요약 · 미확정
+ * 감지"의 축약형이자 목업 nav pill 라벨과 동일), 회의 시간(`meeting-times/page.tsx`의 스캐폴드
+ * 주석 "UX-012 회의 시간 추천"), 피드백(`feedback/page.tsx`의 스캐폴드 주석 "UX-013 응답 피드백").
+ */
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Mediate', href: '/mediate', implemented: true }, // UX-004, T12/T13 done
-  { label: 'Profile', href: '/profile', implemented: true }, // UX-009, T21 done
-  { label: 'Terminology', href: '/terminology', implemented: true }, // UX-010, T23 done
-  { label: 'Pair Protocols', href: '/pair-protocols', implemented: false }, // UX-011, T41/T42 todo
-  { label: 'Meeting Times', href: '/meeting-times', implemented: false }, // UX-012, T31 todo
-  { label: 'Decisions', href: '/decisions', implemented: true }, // UX-008, T27 done
-  { label: 'Feedback', href: '/feedback', implemented: false }, // UX-013, 담당 태스크 미배정 스텁
+  { label: '중재', href: '/mediate', implemented: true }, // UX-004, T12/T13 done
+  { label: '프로필', href: '/profile', implemented: true }, // UX-009, T21 done
+  { label: '용어사전', href: '/terminology', implemented: true }, // UX-010, T23 done
+  { label: '쌍방 규약', href: '/pair-protocols', implemented: false }, // UX-011, T41/T42 todo
+  { label: '회의 시간', href: '/meeting-times', implemented: false }, // UX-012, T31 todo
+  { label: '결정 요약', href: '/decisions', implemented: true }, // UX-008, T27 done
+  { label: '피드백', href: '/feedback', implemented: false }, // UX-013, 담당 태스크 미배정 스텁
   { label: '발송 내역', href: '/sent-messages', implemented: true }, // UX-015, T52 done
   { label: '관측 표본', href: '/observation-samples', implemented: true }, // UX-019, T72 done
 ];
 
+const LIST_ID = 'primary-nav-list';
+
 export function PrimaryNav() {
   const items = NAV_ITEMS.filter((item) => item.implemented);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const navRef = useRef<HTMLElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
+
+  // 🔴 UX.md v6.8 — 열릴 때 첫 항목으로 포커스 이동.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const firstLink = listRef.current?.querySelector<HTMLElement>('a');
+    firstLink?.focus();
+  }, [menuOpen]);
+
+  // 🔴 UX.md v6.8 — 항목 밖 클릭 시 닫는다(포커스 트랩이 없는 disclosure이므로 배경 클릭이
+  // 유효한 상호작용이다).
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handlePointerDown(event: MouseEvent) {
+      if (navRef.current && !navRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [menuOpen]);
+
+  function closeAndReturnFocus() {
+    setMenuOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  // 🔴 UX.md v6.8 — Escape로 닫고 트리거로 포커스 복귀(이 리포의 다른 모달과 같은 관례).
+  function handleKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key === 'Escape' && menuOpen) {
+      event.stopPropagation();
+      closeAndReturnFocus();
+    }
+  }
+
   return (
-    <nav className={styles.nav} aria-label="주 내비게이션">
-      <span className={styles.brand}>MEDIATE</span>
-      <ul className={styles.list}>
+    <nav
+      ref={navRef}
+      className={styles.nav}
+      aria-label="주 내비게이션"
+      onKeyDown={handleKeyDown}
+    >
+      <span className={styles.brand}>
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="2" y="5" width="14" height="4" rx="2" fill="#191f28" />
+          <rect x="8" y="10" width="14" height="4" rx="2" fill="#191f28" />
+          <rect x="2" y="15" width="20" height="4" rx="2" fill="#ff6100" />
+        </svg>
+        사이<span className={styles.brandCaption}>SAI</span>
+      </span>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={styles.menuTrigger}
+        aria-expanded={menuOpen}
+        aria-controls={LIST_ID}
+        onClick={() => setMenuOpen((prev) => !prev)}
+      >
+        <span aria-hidden="true">☰</span> 메뉴
+      </button>
+      <ul
+        id={LIST_ID}
+        ref={listRef}
+        className={menuOpen ? `${styles.list} ${styles.listOpen}` : styles.list}
+      >
         {items.map((item) => (
           <li key={item.href}>
-            <Link href={item.href}>{item.label}</Link>
+            {/* 항목 활성화(=이동)도 메뉴를 닫는다(UX.md v6.8) — 라우트 전환으로 이 컴포넌트가
+                다시 마운트되며 자연히 닫히지만, 같은 세션 안에서 상태를 명시적으로 되돌린다. */}
+            <Link href={item.href} onClick={() => setMenuOpen(false)}>
+              {item.label}
+            </Link>
           </li>
         ))}
       </ul>
-      <LogoutButton />
+      <div className={styles.logoutSlot}>
+        <LogoutButton />
+      </div>
     </nav>
   );
 }

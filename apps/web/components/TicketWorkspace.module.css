@@ -10,8 +10,7 @@
 }
 
 .nonLiveNotice {
-  font: 600 10px var(--font-mono);
-  letter-spacing: 0.06em;
+  font: 600 11px var(--font-sans);
   color: var(--color-accent);
   margin-bottom: 12px;
 }
@@ -32,9 +31,8 @@
 }
 
 .sectionHeading {
-  font: 800 11px var(--font-sans);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 700 13px var(--font-sans);
+  color: var(--text-muted-75);
   margin-bottom: 6px;
 }
 

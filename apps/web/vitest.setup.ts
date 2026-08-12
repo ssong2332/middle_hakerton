@@ -20,6 +20,14 @@ vi.mock('next/font/google', () => ({
   IBM_Plex_Mono: () => ({ className: 'font-plex-mono-mock', variable: '--font-plex-mono' }),
 }));
 
+/**
+ * (v8.0, docs/UX.md 브랜드 리디자인) — `next/font/local`도 같은 컴파일러 전용 매크로라 위와
+ * 동일한 이유로 목이 필요하다(`layout.tsx`가 호출하는 Pretendard self-host).
+ */
+vi.mock('next/font/local', () => ({
+  default: () => ({ className: 'font-pretendard-mock', variable: '--font-pretendard' }),
+}));
+
 afterEach(() => {
   cleanup();
 });

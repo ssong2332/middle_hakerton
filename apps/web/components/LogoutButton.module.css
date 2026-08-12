@@ -1,15 +1,17 @@
 .button {
   min-height: 44px;
   min-width: 44px;
-  padding: 6px 10px;
-  background: transparent;
-  color: var(--color-text);
-  border: 1px solid var(--border-strong);
-  font: 800 11px var(--font-sans);
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--text-muted-75);
+  border: 1px solid var(--border-thin-alt);
+  font: 600 13px var(--font-sans);
 }
 
 .button:hover:not(:disabled) {
-  background: var(--color-accent-tint);
+  background: var(--color-bg);
 }
 
 .button:disabled {

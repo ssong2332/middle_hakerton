@@ -49,9 +49,9 @@ describe('(app)/(with-nav)/layout — Major 5 / T73③④', () => {
     expect(mockEnforceOnboardingRedirect).toHaveBeenCalledTimes(1);
   });
 
-  it('T73③ — Mediate 내비게이션 링크가 렌더된다(PrimaryNav 배선)', async () => {
+  it('T73③ — 중재 내비게이션 링크가 렌더된다(PrimaryNav 배선)', async () => {
     const element = await AppLayout({ children: <p>child</p> });
     render(element);
-    expect(screen.getByRole('link', { name: 'Mediate' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: '중재' })).toBeTruthy();
   });
 });

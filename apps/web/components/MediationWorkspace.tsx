@@ -100,7 +100,19 @@ const srOnlyStyle = {
  * ④ 새 타이머·정리(cleanup) 로직이 없어 컴포넌트가 더 단순하고, 테스트에 fake timer가 필요 없다.
  * 서버가 실제 단계별 진행을 노출하게 되면(향후 범위 밖) 그때 실제 값 기반으로 교체한다.
  */
-export function MediationWorkspace() {
+export interface MediationWorkspaceProps {
+  /**
+   * 🔴 T86 인접(2026-08-12) — "개인화 프로필 적용 중" 배지(`docs/UX.md` UX-004 Visual Design
+   * Brief, 목업 타이틀 행). `mediate/page.tsx`(async Server Component)가
+   * `checkPersonalizationActive()`로 조회해 넘긴다 — 이 컴포넌트 자신은 조회하지 않는다(기존
+   * `MediationWorkspace.test.tsx`의 "`/api/mediate` 호출 1회" 전제 단언들을 건드리지 않기
+   * 위함, `mediate/page.tsx` 헤더 주석 참조). 기본값 `false` — 기존 호출부(테스트)를 깨지 않기
+   * 위한 선택적 prop이다(이 리포의 `isRunning`/`ticketOffered` 등과 같은 패턴).
+   */
+  personalizationActive?: boolean;
+}
+
+export function MediationWorkspace({ personalizationActive = false }: MediationWorkspaceProps = {}) {
   const router = useRouter();
   const [text, setText] = useState('');
   const [recipient, setRecipient] = useState('');
@@ -166,7 +178,7 @@ export function MediationWorkspace() {
       sessionStorage.removeItem(TICKET_RESTORE_SESSION_KEY);
     }
     // M-A(reviewer 발견 → 수정) — `TICKET_DRAFT_SESSION_KEY`(API 소스 스냅샷)도 여기서 함께
-    // 지운다. 이 이펙트는 마운트 시 1회만 도므로, 이 시점 이후 "Convert to Task Ticket"을 실제로
+    // 지운다. 이 이펙트는 마운트 시 1회만 도므로, 이 시점 이후 "작업 티켓으로 전환"을 실제로
     // 클릭하기 전까지는 이 방문에서 그 클릭이 있었을 수 없다 — 즉 지금 이 값이 남아 있다면 그건
     // 이전 방문(직전 티켓 전환)이 남긴 것이고, 이번 방문에서 아직 소비되지 않은 새 값일 수는
     // 없다. 지우지 않으면 이 키가 탭 세션 내내(원래 설계는 "한 번 쓰고 한 번 읽히는" 값이었다,
@@ -413,7 +425,7 @@ export function MediationWorkspace() {
       .catch(() => setEnrichmentLinkVisible(false));
   }
 
-  // 🔴 T25/AC-058① — `RecipientPanel`의 "Convert to Task Ticket" 클릭 핸들러. 승인 대상
+  // 🔴 T25/AC-058① — `RecipientPanel`의 "작업 티켓으로 전환" 클릭 핸들러. 승인 대상
   // 스냅샷 시점의 원문(`approvalSnapshot.text` — `SenderPanel`의 `originalTextSnapshot`과 같은
   // 이유: 이 원문이 실제로 `ticketOption.offered`를 판정한 그 텍스트다)을 API 소스 키에 저장하고
   // `/ticket`으로 이동한다. 스냅샷이 없으면(이 버튼은 `hasResult`가 true일 때만 렌더되므로
@@ -442,6 +454,21 @@ export function MediationWorkspace() {
           않는다). 다른 상태 표시(`role="status"`, "처리 중…" 등)와는 별개의 영역이다. */}
       <div aria-live="polite" role="status" aria-label="중재 진행 상태 알림" style={srOnlyStyle}>
         {liveAnnouncement}
+      </div>
+      {/* T86 인접 — 목업 타이틀 행(제목+부제 좌측, 배지 우측). 부제 문구는 목업 원문("보낼
+          문장을 입력하면 상대가 읽을 문장으로 다듬어 드려요.")을 그대로 쓴다 — 새 카피를
+          짓지 않는다. */}
+      <div className={styles.titleRow}>
+        <div>
+          <h1 className={styles.title}>중재 워크스페이스</h1>
+          <p className={styles.subtitle}>보낼 문장을 입력하면 상대가 읽을 문장으로 다듬어 드려요.</p>
+        </div>
+        {personalizationActive && (
+          <span className={styles.personalizationBadge}>
+            <span aria-hidden="true" className={styles.personalizationDot} />
+            개인화 프로필 적용 중
+          </span>
+        )}
       </div>
       <div className={styles.frame}>
         <div className={styles.twoPanel}>

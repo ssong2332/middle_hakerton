@@ -59,6 +59,20 @@ export type RequestChannel = 'web' | 'extension';
 export type UrgencyLevel = 'CRITICAL' | 'NORMAL' | 'LOW';
 
 /**
+ * `UrgencyLevel`의 한국어 화면 표시 라벨 — 값 자체(`'CRITICAL'`/`'NORMAL'`/`'LOW'`)는 API
+ * 계약·override `<select>`의 `value`로 계속 쓰이지만(변경 시 웹앱·확장·백엔드 3곳이 동시에
+ * 깨진다), 사용자에게 보이는 텍스트는 이 리포의 다른 모든 UI 문구와 마찬가지로 한국어여야
+ * 한다. (2026-08-12, 사용자가 확장 배지에서 "긴급도: NORMAL"이 그대로 노출된 것을 발견 —
+ * 웹앱 `UrgencyPanel.tsx`도 같은 문제였다, 이 리포 전역에 이 값을 표시하는 곳이 둘 다 raw
+ * enum을 그대로 렌더하고 있었다. 웹/확장이 각자 다른 라벨을 만들지 않도록 여기 한 곳에만
+ * 정의한다.) */
+export const URGENCY_LABELS: Record<UrgencyLevel, string> = {
+  CRITICAL: '긴급',
+  NORMAL: '보통',
+  LOW: '낮음',
+};
+
+/**
  * 공휴일 데이터를 보유한 국가 (AC-057 — 한국·미국·일본·중국. **영국은 제외**되고 일본이 추가됐다).
  * 🔴 이 목록에 없는 국가는 타입으로 표현하지 않고 `null` 로 둔다 — "휴일 데이터 없음"은
  * **내부 상태로만** 존재하고 화면에는 어떤 라벨도 렌더하지 않는다(AC-063 ①②).
