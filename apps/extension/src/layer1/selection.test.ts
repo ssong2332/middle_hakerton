@@ -656,11 +656,12 @@ describe('initSelectionOverlay — scroll repositions the button to match the se
   });
 });
 
-// 🔴 (2026-08-12, T81) 사용자 요청 ① — "중재하기" 텍스트를 아이콘 단독으로 바꾸지 않는다
-// (`docs/UX.md` 기존 icon+text 원칙, T77 Decision Log와 같은 결). 대신 accent 배경의 "M"
-// 모노그램 배지 + 기존 텍스트를 함께 렌더한다 — 이 테스트는 그 구조와 접근 가능한 이름이 여전히
-// "중재하기"임을 확인한다(스크린리더 사용자에게는 badge의 "M"이 aria-hidden이라 영향 없음).
-describe('initSelectionOverlay — floating button keeps an accessible text label alongside the logo mark (T81)', () => {
+// 🔴 (2026-08-12, T81→T82) T81은 "M" 모노그램 배지 + 텍스트를 함께 렌더했다. T82에서 사용자가
+// 실제 로고(SHIFT 마크)를 제공하며 아이콘 단독을 명시적으로 요청해 텍스트 라벨을 제거했다 —
+// 대신 `aria-label`로 접근 가능한 이름은 유지한다(WCAG 4.1.2 표준 패턴). 이 테스트는 ① 화면에
+// 보이는 텍스트가 없고(아이콘 단독) ② 그럼에도 접근 가능한 이름은 여전히 "중재하기"이며 ③ 실제
+// SVG 마크가 렌더되는지 확인한다.
+describe('initSelectionOverlay — floating button is icon-only with an aria-label accessible name (T82)', () => {
   let cleanup: () => void;
   let originalGetBoundingClientRect: typeof Range.prototype.getBoundingClientRect | undefined;
 
@@ -680,7 +681,7 @@ describe('initSelectionOverlay — floating button keeps an accessible text labe
     window.getSelection()?.removeAllRanges();
   });
 
-  it('renders a decorative logo mark plus the "중재하기" text (icon-alone is not used)', () => {
+  it('has no visible text content but exposes "중재하기" as its accessible name via aria-label', () => {
     const content = renderGenericSiteA();
     cleanup = initSelectionOverlay();
 
@@ -688,10 +689,22 @@ describe('initSelectionOverlay — floating button keeps an accessible text labe
     fireMouseUp();
 
     const button = getButton()!;
-    expect(button.textContent).toContain('중재하기');
-    const mark = button.querySelector('span[aria-hidden="true"]');
-    expect(mark).not.toBeNull();
-    expect(mark!.textContent).toBe('M');
+    expect(button.textContent?.trim()).toBe('');
+    expect(button.getAttribute('aria-label')).toBe('중재하기');
+  });
+
+  it('renders the SHIFT logo mark as an SVG', () => {
+    const content = renderGenericSiteA();
+    cleanup = initSelectionOverlay();
+
+    selectTextIn(content);
+    fireMouseUp();
+
+    const button = getButton()!;
+    const svg = button.querySelector('svg');
+    expect(svg).not.toBeNull();
+    expect(svg!.getAttribute('aria-hidden')).toBe('true');
+    expect(button.querySelectorAll('rect').length).toBe(3);
   });
 });
 

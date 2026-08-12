@@ -34,7 +34,7 @@
  * "Absent-not-disabled controls" 패턴, `docs/UX.md:929`) — 그 경우 이전과 동일하게 recipient는
  * `null`로 남아 AC-066①④가 그대로 성립한다.
  */
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { computeIndicatorDeltas, LENGTH_COUNTER_SHOW_AT, SOFT_LENGTH_CAP } from '@cross-border/core';
 import type { MediationResult } from '@cross-border/core';
 import { addSample, callMediationApi, fetchKnownCounterparts } from '../shared/api';
@@ -105,11 +105,37 @@ export function MediationPanel({
   const [theme, setTheme] = useState<Layer1Theme>(() => getLayer1Theme());
   useEffect(() => subscribeLayer1ThemeChange(() => setTheme(getLayer1Theme())), []);
 
-  // 🔴 (2026-08-12, T81) `anchorRect`가 있으면 선택 위치 옆에, 없으면 기존 우상단 고정 위치로
-  // 폴백한다. 버튼과 같은 clamp 로직(`computeClampedPosition`)을 재사용해 뷰포트를 벗어나지
-  // 않는다 — `docs/UX.md`가 이미 이 패널에 대해 "opens next to a text selection"이라고 밝힌
-  // 요구를 실제로 구현한다(그동안 `payload.rect`가 `panel-mount.tsx`에서 버려지고 있었다).
+  // 🔴 (2026-08-12, T81→T82 후속) `anchorRect`가 있으면 선택 위치 옆에, 없으면 기존 우상단 고정
+  // 위치로 폴백한다. 버튼과 같은 clamp 로직(`computeClampedPosition`)을 재사용해 뷰포트를
+  // 벗어나지 않는다 — `docs/UX.md`가 이미 이 패널에 대해 "opens next to a text selection"이라고
+  // 밝힌 요구를 실제로 구현한다(그동안 `payload.rect`가 `panel-mount.tsx`에서 버려지고 있었다).
+  //
+  // 🔴 (2026-08-12, T82) 사용자 재신고 — "패널이 드래그(스크롤) 시 여전히 고정돼 있다." T81은
+  // 마운트 시점 1회만 위치를 계산했다 — 패널이 열린 뒤 페이지를 스크롤하면 버튼과 달리 패널은
+  // 원래 화면 좌표에 그대로 남았다. `anchorRect`는 뷰포트 기준 좌표라 스크롤하면 그 자체로는
+  // 의미가 바뀌지 않으므로, 마운트 시점의 `window.scrollX/Y`를 더해 **문서(페이지) 기준 좌표**로
+  // 한 번 변환해 두고(`anchorDocPointRef`), 이후 스크롤마다 그 문서 좌표에서 **현재** 스크롤량을
+  // 빼 다시 뷰포트 좌표를 구한다. 버튼(`selection.ts`)처럼 살아있는 `window.getSelection()`을
+  // 다시 읽지 않는 이유 — 패널 안 요소를 한 번이라도 클릭하면 그 mousedown이 문서 selection을
+  // collapse시킨다는 것이 이미 알려진 구조적 한계라(`focusFloatingButtonIfPresent` 헤더 주석),
+  // 살아있는 selection에 의존하면 그 시점부터 추적이 끊긴다. 순수 산술이라 이 문제가 없다.
   const [anchoredPos, setAnchoredPos] = useState<{ top: number; left: number } | null>(null);
+  const anchorDocPointRef = useRef<{ top: number; bottom: number; left: number; right: number } | null>(null);
+
+  const repositionNearAnchor = useCallback(() => {
+    const anchor = anchorDocPointRef.current;
+    if (!anchor || !panelRef.current) return;
+    const viewportRect = {
+      top: anchor.top - window.scrollY,
+      bottom: anchor.bottom - window.scrollY,
+      left: anchor.left - window.scrollX,
+      right: anchor.right - window.scrollX,
+    };
+    const size = panelRef.current.getBoundingClientRect();
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    setAnchoredPos(computeClampedPosition(viewportRect, { width: size.width, height: size.height }, viewport));
+  }, []);
+
   const [status, setStatus] = useState<Status>('checkingAuth');
   const [text, setText] = useState(initialText);
   const [result, setResult] = useState<MediationResult | null>(null);
@@ -163,16 +189,30 @@ export function MediationPanel({
     panelRef.current?.focus();
   }, []);
 
-  // 🔴 (2026-08-12, T81) 마운트 직후(레이아웃 커밋 후) 패널 실제 크기를 측정해 anchorRect 옆으로
-  // clamp한다 — `selection.ts`의 버튼 위치 계산과 같은 이유로 useLayoutEffect를 쓴다(측정은
-  // DOM에 붙은 뒤에만 가능하다). `anchorRect`가 없으면 아무 것도 하지 않고 기본 우상단 고정
-  // 위치(`panelStyle`)를 그대로 쓴다.
+  // 🔴 (2026-08-12, T81→T82) 마운트/anchorRect 변경 직후(레이아웃 커밋 후) 뷰포트 좌표를 문서
+  // 좌표로 변환해 저장하고 즉시 1회 배치한다 — `selection.ts`의 버튼 위치 계산과 같은 이유로
+  // useLayoutEffect를 쓴다(측정은 DOM에 붙은 뒤에만 가능하다). `anchorRect`가 없으면 아무 것도
+  // 하지 않고 기본 우상단 고정 위치(`panelStyle`)를 그대로 쓴다.
   useLayoutEffect(() => {
-    if (!anchorRect || !panelRef.current) return;
-    const size = panelRef.current.getBoundingClientRect();
-    const viewport = { width: window.innerWidth, height: window.innerHeight };
-    setAnchoredPos(computeClampedPosition(anchorRect, { width: size.width, height: size.height }, viewport));
-  }, [anchorRect]);
+    if (!anchorRect) return;
+    anchorDocPointRef.current = {
+      top: anchorRect.top + window.scrollY,
+      bottom: anchorRect.bottom + window.scrollY,
+      left: anchorRect.left + window.scrollX,
+      right: anchorRect.right + window.scrollX,
+    };
+    repositionNearAnchor();
+  }, [anchorRect, repositionNearAnchor]);
+
+  // 🔴 (2026-08-12, T82) 패널이 열린 뒤 페이지(또는 중첩 스크롤 컨테이너)가 스크롤되면 위 문서
+  // 좌표를 기준으로 다시 배치한다 — `selection.ts`의 버튼 스크롤 재배치(`repositionFloatingButton`,
+  // T81)와 같은 이유·같은 옵션(`capture:true, passive:true`, host 페이지 스크롤에 관여하지
+  // 않는다).
+  useEffect(() => {
+    if (!anchorRect) return;
+    document.addEventListener('scroll', repositionNearAnchor, { capture: true, passive: true });
+    return () => document.removeEventListener('scroll', repositionNearAnchor, { capture: true });
+  }, [anchorRect, repositionNearAnchor]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') onClose();
