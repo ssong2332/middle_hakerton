@@ -8,7 +8,7 @@
  * 값이 실제로 만들어졌는지 정도의 사소한 확인일 뿐이다.
  */
 import { describe, expect, it } from 'vitest';
-import type { DecisionItem, TicketOption, TicketResult } from './contract';
+import { URGENCY_LABELS, type DecisionItem, type TicketOption, type TicketResult } from './contract';
 
 describe('contract.ts — F1-c 판별 유니온 불변식 (불법 조합 3개는 컴파일되지 않는다)', () => {
   it('불법 조합 위의 @ts-expect-error 가 실제로 타입 오류를 잡는다', () => {
@@ -40,5 +40,22 @@ describe('contract.ts — F1-c 판별 유니온 불변식 (불법 조합 3개는
     expect(illegalTicketOption).toBeTruthy();
     expect(illegalTicketResult).toBeTruthy();
     expect(illegalDecisionItem).toBeTruthy();
+  });
+});
+
+// (2026-08-12) 사용자가 웹앱/확장 양쪽에서 raw enum("NORMAL" 등)이 그대로 노출되는 것을
+// 발견 — 이 표가 그 재발을 막는 유일한 정의처다(웹/확장이 각자 다른 라벨을 만들지 않는다).
+describe('URGENCY_LABELS — 한국어 화면 표시 라벨(웹/확장 공유, 단일 정의처)', () => {
+  it('UrgencyLevel의 세 값 모두 한국어 라벨을 갖는다', () => {
+    expect(URGENCY_LABELS.CRITICAL).toBe('긴급');
+    expect(URGENCY_LABELS.NORMAL).toBe('보통');
+    expect(URGENCY_LABELS.LOW).toBe('낮음');
+  });
+
+  it('라벨 중 raw enum 값을 그대로 재사용한 것이 없다(번역 누락 방지)', () => {
+    const labels = Object.values(URGENCY_LABELS);
+    expect(labels).not.toContain('CRITICAL');
+    expect(labels).not.toContain('NORMAL');
+    expect(labels).not.toContain('LOW');
   });
 });
