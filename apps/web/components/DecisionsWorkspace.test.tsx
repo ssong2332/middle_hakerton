@@ -46,16 +46,16 @@ describe('DecisionsWorkspace', () => {
     vi.restoreAllMocks();
   });
 
-  it('Empty — 초기 상태에서는 스레드 텍스트 입력창과 비활성화된 Generate summary 버튼을 보여준다', () => {
+  it('Empty — 초기 상태에서는 스레드 텍스트 입력창과 비활성화된 요약 만들기 버튼을 보여준다', () => {
     render(<DecisionsWorkspace />);
 
     expect(screen.getByRole('textbox', { name: '스레드 텍스트' })).toBeTruthy();
     expect(
-      (screen.getByRole('button', { name: 'Generate summary' }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: '요약 만들기' }) as HTMLButtonElement).disabled,
     ).toBe(true);
   });
 
-  it('Validation — 텍스트를 입력하면 Generate summary 버튼이 활성화된다', () => {
+  it('Validation — 텍스트를 입력하면 요약 만들기 버튼이 활성화된다', () => {
     render(<DecisionsWorkspace />);
 
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
@@ -63,11 +63,11 @@ describe('DecisionsWorkspace', () => {
     });
 
     expect(
-      (screen.getByRole('button', { name: 'Generate summary' }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: '요약 만들기' }) as HTMLButtonElement).disabled,
     ).toBe(false);
   });
 
-  it('Loading — Generate summary 클릭 시 POST /api/summary를 호출하고 진행 중 상태를 보여준다', () => {
+  it('Loading — 요약 만들기 클릭 시 POST /api/summary를 호출하고 진행 중 상태를 보여준다', () => {
     const fetchMock = vi.fn().mockReturnValue(new Promise(() => {}));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -75,7 +75,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '스레드 원문' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/summary',
@@ -95,7 +95,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '스레드 원문' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeTruthy();
@@ -116,7 +116,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '스레드 원문' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeTruthy();
@@ -144,7 +144,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '스레드 원문' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(screen.getByRole('table')).toBeTruthy();
@@ -176,7 +176,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '스레드 원문' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(screen.getByRole('table')).toBeTruthy();
@@ -200,7 +200,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '스레드 원문' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(screen.getByRole('table')).toBeTruthy();
@@ -219,7 +219,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '스레드 원문' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(screen.getByRole('table')).toBeTruthy();
@@ -238,7 +238,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '스레드 원문' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(screen.getByRole('table')).toBeTruthy();
@@ -258,7 +258,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '스레드 원문' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(screen.getByRole('table')).toBeTruthy();
@@ -276,7 +276,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '스레드 원문' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(screen.getByText('결정사항이 발견되지 않았습니다.')).toBeTruthy();
@@ -292,7 +292,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '스레드 원문' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(screen.getByText('폴백 응답 사용 중')).toBeTruthy();
@@ -307,7 +307,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '스레드 원문' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(screen.getByRole('table')).toBeTruthy();
@@ -326,7 +326,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '원본 스레드' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(screen.getByRole('table')).toBeTruthy();
@@ -335,7 +335,7 @@ describe('DecisionsWorkspace', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '스레드 텍스트' }), {
       target: { value: '수정된 스레드' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Generate summary' }));
+    fireEvent.click(screen.getByRole('button', { name: '요약 만들기' }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledTimes(2);

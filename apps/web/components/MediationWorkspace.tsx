@@ -178,7 +178,7 @@ export function MediationWorkspace({ personalizationActive = false }: MediationW
       sessionStorage.removeItem(TICKET_RESTORE_SESSION_KEY);
     }
     // M-A(reviewer 발견 → 수정) — `TICKET_DRAFT_SESSION_KEY`(API 소스 스냅샷)도 여기서 함께
-    // 지운다. 이 이펙트는 마운트 시 1회만 도므로, 이 시점 이후 "Convert to Task Ticket"을 실제로
+    // 지운다. 이 이펙트는 마운트 시 1회만 도므로, 이 시점 이후 "작업 티켓으로 전환"을 실제로
     // 클릭하기 전까지는 이 방문에서 그 클릭이 있었을 수 없다 — 즉 지금 이 값이 남아 있다면 그건
     // 이전 방문(직전 티켓 전환)이 남긴 것이고, 이번 방문에서 아직 소비되지 않은 새 값일 수는
     // 없다. 지우지 않으면 이 키가 탭 세션 내내(원래 설계는 "한 번 쓰고 한 번 읽히는" 값이었다,
@@ -425,7 +425,7 @@ export function MediationWorkspace({ personalizationActive = false }: MediationW
       .catch(() => setEnrichmentLinkVisible(false));
   }
 
-  // 🔴 T25/AC-058① — `RecipientPanel`의 "Convert to Task Ticket" 클릭 핸들러. 승인 대상
+  // 🔴 T25/AC-058① — `RecipientPanel`의 "작업 티켓으로 전환" 클릭 핸들러. 승인 대상
   // 스냅샷 시점의 원문(`approvalSnapshot.text` — `SenderPanel`의 `originalTextSnapshot`과 같은
   // 이유: 이 원문이 실제로 `ticketOption.offered`를 판정한 그 텍스트다)을 API 소스 키에 저장하고
   // `/ticket`으로 이동한다. 스냅샷이 없으면(이 버튼은 `hasResult`가 true일 때만 렌더되므로

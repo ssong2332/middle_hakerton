@@ -35,7 +35,7 @@ export interface RecipientPanelProps {
   sentAt: string | null;
   /**
    * 🔴 T25/AC-058 — 이 결과에 대해 C6 티켓 변환 옵션이 제시되었는가(`ticketOption.offered`,
-   * `docs/UX.md` UX-007 Entry). `false`면 "Convert to Task Ticket" 링크를 **완전히 렌더하지
+   * `docs/UX.md` UX-007 Entry). `false`면 "작업 티켓으로 전환" 링크를 **완전히 렌더하지
    * 않는다** — 비활성·회색 링크 금지(AC-058②, "Absent-not-disabled controls" 패턴,
    * `PrimaryNav.tsx`의 `implemented` 필터와 같은 원칙). 기본값 `false` — 기존 호출부를 깨지 않기
    * 위한 선택적 prop이다(`isRunning`과 같은 패턴).
@@ -46,7 +46,7 @@ export interface RecipientPanelProps {
    * 때만 실제로 렌더·호출된다. */
   onConvertToTicket?: () => void;
   /**
-   * 🔴 T40/AC-005 — "Set response deadline" 진입 버튼이 렌더 가능한가. **CRITICAL 메시지에서는
+   * 🔴 T40/AC-005 — "마감 기한 협상" 진입 버튼이 렌더 가능한가. **CRITICAL 메시지에서는
    * 반드시 `false`여야 한다**(부모가 `displayedUrgency !== 'CRITICAL'`로 판정, `docs/UX.md`
    * UX-004 Secondary Actions). `ticketOffered`와 같은 원칙 — 비활성이 아니라 **미렌더**
    * (AC-058②와 같은 "Absent-not-disabled controls" 패턴). 기본값 `false`.
@@ -131,7 +131,7 @@ export function RecipientPanel({
               className={styles.ticketLink}
               onClick={() => onConvertToTicket?.()}
             >
-              Convert to Task Ticket
+              작업 티켓으로 전환
             </button>
           )}
           {/* T40/AC-005 — CRITICAL이면 `deadlineNegotiationAvailable`이 false라 이 블록 자체가
@@ -142,7 +142,7 @@ export function RecipientPanel({
               className={styles.deadlineLink}
               onClick={() => onOpenDeadlineNegotiation?.()}
             >
-              Set response deadline
+              마감 기한 협상
             </button>
           )}
           {!isDelivered && confirmedDeadline && (
