@@ -373,7 +373,12 @@ export function MediationPanel({
         @media (prefers-reduced-motion: reduce) {
           .cbm-spinner, .cbm-progress-fill { animation: none !important; }
         }
+        .cbm-icon-btn:hover { background: ${theme.surfaceAlt}; color: ${theme.text}; }
       `}</style>
+      {/* 🔴 (2026-08-12, 사용자 요청 — 목업 재대조) 이전엔 패널 전체가 `padding:'12px'` 하나로
+          평평하게 감싸여 있었다 — 목업은 헤더(`16px 18px 0`)와 본문(`14px 18px 18px`)의 여백이
+          서로 다르다. `buildPanelStyle`의 패딩을 0으로 비우고 여기서 각각 감싼다. */}
+      <div style={{ padding: '16px 18px 0' }}>
       <div style={headerStyle}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
           <span
@@ -390,6 +395,7 @@ export function MediationPanel({
               `chrome.storage.local`에 저장되어 다음 방문에도 유지된다. */}
           <button
             type="button"
+            className="cbm-icon-btn"
             onClick={() => toggleThemeMode()}
             aria-label={getThemeMode() === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
             title={getThemeMode() === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
@@ -397,11 +403,13 @@ export function MediationPanel({
           >
             {getThemeMode() === 'dark' ? '☀️' : '🌙'}
           </button>
-          <button type="button" onClick={onClose} aria-label="닫기" style={closeButtonStyle}>
+          <button type="button" className="cbm-icon-btn" onClick={onClose} aria-label="닫기" style={closeButtonStyle}>
             ×
           </button>
         </span>
       </div>
+      </div>
+      <div style={{ padding: '14px 18px 18px' }}>
 
       {status === 'checkingAuth' && <p role="status">확인 중…</p>}
 
@@ -423,7 +431,7 @@ export function MediationPanel({
         status === 'error' ||
         status === 'success') && (
         <>
-          <label htmlFor="cbm-panel-text">선택한 텍스트</label>
+          <label htmlFor="cbm-panel-text" style={labelStyle(theme)}>선택한 텍스트</label>
           <textarea
             id="cbm-panel-text"
             value={text}
@@ -452,7 +460,7 @@ export function MediationPanel({
           <div
             role="group"
             aria-label="모드"
-            style={{ padding: '3px', margin: '4px 0', background: theme.surface, borderRadius: '11px', display: 'flex', gap: '5px' }}
+            style={{ padding: '3px', margin: '4px 0', background: theme.surfaceAlt, borderRadius: '11px', display: 'flex', gap: '5px' }}
           >
             {(
               [
@@ -473,7 +481,7 @@ export function MediationPanel({
                     height: '36px',
                     padding: '0 8px',
                     borderRadius: '9px',
-                    background: active ? theme.bg : 'transparent',
+                    background: active ? theme.surface : 'transparent',
                     boxShadow: active ? '0 1px 3px rgba(17,24,39,.1)' : 'none',
                     fontSize: '12.5px',
                     fontWeight: 600,
@@ -507,7 +515,7 @@ export function MediationPanel({
                       이월됐으므로 여기서는 목록 선택만 한다. */}
                   {counterparts.length > 0 && (
                     <div>
-                      <label htmlFor="cbm-panel-recipient">받는 사람 (선택)</label>
+                      <label htmlFor="cbm-panel-recipient" style={labelStyle(theme)}>받는 사람 (선택)</label>
                       <select
                         id="cbm-panel-recipient"
                         value={recipient ?? ''}
@@ -582,7 +590,7 @@ export function MediationPanel({
                       minWidth: 0,
                       display: 'grid',
                       gap: '10px',
-                      borderLeft: `1px solid ${theme.border}`,
+                      borderLeft: `1px solid ${theme.borderThin}`,
                       paddingLeft: '14px',
                     }}
                   >
@@ -602,7 +610,7 @@ export function MediationPanel({
                       )}
                     </div>
 
-                    <label htmlFor="cbm-panel-final-text">변환된 메시지</label>
+                    <label htmlFor="cbm-panel-final-text" style={labelStyle(theme)}>변환된 메시지</label>
                     <textarea
                       id="cbm-panel-final-text"
                       value={finalText}
@@ -667,7 +675,7 @@ export function MediationPanel({
               파이프라인·LLM 호출 없이 로컬 집계 → 표본 저장만 한다. */}
           {mode === 'mark' && (
             <>
-              <label htmlFor="cbm-panel-mark-counterpart">상대 식별자</label>
+              <label htmlFor="cbm-panel-mark-counterpart" style={labelStyle(theme)}>상대 식별자</label>
               <input
                 id="cbm-panel-mark-counterpart"
                 type="text"
@@ -697,6 +705,7 @@ export function MediationPanel({
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
@@ -720,16 +729,21 @@ function buildPanelStyle(
     width: 'min(560px, calc(100vw - 32px))',
     maxHeight: '80vh',
     overflowY: 'auto',
-    background: theme.bg,
+    // 🔴 (2026-08-12, 사용자 요청 — 목업 재대조) 이전엔 `theme.bg`(페이지 배경, #F9FAFB)를 패널
+    // 배경으로 썼다 — 목업은 패널 자체가 카드(`background:#FFFFFF`)이고 `theme.bg`는 그 카드가
+    // 얹히는 host 페이지 쪽 색이다. `theme.surface`로 교체. 테두리도 목업의 옅은 `#EEF1F4`
+    // (`theme.borderThin`)로, 그림자도 목업처럼 굵은 것 + 얇은 것 2단으로 맞춘다.
+    background: theme.surface,
     color: theme.text,
-    border: `1px solid ${theme.border}`,
-    borderRadius: '20px', // v8.0 — docs/UX.md --radius-lg, 사이 확장 패널.dc.html 패널 카드
-    boxShadow: `0 24px 60px ${theme.shadow}`,
-    padding: '12px',
+    border: `1px solid ${theme.borderThin}`,
+    borderRadius: '20px', // docs/UX.md --radius-lg, 사이 확장 패널.dc.html 패널 카드
+    boxShadow: `0 24px 60px ${theme.shadow}, 0 2px 8px ${theme.shadowFine}`,
+    padding: 0,
     fontSize: '13px',
     fontFamily: 'system-ui, sans-serif',
     zIndex: 2147483647,
     colorScheme: getLayer1ColorScheme(),
+    animation: 'om-in 0.22s ease-out both',
   };
 }
 
@@ -741,42 +755,55 @@ const headerStyle: React.CSSProperties = {
   marginBottom: '8px',
 };
 
+// 44×44는 WCAG 2.5.5 터치 타깃 최소값(목업 원본은 28×28이지만 접근성 요구가 픽셀 일치보다
+// 우선한다 — 의도적 이탈, 아래 `.cbm-icon-btn:hover` 규칙으로 목업의 호버 배경만 재현한다).
 const closeButtonStyle: React.CSSProperties = {
   minWidth: '44px',
   minHeight: '44px',
   border: 'none',
+  borderRadius: '9px',
   background: 'transparent',
   fontSize: '18px',
   cursor: 'pointer',
 };
 
-// 🔴 (2026-08-12, T81) 사용자 요청 ② "통일성" — 지금까지 패널 안의 버튼/입력/셀렉트가 브라우저
-// 기본 스타일 그대로였다(테두리·배경·크기가 제각각). 이 세 헬퍼로 패널 안 모든 상호작용
+// 🔴 (2026-08-12, T81; 재대조 후속 2026-08-12) 사용자 요청 ② "통일성" — 지금까지 패널 안의
+// 버튼/입력/셀렉트가 브라우저 기본 스타일 그대로였다. 이 세 헬퍼로 패널 안 모든 상호작용
 // 요소가 같은 토큰을 쓴다. `primary`는 이 세션의 핵심 동작(중재 실행/확정/표본에 추가) 하나에만
 // 쓴다 — 여러 버튼이 동시에 accent로 칠해지면 "이게 기본 액션"이라는 신호가 무의미해진다
 // (`apps/web/app/globals.css`의 accent 사용 원칙과 같은 이유).
+// 🔴 재대조 후속 — `secondary`가 이전엔 투명+테두리(outline)였다. 목업의 `copyBtnStyle`
+// (`this.btn(s.copied?"#E6F5EC":"#191F28", ...,"#FFFFFF", 44)`)은 outline이 아니라 **꽉 찬
+// 진한 배경 + 흰 글자**다 — `theme.text`를 배경으로, `theme.bg`(반대쪽 극단 톤)를 글자색으로
+// 써서 라이트/다크 양쪽에서 목업과 같은 "고대비 solid fill" 인상을 재현한다.
 function actionButtonStyle(theme: Layer1Theme, variant: 'primary' | 'secondary' = 'secondary'): React.CSSProperties {
   const isPrimary = variant === 'primary';
   return {
-    font: '700 13px system-ui, sans-serif', // v8.0 — 사이 확장 패널.dc.html btn() 헬퍼
-    padding: '7px 12px',
+    font: '700 14px system-ui, sans-serif', // 사이 확장 패널.dc.html btn() 헬퍼
+    height: isPrimary ? '46px' : '44px',
+    padding: '0 14px',
     borderRadius: '13px',
-    border: `1px solid ${isPrimary ? theme.accent : theme.border}`,
-    background: isPrimary ? theme.accent : 'transparent',
-    color: isPrimary ? theme.accentText : theme.text,
+    border: 'none',
+    background: isPrimary ? theme.accent : theme.text,
+    color: isPrimary ? theme.accentText : theme.bg,
     cursor: 'pointer',
-    minHeight: '32px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
   };
 }
 
 function fieldStyle(theme: Layer1Theme): React.CSSProperties {
   return {
     font: 'inherit',
-    fontSize: '13px',
-    padding: '6px 8px',
-    borderRadius: '12px', // v8.0 — docs/UX.md --radius-md
-    border: `1px solid ${theme.border}`,
-    background: theme.surface,
+    fontSize: '14px',
+    minHeight: '42px',
+    padding: '11px 13px',
+    borderRadius: '12px', // docs/UX.md --radius-md
+    border: 'none',
+    background: theme.surfaceAlt, // 재대조 후속 — 이전엔 theme.surface(흰색)라 패널과 같은
+    // 색으로 렌더돼 필드 경계가 안 보였다. 목업은 #F2F4F6, 테두리 없음.
     color: theme.text,
     width: '100%',
     boxSizing: 'border-box',
@@ -785,6 +812,12 @@ function fieldStyle(theme: Layer1Theme): React.CSSProperties {
 
 function alertTextStyle(theme: Layer1Theme): React.CSSProperties {
   return { color: theme.danger, fontWeight: 600 };
+}
+
+// 재대조 후속 — 목업 필드 레이블(예: "선택한 텍스트")은 `fontSize:12px; fontWeight:600;
+// color:#4E5968` 무채색 캡션이다. 이전엔 브라우저 기본 `<label>` 스타일(굵게, 본문색) 그대로였다.
+function labelStyle(theme: Layer1Theme): React.CSSProperties {
+  return { display: 'block', fontSize: '12px', fontWeight: 600, color: theme.text + 'bb', marginBottom: '7px' };
 }
 
 /**
@@ -802,7 +835,9 @@ function badgeStyle(theme: Layer1Theme, tone: 'neutral' | 'warn'): React.CSSProp
     borderRadius: '999px',
     fontSize: '11px',
     fontWeight: 700,
-    background: tone === 'warn' ? theme.danger + '22' : theme.surface,
+    // 재대조 후속 — 목업 "긴급도 낮음" 배지는 `background:#F2F4F6`(surfaceAlt)다. 이전엔
+    // theme.surface(흰색)라 패널 카드와 같은 색으로 묻혔다.
+    background: tone === 'warn' ? theme.danger + '22' : theme.surfaceAlt,
     color: tone === 'warn' ? theme.danger : theme.text,
     marginRight: '6px',
     marginBottom: '6px',

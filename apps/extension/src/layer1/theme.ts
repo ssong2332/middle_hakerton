@@ -25,13 +25,22 @@
 export interface Layer1Theme {
   bg: string;
   surface: string;
+  /** 입력/select/모드 토글 트랙처럼 "채운" 필(pill) 배경 — `apps/web` --color-surface-alt와
+   * 같은 역할. `surface`(패널 카드 배경, 흰색)와는 다른 톤이어야 목업의 필드 대비가 산다.
+   * (2026-08-12 후속 — 사용자가 목업 대조를 요청해 발견: 이전엔 이 토큰이 없어 입력 필드가
+   * `surface`를 그대로 써서 패널과 같은 흰색으로 렌더됐다, 목업은 #F2F4F6.) */
+  surfaceAlt: string;
   text: string;
   border: string;
+  /** 패널 바깥 테두리 전용 — `border`보다 옅다(목업 `#EEF1F4` vs 입력 테두리류 `#E5E8EB`). */
+  borderThin: string;
   accent: string;
   accentHover: string;
   accentText: string;
   danger: string;
   shadow: string;
+  /** 패널의 2단 그림자 중 얇은 쪽(`0 2px 8px`) — `shadow`는 굵은 쪽(`0 24px 60px`)에 쓴다. */
+  shadowFine: string;
 }
 
 export type ThemeMode = 'light' | 'dark';
@@ -39,25 +48,33 @@ export type ThemeMode = 'light' | 'dark';
 const LIGHT: Layer1Theme = {
   bg: '#F9FAFB', // apps/web globals.css --color-bg
   surface: '#FFFFFF', // --color-surface
+  surfaceAlt: '#F2F4F6', // --color-surface-alt
   text: '#191F28', // --color-text
   border: '#E5E8EB', // --border-thin-alt
+  borderThin: '#EEF1F4', // --border-thin
   accent: '#FF6100', // --color-accent
   accentHover: '#E85700', // --color-accent-hover
   accentText: '#FFFFFF',
   danger: '#C40029', // --color-danger-text
   shadow: 'rgba(17, 24, 39, 0.24)', // --shadow-elevated
+  shadowFine: 'rgba(17, 24, 39, 0.08)',
 };
 
 const DARK: Layer1Theme = {
   bg: '#211f1e',
   surface: '#2c2a29',
+  surfaceAlt: '#171615', // bg보다 더 짙게 — 라이트가 bg보다 더 옅은 surfaceAlt를 쓰는 것과
+  // 대칭인 관계(surface는 bg에서 밝은 쪽으로, surfaceAlt는 어두운 쪽으로 한 단계). WCAG:
+  // text(#f3f2f2)/surfaceAlt ≈16.17:1 — AA 여유 통과(2026-08-12 측정).
   text: '#f3f2f2',
   border: '#8a857f',
+  borderThin: '#4a4744',
   accent: '#ff8a54',
   accentHover: '#ffa374',
   accentText: '#211f1e',
   danger: '#ffab8a',
   shadow: 'rgba(0, 0, 0, 0.55)',
+  shadowFine: 'rgba(0, 0, 0, 0.3)',
 };
 
 export const THEME_MODE_STORAGE_KEY = 'cbmLayer1ThemeMode';
