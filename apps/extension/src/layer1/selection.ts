@@ -9,11 +9,14 @@ const BUTTON_ID = 'cbm-layer1-selection-button';
 
 /**
  * MEDIATE "SHIFT" 로고 마크 — 사용자가 제공한 Claude Design 프로젝트
- * `MEDIATE 로고 03 SHIFT 전개.dc.html`의 원본 SVG를 그대로 옮긴다(좌표·비율을 임의로 바꾸지
- * 않는다). 원문의 "축소 한계" 섹션이 20×10(viewBox 0 0 188 96 그대로 스케일)을 이미 검증된
- * 최소 크기 중 하나로 명시했다 — 여기서는 그 크기를 기본값으로 쓴다. 다크모드 대응도 원문 그대로:
- * 어긋난 두 바(위 두 개)는 배경 대비에 따라 반전(`theme.text` 재사용), 정렬된 결과 바(아래,
- * 넓은 바)는 원문이 다크 변형에서도 고정해 둔 브랜드 레드 `#ec3013`을 그대로 쓴다(테마 무관).
+ * `MEDIATE 로고 03 SHIFT 전개.dc.html`의 원본 SVG를 그대로 옮긴다(좌표·비율(188:96)을 임의로
+ * 바꾸지 않는다 — width/height는 호출부가 지정, 종횡비만 고정). 🔴 (T83) 원문의 "축소 한계"
+ * 섹션이 명시한 20/30/14px는 파비콘 등 다른 시각 요소가 이미 주의를 끄는 맥락의 최소 판독
+ * 한계였지, 임의 페이지 위에 홀로 떠서 그 자체로 눈에 띄어야 하는 플로팅 트리거의 권장 크기가
+ * 아니었다 — 실사용 신고(가독성 저하) 후 24px 높이로 올렸다(`createFloatingButton` 호출부
+ * 참조). 다크모드 대응은 원문 그대로: 어긋난 두 바(위 두 개)는 배경 대비에 따라 반전
+ * (`theme.text` 재사용), 정렬된 결과 바(아래, 넓은 바)는 원문이 다크 변형에서도 고정해 둔
+ * 브랜드 레드 `#ec3013`을 그대로 쓴다(테마 무관).
  */
 function shiftMarkSvg(theme: Layer1Theme, width: number, height: number): string {
   return (
@@ -163,12 +166,16 @@ function createFloatingButton(
   // 유지한다(아이콘 단독 버튼에 `aria-label`을 다는 것은 WCAG 4.1.2 충족의 표준 패턴이며,
   // 기존 원칙이 막던 것은 "텍스트 대안이 어디에도 없는" 상태다 — T77의 내비 토글처럼 상시
   // 노출되는 신호와 달리 이건 사용자가 만든 일회성 트리거라는 점도 다르다).
-  // 마크 자체는 디자인 원문의 "축소 한계" 표(30/20/14px)에서 이미 검증된 20px 폭 버전을
-  // 그대로 쓴다(임의로 재스케일하지 않는다) — 두 어긋난 바는 배경 대비에 맞춰 반전되고(라이트:
-  // 짙은색 / 다크: 밝은색, `theme.text` 재사용), 세 번째(합쳐진 결과) 바는 디자인 원문이 다크
-  // 변형에서도 고정해 둔 브랜드 레드 `#ec3013`을 테마와 무관하게 그대로 쓴다.
+  // 🔴 (2026-08-12, T83) 사용자 재신고 — "로고가 가독성이 안 좋다, DeepL 옆에서도 눈에 안
+  // 띈다." 원인은 크기였다: 디자인 원문의 "축소 한계" 표가 검증한 가장 작은 폭(20px)을 그대로
+  // 썼는데, 그 표의 세 값(30/20/14px)은 **파비콘 등 이미 다른 시각적 맥락이 주의를 끄는
+  // 자리**에서의 최소 판독 한계이지, 임의 페이지 위에 새로 떠서 그 자체로 눈에 띄어야 하는
+  // 플로팅 트리거의 권장 크기가 아니다. 바 높이가 실제로 1px 안팎이 되어 세 바가 뭉개져
+  // 보였다. 명시적 "권장" 크기가 원문에 없어 실측 가독성 기준(DeepL 아이콘과 나란히 놓아도
+  // 밀리지 않을 크기)으로 implementer가 정한다 — 마크의 종횡비(188:96)는 원문 그대로 유지하고
+  // 높이만 24px로 올린다(20px 폭 대비 118% 확대, 형태·색상 규칙은 변경 없음).
   const theme = getLayer1Theme();
-  button.innerHTML = shiftMarkSvg(theme, 20, 10);
+  button.innerHTML = shiftMarkSvg(theme, 47, 24);
   button.setAttribute('aria-label', '중재하기');
   button.title = '중재하기';
 
@@ -187,12 +194,13 @@ function createFloatingButton(
     alignItems: 'center',
     justifyContent: 'center',
     // 🔴 (2026-08-12, T82) 아이콘 단독으로 바뀌며 좌우 여백을 동일하게 맞춘다(이전엔 텍스트
-    // 옆의 비대칭 여백 4px/10px였다).
-    padding: '6px',
+    // 옆의 비대칭 여백 4px/10px였다). 🔴 (T83) 마크 확대(24px)에 맞춰 여백도 키우고, 임의
+    // 페이지 배경 위에서 더 또렷이 보이도록 테두리를 2px로, 그림자를 더 짙게 조정했다.
+    padding: '8px',
     borderRadius: '4px',
-    border: `1px solid ${theme.border}`,
+    border: `2px solid ${theme.border}`,
     background: theme.bg,
-    boxShadow: `0 1px 4px ${theme.shadow}`,
+    boxShadow: `0 2px 8px ${theme.shadow}`,
     cursor: 'pointer',
     colorScheme: getLayer1ColorScheme(),
   });

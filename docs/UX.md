@@ -7,9 +7,11 @@ Flow IDs and Screen IDs are immutable once assigned — never renumber existing 
 ## Overview
 | Item | Value |
 |---|---|
-| Document Version | 7.0 |
+| Document Version | 7.1 |
 | Based on PRD Version | v3.0 (2026-08-04, incorporating Planning Decisions #101–#112) — unchanged this pass |
 | Last Updated | 2026-08-12 |
+
+**v7.1 summary (2026-08-12)** — `docs/Tasks.md` T83, pure bug-fix pass against T82's own live build — no new design decisions, no pattern/principle changes, so nothing in this document's normative sections changes. Two corrections: the logo mark's size (T82 used the design file's documented "minimum legibility" size, which turned out to be too small for a control that must catch attention on its own — increased, same aspect ratio, no shape/color change) and the panel's scroll-tracking mechanism (T82's approach only accounted for window-level scroll; corrected to track via the origin element's live position, which is scroll-source-agnostic). Both are implementation corrections against the v7.0 decisions below, not revisions of them.
 
 **v7.0 summary (2026-08-12)** — Follow-up fix pass for `docs/Tasks.md` T82, reported against T81's own live build: the panel is now scroll-tracked (T81 only handled the button); the trigger button now disappears the instant the panel opens instead of both showing at once; and the button's placeholder monogram is replaced with the product's real logo (the "SHIFT" mark, supplied by the user via their own Claude Design project), rendered icon-only per explicit instruction — a scoped, disclosed exception to this document's icon+text convention, not a reversal of it (accessible name preserved via `aria-label`). No screen/flow added/removed/deprecated. See "Selection-triggered floating button" / "Layer 1 dark mode & logo mark" pattern amendments above and UX Decision Log "Layer 1 Panel Scroll Tracking, Button Hide-on-Open & Real Logo Mark" entry.
 

@@ -572,28 +572,15 @@ describe('MediationPanel — T81 anchorRect positioning', () => {
 });
 
 // 🔴 (2026-08-12, T82) 사용자 재신고 — "패널이 드래그(스크롤) 시 여전히 고정돼 있다." T81은
-// anchorRect로 마운트 시점 1회만 위치를 잡았고 스크롤을 반영하지 않았다. 이 describe는 스크롤 후
-// 뷰포트 좌표가 문서 좌표 기준으로 다시 계산되는지 검증한다 — `window.scrollY`를 바꾼 뒤 scroll
-// 이벤트를 쏴서 위치가 그만큼 갱신되는지 확인한다(jsdom은 `scrollX`/`scrollY`가 읽기 전용
-// getter라 `Object.defineProperty`로 덮어쓴다 — `selection.test.ts`의 `innerWidth`/`innerHeight`
-// 스텁과 같은 패턴).
-describe('MediationPanel — T82 panel tracks scroll after opening', () => {
-  let originalScrollX: number;
-  let originalScrollY: number;
-
-  beforeEach(() => {
-    mockedGetStoredToken.mockResolvedValue('tok');
-    mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
-    originalScrollX = window.scrollX;
-    originalScrollY = window.scrollY;
-  });
-
-  afterEach(() => {
-    Object.defineProperty(window, 'scrollX', { value: originalScrollX, configurable: true });
-    Object.defineProperty(window, 'scrollY', { value: originalScrollY, configurable: true });
-    vi.clearAllMocks();
-  });
-
+// anchorRect로 마운트 시점 1회만 위치를 잡았고 스크롤을 반영하지 않았다.
+//
+// 🔴 (2026-08-12, T83) 첫 수정(`window.scrollY` 기반)이 중첩 스크롤 컨테이너에서 또 실패해
+// `origin` 엘리먼트의 `getBoundingClientRect()` 델타 방식으로 교체했다 — 이 describe는
+// `window.scrollY`가 **전혀 바뀌지 않아도**(중첩 컨테이너 스크롤을 흉내낸다) origin 엘리먼트의
+// 측정값이 달라지면 패널이 그만큼 따라 움직이는지 검증한다. `getBoundingClientRect`는 jsdom에서
+// 항상 0을 반환하므로(레이아웃 엔진 없음 — `selection.test.ts`와 같은 제약) 호출마다 다른 값을
+// 주도록 스텁한다(1회차=마운트 시 측정, 2회차=스크롤 후 측정).
+describe('MediationPanel — T82/T83 panel tracks scroll after opening', () => {
   function fakeRect(overrides: Partial<DOMRect>): DOMRect {
     return {
       top: 0,
@@ -611,24 +598,48 @@ describe('MediationPanel — T82 panel tracks scroll after opening', () => {
     } as DOMRect;
   }
 
-  it('repositions to follow the original selection point when the page scrolls', async () => {
+  beforeEach(() => {
+    mockedGetStoredToken.mockResolvedValue('tok');
+    mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
+
+  it('repositions to follow the origin element even when window.scrollY never changes (nested scroll container)', async () => {
+    const originEl = document.createElement('div');
+    document.body.appendChild(originEl);
+    // 마운트 시 origin을 두 번 읽는다(useLayoutEffect의 기준점 측정 1회 + 그 안에서 곧바로
+    // 부르는 repositionNearAnchor()의 델타 계산용 측정 1회) — 둘 다 아직 스크롤 전이므로 같은
+    // 값(300)이어야 한다. 이후 컨테이너 스크롤로 100px 위로 이동했다고 가정(3회차부터 200).
+    const originRectSpy = vi
+      .spyOn(originEl, 'getBoundingClientRect')
+      .mockReturnValueOnce({ top: 300, left: 50 } as DOMRect)
+      .mockReturnValueOnce({ top: 300, left: 50 } as DOMRect)
+      .mockReturnValue({ top: 200, left: 50 } as DOMRect);
+
     // 클램프(0 이하로 내려가지 않음)에 걸리지 않도록 뷰포트 안쪽 값을 쓴다 — 이 테스트의
     // 목적은 스크롤 추적 산술 자체이지 clamp 경계 동작이 아니다(clamp 자체는
     // `computeClampedPosition`의 기존 단위 테스트가 이미 커버한다).
     const anchorRect = fakeRect({ top: 300, bottom: 320, left: 50, right: 150 });
-    render(<MediationPanel initialText="x" onClose={vi.fn()} anchorRect={anchorRect} />);
+    render(
+      <MediationPanel initialText="x" onClose={vi.fn()} anchorRect={anchorRect} origin={originEl} />,
+    );
     const panel = await screen.findByRole('dialog');
     expect(panel.style.top).toBe('324px');
 
-    // 페이지가 아래로 100px 스크롤됐다고 가정 — 같은 문서상 지점은 뷰포트에서 100px 위로
-    // 올라간 것처럼 보여야 한다. React state를 통해 갱신되므로(버튼의 직접 DOM 조작과 달리)
-    // `waitFor`로 리렌더를 기다린다.
-    Object.defineProperty(window, 'scrollY', { value: 100, configurable: true });
+    // window.scrollY는 건드리지 않는다 — 스크롤이 중첩 컨테이너 안에서 일어난 상황을 흉내낸다.
+    // origin 엘리먼트가 100px 위로 이동한 것으로 측정되면(위 spy 2회차) 패널도 그만큼 따라가야
+    // 한다. React state를 통해 갱신되므로(버튼의 직접 DOM 조작과 달리) `waitFor`로 리렌더를
+    // 기다린다.
     document.dispatchEvent(new Event('scroll'));
 
     await waitFor(() => {
       expect(panel.style.top).toBe(`${324 - 100}px`);
     });
+    expect(originRectSpy).toHaveBeenCalled();
   });
 
   it('does nothing when no anchorRect was given (default corner position is not scroll-tracked)', async () => {
