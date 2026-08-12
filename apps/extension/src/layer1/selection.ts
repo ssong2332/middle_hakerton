@@ -3,7 +3,7 @@
 //    이 파일은 현재 페이지 주소를 읽어 분기하지 않는다 — 읽으면 위반(`docs/CodingRules.md`
 //    Directory Rules `apps/extension/src/layer1` 행, 검증: `selection.test.ts`).
 
-import { getLayer1ColorScheme, getLayer1Theme, type Layer1Theme } from './theme';
+import { getLayer1ColorScheme, getLayer1Theme, loadStoredThemeMode, type Layer1Theme } from './theme';
 
 const BUTTON_ID = 'cbm-layer1-selection-button';
 
@@ -319,6 +319,10 @@ function getSelectionPayload(): SelectionPayload | null {
  */
 export function initSelectionOverlay(options: SelectionOverlayOptions = {}): () => void {
   const onSelect = options.onSelect ?? defaultOnSelect;
+
+  // 저장된 테마 선택(라이트/다크)을 비동기로 읽어온다 — 없으면 기본값(라이트) 그대로 유지된다
+  // (`theme.ts` 헤더 주석 참조). `chrome.storage`가 없는 환경(테스트 등)에서는 조용히 no-op이다.
+  void loadStoredThemeMode();
 
   // AC-052 ⑤ 간섭 금지: 아래 문서/윈도우 레벨 리스너 중 어떤 것도 `preventDefault`/
   // `stopPropagation`을 호출하지 않는다 — 대상 사이트의 클릭·스크롤·단축키 동작은 이 코드가

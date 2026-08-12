@@ -1,12 +1,14 @@
 /**
- * 층 1(선택 오버레이) 다크모드 대응 + 웹앱 디자인 토큰 통일 (신규 2026-08-12, T81; 팔레트 값
- * v8.0 브랜드 리디자인으로 교체, docs/UX.md Design Tokens 참조).
+ * 층 1(선택 오버레이) 테마 + 웹앱 디자인 토큰 통일 (신규 2026-08-12, T81; 팔레트 값 v8.0 브랜드
+ * 리디자인으로 교체, docs/UX.md Design Tokens 참조).
  *
- * `panel-mount.tsx`가 이미 밝혔듯 패널/버튼은 Shadow DOM(또는 버튼은 host 라이트 DOM 안이지만
- * host 페이지 CSS를 참조하지 않는 인라인 style)이라 host 페이지의 다크모드 여부를 상속받지
- * 않는다 — 대신 `window.matchMedia('(prefers-color-scheme: dark)')`로 사용자의 실제 OS/브라우저
- * 설정을 직접 읽는다. 이 신호는 host 페이지와 무관하다(host가 다크든 라이트든 우리 UI는 사용자의
- * 실제 선호를 따른다).
+ * 🔴 (2026-08-12, 사용자 실사용 재현 — 후속) T81 원안은 `window.matchMedia('(prefers-color-scheme:
+ * dark)')`로 OS/브라우저 다크모드 신호를 자동으로 따라갔다. 사용자가 실제 다크 테마 페이지에서
+ * 확장을 켜 보고 "기본적으로 흰색으로 하고, 다크모드는 따로 설정을 통해서" 하자고 요청했다 —
+ * 즉 OS 신호 자동 추종을 그만두고, **기본값은 항상 라이트**이며 사용자가 패널 안 토글을 직접
+ * 눌러야만(그리고 그 선택이 `chrome.storage.local`에 저장돼 다음 방문에도 유지돼야) 다크로
+ * 바뀐다. `notice.ts`(AC-076 고지 버전 저장)가 이미 쓰는 "chrome.storage.local 비동기 읽기/쓰기
+ * + 순수 로직 분리" 패턴을 그대로 재사용한다 — 이 리포에 이미 있는 선례를 새로 발명하지 않는다.
  *
  * light 팔레트 값은 `apps/web/app/globals.css`의 v8.0 토큰과 동일하게 맞춘다(웹앱과의 시각적
  * 통일성). dark 팔레트는 이 리포에 선례가 없어 이번에도 새로 정했다 — WCAG 2.1 상대휘도 공식으로
@@ -32,6 +34,8 @@ export interface Layer1Theme {
   shadow: string;
 }
 
+export type ThemeMode = 'light' | 'dark';
+
 const LIGHT: Layer1Theme = {
   bg: '#F9FAFB', // apps/web globals.css --color-bg
   surface: '#FFFFFF', // --color-surface
@@ -56,35 +60,79 @@ const DARK: Layer1Theme = {
   shadow: 'rgba(0, 0, 0, 0.55)',
 };
 
-function prefersDark(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-  );
+export const THEME_MODE_STORAGE_KEY = 'cbmLayer1ThemeMode';
+
+// 기본값은 항상 'light' — OS/브라우저 신호를 더는 참고하지 않는다(위 헤더 주석).
+let currentMode: ThemeMode = 'light';
+const listeners = new Set<() => void>();
+
+function notify(): void {
+  for (const listener of listeners) listener();
 }
 
-/** 호출 시점의 OS/브라우저 다크모드 여부를 읽어 그에 맞는 팔레트를 반환한다. */
+/** 현재 적용 중인 모드('light'|'dark')를 동기적으로 읽는다. */
+export function getThemeMode(): ThemeMode {
+  return currentMode;
+}
+
+/** 호출 시점의 모드에 맞는 팔레트를 반환한다. */
 export function getLayer1Theme(): Layer1Theme {
-  return prefersDark() ? DARK : LIGHT;
+  return currentMode === 'dark' ? DARK : LIGHT;
 }
 
-/** 다크모드 여부에 맞는 CSS `color-scheme` 값 — 브라우저의 강제 다크모드 재처리를 막는다
+/** 현재 모드에 맞는 CSS `color-scheme` 값 — 브라우저의 강제 다크모드 재처리를 막는다
  * (우리가 이미 명시적으로 테마를 적용했음을 렌더링 엔진에 알린다). */
-export function getLayer1ColorScheme(): 'light' | 'dark' {
-  return prefersDark() ? 'dark' : 'light';
+export function getLayer1ColorScheme(): ThemeMode {
+  return currentMode;
 }
 
 /**
- * 다크모드 전환을 실시간으로 반영하고 싶을 때 구독한다. 반환값은 구독 해제 함수.
- * `matchMedia`가 없는 환경(구형 jsdom 등)에서는 조용히 아무 것도 하지 않는 no-op을 반환한다.
+ * 모드를 바꾸고 구독자에게 알린 뒤, `chrome.storage.local`에 저장한다(다음 방문에도 유지).
+ * `chrome.storage`가 없는 환경(테스트 등)에서는 저장을 건너뛰고 메모리 상태만 바꾼다.
+ */
+export function setThemeMode(mode: ThemeMode): void {
+  if (currentMode === mode) return;
+  currentMode = mode;
+  notify();
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    void chrome.storage.local.set({ [THEME_MODE_STORAGE_KEY]: mode });
+  }
+}
+
+export function toggleThemeMode(): void {
+  setThemeMode(currentMode === 'dark' ? 'light' : 'dark');
+}
+
+/**
+ * 콘텐츠 스크립트 진입점에서 1회 호출한다(`initSelectionOverlay()`가 호출) — 저장된 선택을
+ * 비동기로 읽어 메모리 상태에 반영한다. 저장된 값이 없으면(첫 실행) 기본값 'light'를 그대로
+ * 유지한다 — 이 함수 자체가 'light'로 되돌리지 않는다(이미 'light'가 기본이므로 아무 것도
+ * 안 해도 같다). `chrome.storage`가 없는 환경에서는 조용히 아무 것도 하지 않는다.
+ */
+export async function loadStoredThemeMode(): Promise<void> {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+  try {
+    const stored = (await chrome.storage.local.get(THEME_MODE_STORAGE_KEY)) as Record<
+      string,
+      unknown
+    >;
+    const value = stored[THEME_MODE_STORAGE_KEY];
+    if (value === 'light' || value === 'dark') {
+      currentMode = value;
+      notify();
+    }
+  } catch {
+    // 저장소 접근 실패 — 기본값(light) 유지, 조용히 무시한다(고지·설정 저장 실패가 UI를
+    // 막아서는 안 된다).
+  }
+}
+
+/**
+ * 모드 전환을 실시간으로 반영하고 싶을 때 구독한다. 반환값은 구독 해제 함수.
  */
 export function subscribeLayer1ThemeChange(onChange: () => void): () => void {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return () => {};
-  }
-  const mql = window.matchMedia('(prefers-color-scheme: dark)');
-  const listener = () => onChange();
-  mql.addEventListener('change', listener);
-  return () => mql.removeEventListener('change', listener);
+  listeners.add(onChange);
+  return () => {
+    listeners.delete(onChange);
+  };
 }

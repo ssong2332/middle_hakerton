@@ -16,6 +16,7 @@ vi.mock('../shared/api', () => ({
 import { getStoredToken } from '../shared/token-storage';
 import { addSample, callMediationApi, fetchKnownCounterparts } from '../shared/api';
 import { MediationPanel } from './MediationPanel';
+import { setThemeMode } from './theme';
 import type { Layer2Adapter } from './registry';
 
 const mockedGetStoredToken = vi.mocked(getStoredToken);
@@ -654,39 +655,31 @@ describe('MediationPanel — T82/T83 panel tracks scroll after opening', () => {
   });
 });
 
-// 🔴 (2026-08-12, T81) 사용자 요청 ① — 다크모드에서 패널 텍스트가 제대로 보이지 않았다(host
-// 페이지 CSS를 상속하지 않는 Shadow DOM인데도 배경/텍스트가 하드코딩 라이트 팔레트 고정이었다).
-// 실제 색상값이 아니라 "OS/브라우저가 다크를 선호하면 라이트 렌더와 다른 팔레트를 쓴다"는
-// 구조적 사실만 검증한다(정확한 hex는 `theme.test.ts`가 이미 커버).
+// 🔴 (2026-08-12, T81; 후속 2026-08-12) 사용자 요청 ① — 다크모드에서 패널 텍스트가 제대로 안
+// 보였다(host 페이지 CSS를 상속하지 않는 Shadow DOM인데도 배경/텍스트가 하드코딩 라이트 팔레트
+// 고정이었다). **후속 변경**: 이제 OS/브라우저 신호를 자동으로 안 따르고(사용자 요청 — "기본은
+// 라이트, 다크는 별도 설정") `setThemeMode()`로 명시 전환한 값만 반영한다 — `theme.ts` 헤더
+// 주석 참조. 실제 색상값이 아니라 "모드가 dark면 라이트 렌더와 다른 팔레트를 쓴다"는 구조적
+// 사실만 검증한다(정확한 hex는 `theme.test.ts`가 이미 커버).
 describe('MediationPanel — T81 dark mode', () => {
-  const originalMatchMedia = window.matchMedia;
-
   beforeEach(() => {
     mockedGetStoredToken.mockResolvedValue('tok');
     mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
   });
 
   afterEach(() => {
-    window.matchMedia = originalMatchMedia;
+    setThemeMode('light'); // 모듈 레벨 상태를 기본값으로 되돌린다(테스트 간 순서 의존 방지).
     vi.clearAllMocks();
   });
 
-  function mockPrefersDark(matches: boolean) {
-    window.matchMedia = vi.fn().mockReturnValue({
-      matches,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }) as unknown as typeof window.matchMedia;
-  }
-
-  it('renders a different background/text color when the OS/browser prefers dark', async () => {
-    mockPrefersDark(false);
+  it('renders a different background/text color when the mode is switched to dark', async () => {
+    setThemeMode('light');
     const { unmount } = render(<MediationPanel initialText="x" onClose={vi.fn()} />);
     const lightPanel = await screen.findByRole('dialog');
     const lightBg = lightPanel.style.background;
     unmount();
 
-    mockPrefersDark(true);
+    setThemeMode('dark');
     render(<MediationPanel initialText="x" onClose={vi.fn()} />);
     const darkPanel = await screen.findByRole('dialog');
 
@@ -695,7 +688,9 @@ describe('MediationPanel — T81 dark mode', () => {
 });
 
 // T71(AC-080/081) — Mark 모드. 기본 모드는 여전히 "중재"(위 기존 테스트 전부가 이 기본값에
-// 의존하므로 바꾸지 않는다) — 라디오로 "상대가 쓴 것으로 표시"를 선택해야 Mark UI가 나온다.
+// 의존하므로 바꾸지 않는다) — 토글 버튼으로 "상대가 쓴 것으로 표시"를 선택해야 Mark UI가 나온다.
+// v8.0 후속(2026-08-12) — 모드 선택이 네이티브 radio에서 `aria-pressed` 토글 버튼으로 바뀌었다
+// (목업과 일치, `terminology/page.tsx`의 기존 패턴 재사용) — role이 'radio'에서 'button'으로.
 describe('MediationPanel — T71 Mark 모드', () => {
   beforeEach(() => {
     mockedFetchKnownCounterparts.mockResolvedValue({ ok: true, counterparts: [] });
@@ -706,7 +701,7 @@ describe('MediationPanel — T71 Mark 모드', () => {
   });
 
   function switchToMarkMode() {
-    fireEvent.click(screen.getByRole('radio', { name: '상대가 쓴 것으로 표시' }));
+    fireEvent.click(screen.getByRole('button', { name: '상대가 쓴 것으로 표시' }));
   }
 
   it('기본 모드는 중재다 — Mark UI(상대 식별자 입력)가 처음엔 보이지 않는다', async () => {
