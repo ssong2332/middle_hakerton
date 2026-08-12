@@ -42,14 +42,25 @@ interface NavItem {
   implemented: boolean;
 }
 
+/**
+ * 🔴 (T86 인접 발견, 2026-08-12 사용자 지적) 라벨이 영어("Mediate"/"Profile"/"Terminology"/
+ * "Decisions")와 한글("발송 내역"/"관측 표본")이 섞여 있었다 — 목업·나머지 화면 전체(각 화면의
+ * `<h1>`, 예: `mediate/page.tsx`의 "중재 워크스페이스", `profile/page.tsx`의 "프로필")가 모두
+ * 한글인데 이 nav만 영어 잔재가 남아 있었다. 각 화면 자신의 제목/기존 코드 주석이 이미 쓰는
+ * 한글 명칭을 그대로 가져온다(새 용어를 짓지 않는다): 중재(`mediate/page.tsx` h1), 프로필
+ * (`profile/page.tsx` h1), 용어사전(`terminology/page.tsx` h1), 쌍방 규약(`pair-protocols/page.tsx`
+ * h1, 이미 구현되어 있음), 결정 요약(`decisions/page.tsx`가 실제로 쓰는 "결정 요약 · 미확정
+ * 감지"의 축약형이자 목업 nav pill 라벨과 동일), 회의 시간(`meeting-times/page.tsx`의 스캐폴드
+ * 주석 "UX-012 회의 시간 추천"), 피드백(`feedback/page.tsx`의 스캐폴드 주석 "UX-013 응답 피드백").
+ */
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Mediate', href: '/mediate', implemented: true }, // UX-004, T12/T13 done
-  { label: 'Profile', href: '/profile', implemented: true }, // UX-009, T21 done
-  { label: 'Terminology', href: '/terminology', implemented: true }, // UX-010, T23 done
-  { label: 'Pair Protocols', href: '/pair-protocols', implemented: false }, // UX-011, T41/T42 todo
-  { label: 'Meeting Times', href: '/meeting-times', implemented: false }, // UX-012, T31 todo
-  { label: 'Decisions', href: '/decisions', implemented: true }, // UX-008, T27 done
-  { label: 'Feedback', href: '/feedback', implemented: false }, // UX-013, 담당 태스크 미배정 스텁
+  { label: '중재', href: '/mediate', implemented: true }, // UX-004, T12/T13 done
+  { label: '프로필', href: '/profile', implemented: true }, // UX-009, T21 done
+  { label: '용어사전', href: '/terminology', implemented: true }, // UX-010, T23 done
+  { label: '쌍방 규약', href: '/pair-protocols', implemented: false }, // UX-011, T41/T42 todo
+  { label: '회의 시간', href: '/meeting-times', implemented: false }, // UX-012, T31 todo
+  { label: '결정 요약', href: '/decisions', implemented: true }, // UX-008, T27 done
+  { label: '피드백', href: '/feedback', implemented: false }, // UX-013, 담당 태스크 미배정 스텁
   { label: '발송 내역', href: '/sent-messages', implemented: true }, // UX-015, T52 done
   { label: '관측 표본', href: '/observation-samples', implemented: true }, // UX-019, T72 done
 ];

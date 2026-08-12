@@ -62,6 +62,28 @@ describe('MediationWorkspace', () => {
     window.sessionStorage.clear();
   });
 
+  // T86 인접 — 목업 타이틀 행(제목+부제+개인화 배지).
+  it('제목과 부제를 렌더한다', () => {
+    render(<MediationWorkspace />);
+
+    expect(screen.getByRole('heading', { name: '중재 워크스페이스' })).toBeTruthy();
+    expect(
+      screen.getByText('보낼 문장을 입력하면 상대가 읽을 문장으로 다듬어 드려요.'),
+    ).toBeTruthy();
+  });
+
+  it('personalizationActive가 true면 "개인화 프로필 적용 중" 배지를 보여준다', () => {
+    render(<MediationWorkspace personalizationActive={true} />);
+
+    expect(screen.getByText('개인화 프로필 적용 중')).toBeTruthy();
+  });
+
+  it('personalizationActive가 false(기본값)면 배지를 렌더하지 않는다(장식용 상시 표시 금지)', () => {
+    render(<MediationWorkspace />);
+
+    expect(screen.queryByText('개인화 프로필 적용 중')).toBeNull();
+  });
+
   it('AC-009 — 발신자 패널과 수신자 패널이 한 화면에 동시에 표시된다', () => {
     render(<MediationWorkspace />);
 

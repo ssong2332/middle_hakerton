@@ -22,6 +22,20 @@
   color: var(--text-muted-75);
 }
 
+/* v8.3(T86 인접, 사용자 지적 — "실행 시 애니메이션이 없다") — `SenderPanel.module.css`의
+   `.resultBlock`과 같은 이유·같은 값. 결과가 새로 나타날 때(hasResult가 false→true)만 1회
+   재생되고, 이후 같은 블록 안의 상태 변화(승인 중/발송됨)로는 다시 재생되지 않는다(엘리먼트가
+   재마운트되지 않으므로 CSS 애니메이션이 다시 걸리지 않는다). */
+.resultBlock {
+  animation: om-in 0.28s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resultBlock {
+    animation: none;
+  }
+}
+
 .fieldGroup {
   display: grid;
   gap: 5px;

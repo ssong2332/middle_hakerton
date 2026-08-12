@@ -31,9 +31,11 @@
 
 /* v8.3 후속(T86 인접 정리) — 굵은 검정 테두리 박스는 리브랜딩 이전 스타일이다. 목업의 결과
    카드 언어(옅은 배경 + 라운드, 테두리 없음)로 맞춘다. */
+/* v8.3(T86 인접) — 이제 `SenderPanel.module.css`의 `.resultCard`(surface-alt, 회색) 안에
+   중첩된다 — `UrgencyPanel.module.css` `.panel`과 같은 이유로 흰색으로 뒤집는다. */
 .transformedColumn {
   border-radius: var(--radius-md);
-  background: var(--color-surface-alt);
+  background: var(--color-surface);
   padding: 11px 12px;
 }
 
@@ -47,9 +49,21 @@
   color: var(--text-muted-75);
 }
 
-.preserved ul {
+/* v8.3(T86 인접) — 목업 태그 칩 스케일(6-11px 패딩, 999px 라운드, 11-12px/600-700). */
+.preservedList {
   margin: 0;
-  padding-left: 16px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preservedTag {
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  background: #e6f5ec;
+  color: #007a4d;
   font: 400 11px var(--font-sans);
 }
 

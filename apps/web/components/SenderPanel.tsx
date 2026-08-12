@@ -185,7 +185,14 @@ export function SenderPanel({
           유지되어야 RecipientPanel의 승인 가능 상태와 일치한다. */}
       {(status === 'success' || hasResult) && result && (
         <div className={styles.resultBlock}>
-          {displayedUrgency && (
+          {/* v8.3(T86 인접, 사용자 결정 2026-08-12 — "결과 카드 구조는 목업으로 진행") — 목업의
+              "상대가 읽을 문장" 카드(긴급도 칩 + 변환문 + 보존 태그)를 시각적으로 재현한다.
+              UrgencyPanel/ComparisonView 두 컴포넌트·테스트는 그대로 두고(각자 AC-003/004,
+              AC-006/007/008을 소유), 이 래퍼가 "한 카드처럼 보이게" 감싸기만 한다 — 목업 구조를
+              흉내 내려고 두 컴포넌트를 하나로 합쳐 AC-008이 요구하는 원문/변환문/변환 이유
+              3열 비교(현재 구조가 "나란히"를 더 문자 그대로 만족)를 줄이지 않는다. */}
+          <div className={styles.resultCard}>
+            {displayedUrgency && (
             // 🔴 (2026-08-05 — C-1, reviewer REJECTED → 수정, F1-e·ADR-0009 D3) `stepSources.c1`을
             // 넘긴다 — ADR-0009 D3 매핑표가 "c1 → UrgencyPanel.tsx"를 지정했는데 이전 배선에는 이
             // 컴포넌트에 출처를 넘기는 경로 자체가 없어, c1만 fallback이고 c2/c4가 live일 때 화면
@@ -206,8 +213,8 @@ export function SenderPanel({
               // 지어내지 않는다.
               source={result.stepSources?.c1 ?? result.source}
             />
-          )}
-          {/* AC-008 — 원문/변환문/변환 이유 3열 비교 + AC-007 보존 항목 표시.
+            )}
+            {/* AC-008 — 원문/변환문/변환 이유 3열 비교 + AC-007 보존 항목 표시.
               MJ-5 — 원문은 스냅샷 시점 값(originalTextSnapshot)을 쓴다(라이브 text 아님).
               🔴 (2026-08-05 복원 — F1-e, DECISIONS #48 · ADR-0009) Major 2(2026-08-05)가 되돌렸던
               폴백 배지를 정확한 값으로 복원한다. `MediationResult.source`(C1/C2/C4를 합친 단일 값)
@@ -222,7 +229,8 @@ export function SenderPanel({
             // Minor(방어적) — SenderPanel.tsx의 UrgencyPanel 배선과 같은 이유.
             // M1(2026-08-06) — 같은 이유로 `?? result.source`로 수정(정보를 지어내지 않는다).
             source={result.stepSources?.c2 ?? result.source}
-          />
+            />
+          </div>
           {/* AC-043 — 오해 사전 경고. 승인(Approve & Send, RecipientPanel) 이전 단계인 이 화면에서
               항상 먼저 렌더된다. 빈 배열이면 컴포넌트 자체가 아무것도 그리지 않는다.
               🔴 `variant="full"` 고정 — `docs/UX.md` UX-004 States "MisreadRisk"는 Full/Reduced 중

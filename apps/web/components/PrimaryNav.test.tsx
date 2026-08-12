@@ -18,28 +18,30 @@ vi.mock('../lib/supabase/browser', () => ({
 import { vi } from 'vitest';
 import { PrimaryNav } from './PrimaryNav';
 
-/** `docs/UX.md:893`가 정한 항목 전체 집합(라벨→href) — 이 밖의 항목이 렌더되면 AC-084⑤ 위반. */
+/** `docs/UX.md:893`가 정한 항목 전체 집합(라벨→href) — 이 밖의 항목이 렌더되면 AC-084⑤ 위반.
+ * 🔴 (T86 인접 발견) 라벨을 전부 한글로 통일한다 — 이전엔 "Mediate"/"Profile"/"Terminology"/
+ * "Decisions"가 영어로 남아 나머지 화면·목업과 일관되지 않았다(`PrimaryNav.tsx` 헤더 주석 참조). */
 const ALLOWED_ITEMS: Record<string, string> = {
-  Mediate: '/mediate',
-  Profile: '/profile',
-  Terminology: '/terminology',
-  'Pair Protocols': '/pair-protocols',
-  'Meeting Times': '/meeting-times',
-  Decisions: '/decisions',
-  Feedback: '/feedback',
+  중재: '/mediate',
+  프로필: '/profile',
+  용어사전: '/terminology',
+  '쌍방 규약': '/pair-protocols',
+  '회의 시간': '/meeting-times',
+  '결정 요약': '/decisions',
+  피드백: '/feedback',
   '발송 내역': '/sent-messages',
   '관측 표본': '/observation-samples',
 };
 
 describe('PrimaryNav — T73③/④', () => {
-  it('구현된 화면(Mediate/Profile/Terminology/Decisions/발송 내역/관측 표본)은 렌더된다', () => {
+  it('구현된 화면(중재/프로필/용어사전/결정 요약/발송 내역/관측 표본)은 렌더된다', () => {
     render(<PrimaryNav />);
-    expect(screen.getByRole('link', { name: 'Mediate' }).getAttribute('href')).toBe('/mediate');
-    expect(screen.getByRole('link', { name: 'Profile' }).getAttribute('href')).toBe('/profile');
-    expect(screen.getByRole('link', { name: 'Terminology' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: '중재' }).getAttribute('href')).toBe('/mediate');
+    expect(screen.getByRole('link', { name: '프로필' }).getAttribute('href')).toBe('/profile');
+    expect(screen.getByRole('link', { name: '용어사전' }).getAttribute('href')).toBe(
       '/terminology',
     );
-    expect(screen.getByRole('link', { name: 'Decisions' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: '결정 요약' }).getAttribute('href')).toBe(
       '/decisions',
     );
     expect(screen.getByRole('link', { name: '발송 내역' }).getAttribute('href')).toBe(
@@ -50,9 +52,9 @@ describe('PrimaryNav — T73③/④', () => {
     );
   });
 
-  it('아직 구현되지 않은 화면(Pair Protocols/Meeting Times/Feedback)은 렌더되지 않는다 — AC-084⑥', () => {
+  it('아직 구현되지 않은 화면(쌍방 규약/회의 시간/피드백)은 렌더되지 않는다 — AC-084⑥', () => {
     render(<PrimaryNav />);
-    for (const label of ['Pair Protocols', 'Meeting Times', 'Feedback']) {
+    for (const label of ['쌍방 규약', '회의 시간', '피드백']) {
       expect(screen.queryByRole('link', { name: label })).toBeNull();
     }
   });
@@ -95,7 +97,7 @@ describe('PrimaryNav — T77 모바일 내비 접기 (docs/UX.md v6.8)', () => {
     render(<PrimaryNav />);
     fireEvent.click(screen.getByRole('button', { name: /메뉴/ }));
 
-    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Mediate' }));
+    expect(document.activeElement).toBe(screen.getByRole('link', { name: '중재' }));
   });
 
   it('Escape를 누르면 닫히고 트리거로 포커스가 복귀한다 — UX.md v6.8 close/focus-return 관례', () => {
@@ -116,7 +118,7 @@ describe('PrimaryNav — T77 모바일 내비 접기 (docs/UX.md v6.8)', () => {
     fireEvent.click(trigger);
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
 
-    fireEvent.click(screen.getByRole('link', { name: 'Mediate' }));
+    fireEvent.click(screen.getByRole('link', { name: '중재' }));
 
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
   });
