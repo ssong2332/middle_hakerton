@@ -81,6 +81,7 @@ export function DecisionsWorkspace() {
         onClick={handleGenerate}
         disabled={!canGenerate}
       >
+        {status === 'loading' && <span aria-hidden="true" className={styles.spinner} />}
         {status === 'error' ? '다시 시도' : 'Generate summary'}
       </button>
 

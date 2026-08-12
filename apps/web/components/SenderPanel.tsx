@@ -154,15 +154,25 @@ export function SenderPanel({
         onClick={onRunMediation}
         disabled={!canRun}
       >
+        {status === 'loading' && <span aria-hidden="true" className={styles.spinner} />}
         {status === 'error' ? '다시 시도' : '실행'}
       </button>
       {/* T16(AC-029, docs/UX.md:1013) — 단계 라벨 진행 표시. `docs/UX.md`의 예시 문구를 그대로
           쓰는 정적 텍스트다(타이머로 단계를 전환하지 않는다) — 판단 근거는
           `MediationWorkspace.tsx` 헤더 주석 "T16 — 진행 표시 방식" 참조. */}
       {status === 'loading' && (
-        <p role="status" className={styles.loadingText}>
-          분류 중 → 변환 중 → 역번역 중
-        </p>
+        <>
+          {/* v8.0 후속(사용자 지적 — 목업의 om-bar 슬라이딩 진행바가 안 보인다) — 순수 장식용
+              불확정(indeterminate) 진행바다. T16이 거부한 "타이머로 단계를 흉내 내는" 방식과는
+              다르다 — 이 바는 몇 번째 단계인지 주장하지 않고 "멈추지 않았다"만 표시한다(정확한
+              단계 텍스트는 바로 아래 기존 문구가 그대로 담당). */}
+          <div className={styles.progressTrack} aria-hidden="true">
+            <div className={styles.progressFill} />
+          </div>
+          <p role="status" className={styles.loadingText}>
+            분류 중 → 변환 중 → 역번역 중
+          </p>
+        </>
       )}
       {status === 'error' && (
         <p role="alert" className={styles.errorText}>

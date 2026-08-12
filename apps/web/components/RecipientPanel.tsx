@@ -181,6 +181,7 @@ export function RecipientPanel({
               onClick={onApprove}
               disabled={approveStatus === 'sending' || isStale || isRunning || isFinalTextEmpty}
             >
+              {approveStatus === 'sending' && <span aria-hidden="true" className={styles.spinner} />}
               승인 & 전송
             </button>
           )}

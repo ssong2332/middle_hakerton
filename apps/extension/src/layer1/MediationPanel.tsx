@@ -410,29 +410,53 @@ export function MediationPanel({
           {/* 🔴 T71/`docs/UX.md:766` Accessibility — "The mode selector (mediate / Interpret /
               Mark-as-counterpart's) is a keyboard-operable choice control, and the active mode
               is exposed as text". 네이티브 radio 2개(키보드 조작 가능) + `aria-current`로 활성
-              모드를 텍스트로도 노출한다. Interpret(T59)은 아직 없어 두 값뿐이다. */}
-          <fieldset style={{ border: 'none', padding: 0, margin: '4px 0' }}>
-            <legend style={{ fontSize: '11px', fontWeight: 700 }}>모드</legend>
-            <label style={{ marginRight: '12px' }}>
-              <input
-                type="radio"
-                name="cbm-panel-mode"
-                checked={mode === 'mediate'}
-                onChange={() => setMode('mediate')}
-                aria-current={mode === 'mediate' ? 'true' : undefined}
-              />
-              중재
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="cbm-panel-mode"
-                checked={mode === 'mark'}
-                onChange={() => setMode('mark')}
-                aria-current={mode === 'mark' ? 'true' : undefined}
-              />
-              상대가 쓴 것으로 표시
-            </label>
+              모드를 텍스트로도 노출한다. Interpret(T59)은 아직 없어 두 값뿐이다.
+              v8.0 후속(사용자 지적 — "그냥 비율만 바뀌었을 뿐") — 목업의 세그먼트 필(pill)
+              토글처럼 보이도록 레이블을 칩으로 감싼다. 네이티브 radio는 지우지 않는다(숨기면
+              키보드 포커스 링도 함께 사라져 접근성이 나빠진다) — 대신 작게 두고 칩 배경/글자
+              굵기로 활성 상태를 표시한다. */}
+          <fieldset style={{ border: 'none', padding: '3px', margin: '4px 0', background: theme.surface, borderRadius: '11px', display: 'flex', gap: '5px' }}>
+            <legend style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0,0,0,0)' }}>모드</legend>
+            {(
+              [
+                { value: 'mediate' as const, label: '중재' },
+                { value: 'mark' as const, label: '상대가 쓴 것으로 표시' },
+              ]
+            ).map((option) => {
+              const active = mode === option.value;
+              return (
+                <label
+                  key={option.value}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    height: '36px',
+                    padding: '0 8px',
+                    borderRadius: '9px',
+                    background: active ? theme.bg : 'transparent',
+                    boxShadow: active ? '0 1px 3px rgba(17,24,39,.1)' : 'none',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    color: active ? theme.text : theme.text + '99',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="cbm-panel-mode"
+                    checked={active}
+                    onChange={() => setMode(option.value)}
+                    aria-current={active ? 'true' : undefined}
+                    style={{ width: '13px', height: '13px', flexShrink: 0 }}
+                  />
+                  {option.label}
+                </label>
+              );
+            })}
           </fieldset>
 
           {mode === 'mediate' && (
@@ -442,7 +466,13 @@ export function MediationPanel({
                   자동으로 세로 스택된다(모바일 브레이크포인트를 별도로 코딩하지 않는다 —
                   `docs/UX.md` Responsive Behavior "확장은 별도 반응형 처리 없음"과 모순되지
                   않는다: 이건 미디어쿼리가 아니라 flex-wrap 자체의 기본 동작이다). */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px' }}>
+              {/* 🔴 (2026-08-12, 사용자 실사용 재현) `alignItems`를 안 정하면 기본값 `stretch`라
+                  왼쪽 열이 오른쪽(결과) 열의 큰 높이에 맞춰 강제로 늘어났다 — 왼쪽 열 자신은
+                  `display:grid`라 그 안의 auto 행(select, 버튼)이 `align-content:normal`(그리드
+                  기준 stretch와 동등)로 남는 공간을 나눠 가지면서, select는 폼 컨트롤이라
+                  치수가 안 늘었지만 버튼은 그대로 늘어나 화면 절반을 차지하는 거대한 주황 박스로
+                  보였다. `alignItems:'flex-start'`로 두 열이 서로의 높이에 영향받지 않게 한다. */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'flex-start' }}>
                 <div style={{ flex: '1 1 240px', minWidth: 0, display: 'grid', gap: '10px' }}>
                   {/* T66(AC-067①, docs/UX.md v6.7 RecipientKnownCounterparts) — 규약이 0건이면
                       아예 렌더하지 않는다(비활성 아님). 페이지 맥락 자동 감지는 스트레치로

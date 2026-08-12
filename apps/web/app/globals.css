@@ -115,6 +115,21 @@ h4 {
   }
 }
 
+@keyframes om-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes om-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
 @keyframes om-pop {
   0% {
     opacity: 0;
