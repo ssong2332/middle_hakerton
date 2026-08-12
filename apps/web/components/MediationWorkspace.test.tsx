@@ -6,6 +6,7 @@
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { URGENCY_LABELS } from '@cross-border/core';
 import { TICKET_DRAFT_SESSION_KEY, TICKET_RESTORE_SESSION_KEY } from '../lib/ticket-draft';
 
 // T25 — `MediationWorkspace`가 "Convert to Task Ticket" 클릭 시 `/ticket`으로 이동한다
@@ -404,7 +405,7 @@ describe('MediationWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: '실행' }));
 
     await waitFor(() => {
-      expect(screen.getByText('CRITICAL', { selector: 'strong' })).toBeTruthy();
+      expect(screen.getByText(URGENCY_LABELS.CRITICAL, { selector: 'strong' })).toBeTruthy();
     });
 
     approveButton = within(recipientPanel).getByRole('button', {
@@ -566,7 +567,7 @@ describe('MediationWorkspace', () => {
     fillAndRun();
 
     await waitFor(() => {
-      expect(screen.getByText('NORMAL', { selector: 'strong' })).toBeTruthy();
+      expect(screen.getByText(URGENCY_LABELS.NORMAL, { selector: 'strong' })).toBeTruthy();
     });
 
     fireEvent.change(screen.getByLabelText('긴급도 조정'), { target: { value: 'CRITICAL' } });
@@ -575,7 +576,7 @@ describe('MediationWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: '실행' }));
 
     await waitFor(() => {
-      expect(screen.getByText('CRITICAL', { selector: 'strong' })).toBeTruthy();
+      expect(screen.getByText(URGENCY_LABELS.CRITICAL, { selector: 'strong' })).toBeTruthy();
     });
     expect(screen.getByText('사용자가 등급을 조정했습니다')).toBeTruthy();
   });

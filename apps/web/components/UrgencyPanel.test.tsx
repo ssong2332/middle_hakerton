@@ -22,7 +22,9 @@ describe('UrgencyPanel', () => {
       />,
     );
 
-    expect(screen.getByText('CRITICAL', { selector: 'strong' })).toBeTruthy();
+    // (2026-08-12) raw enum('CRITICAL') 대신 한국어 라벨(URGENCY_LABELS.CRITICAL='긴급')을
+    // 표시하도록 고쳤다 — 사용자가 실사용 중 raw 값 노출을 발견해 확인.
+    expect(screen.getByText('긴급', { selector: 'strong' })).toBeTruthy();
     expect(screen.getByText('프로덕션 장애로 즉시 대응이 필요합니다.')).toBeTruthy();
   });
 

@@ -35,7 +35,7 @@
  * `null`로 남아 AC-066①④가 그대로 성립한다.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { computeIndicatorDeltas, LENGTH_COUNTER_SHOW_AT, SOFT_LENGTH_CAP } from '@cross-border/core';
+import { computeIndicatorDeltas, LENGTH_COUNTER_SHOW_AT, SOFT_LENGTH_CAP, URGENCY_LABELS } from '@cross-border/core';
 import type { MediationResult } from '@cross-border/core';
 import { addSample, callMediationApi, fetchKnownCounterparts } from '../shared/api';
 import { getStoredToken } from '../shared/token-storage';
@@ -595,8 +595,11 @@ export function MediationPanel({
                     }}
                   >
                     <div>
+                      {/* (2026-08-12) 사용자가 발견 — raw enum("긴급도: NORMAL")이 그대로
+                          노출되고 있었다(웹앱 UrgencyPanel도 같은 문제, 함께 고쳤다).
+                          `URGENCY_LABELS`(packages/core, 이 리포 유일한 정의처)로 교체. */}
                       <span role="status" style={badgeStyle(theme, 'neutral')}>
-                        긴급도: {result.urgency}
+                        긴급도: {URGENCY_LABELS[result.urgency]}
                       </span>
                       {result.personalizationApplied === false && (
                         <span role="status" style={badgeStyle(theme, 'warn')}>

@@ -1,6 +1,6 @@
 'use client';
 
-import type { ResponseSource, UrgencyLevel } from '@cross-border/core';
+import { URGENCY_LABELS, type ResponseSource, type UrgencyLevel } from '@cross-border/core';
 import { NON_LIVE_NOTICE } from '../lib/non-live-notice';
 import styles from './UrgencyPanel.module.css';
 
@@ -53,7 +53,10 @@ export function UrgencyPanel({
       <div className={styles.badgeRow}>
         <span className={styles.badgeLabel}>긴급도</span>
         <p>
-          <strong className={styles.badge}>{urgency}</strong>
+          {/* (2026-08-12) 이전엔 raw enum(`'CRITICAL'` 등)을 그대로 렌더했다 — 사용자가 확장
+              패널에서 "긴급도: NORMAL"이 그대로 노출된 것을 발견해 웹앱도 같은 문제였음을
+              확인, `URGENCY_LABELS`(packages/core)로 한국어 라벨을 붙인다. */}
+          <strong className={styles.badge}>{URGENCY_LABELS[urgency]}</strong>
         </p>
       </div>
       <p className={styles.reason}>{urgencyReason}</p>
@@ -78,7 +81,7 @@ export function UrgencyPanel({
       >
         {URGENCY_LEVELS.map((level) => (
           <option key={level} value={level}>
-            {level}
+            {URGENCY_LABELS[level]}
           </option>
         ))}
       </select>
