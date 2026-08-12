@@ -112,29 +112,47 @@ export function MediationPanel({
   //
   // 🔴 (2026-08-12, T82) 사용자 재신고 — "패널이 드래그(스크롤) 시 여전히 고정돼 있다." T81은
   // 마운트 시점 1회만 위치를 계산했다 — 패널이 열린 뒤 페이지를 스크롤하면 버튼과 달리 패널은
-  // 원래 화면 좌표에 그대로 남았다. `anchorRect`는 뷰포트 기준 좌표라 스크롤하면 그 자체로는
-  // 의미가 바뀌지 않으므로, 마운트 시점의 `window.scrollX/Y`를 더해 **문서(페이지) 기준 좌표**로
-  // 한 번 변환해 두고(`anchorDocPointRef`), 이후 스크롤마다 그 문서 좌표에서 **현재** 스크롤량을
-  // 빼 다시 뷰포트 좌표를 구한다. 버튼(`selection.ts`)처럼 살아있는 `window.getSelection()`을
-  // 다시 읽지 않는 이유 — 패널 안 요소를 한 번이라도 클릭하면 그 mousedown이 문서 selection을
-  // collapse시킨다는 것이 이미 알려진 구조적 한계라(`focusFloatingButtonIfPresent` 헤더 주석),
-  // 살아있는 selection에 의존하면 그 시점부터 추적이 끊긴다. 순수 산술이라 이 문제가 없다.
+  // 원래 화면 좌표에 그대로 남았다.
+  //
+  // 🔴 (2026-08-12, T83) 첫 수정(`window.scrollX/Y` 기반 문서 좌표 변환)이 실사용에서 또
+  // 실패했다 — 원인: 그 방식은 **문서/윈도우 레벨 스크롤만** 반영한다. 이 페이지처럼 실제
+  // 스크롤이 중첩된 내부 컨테이너(예: 피드 영역)에서 일어나면 `window.scrollY`는 전혀 변하지
+  // 않아 재계산해도 값이 그대로였다(M-3 주석이 이미 언급한 "중첩 스크롤 컨테이너"와 같은 부류의
+  // 문제, 버튼 쪽은 애초에 이 문제가 없다 — 아래 참조). 고친 방법: `origin`(선택이 시작된 host
+  // 엘리먼트, prop으로 이미 갖고 있음)의 `getBoundingClientRect()`를 마운트 시점과 재계산
+  // 시점에 각각 실측해 **그 델타(이동량)** 만큼 `anchorRect`를 평행이동한다. 엘리먼트
+  // `getBoundingClientRect()`는 어떤 조상이 스크롤됐든(윈도우든 중첩 컨테이너든) 항상 현재
+  // 뷰포트 기준 정답을 브라우저가 직접 계산해 주므로 스크롤 출처를 몰라도 된다.
+  // 버튼(`selection.ts`)이 살아있는 `window.getSelection()`을 다시 읽는 방식을 쓰지 않는 이유는
+  // 여기도 동일하다 — 패널 안 요소를 한 번이라도 클릭하면 그 mousedown이 문서 selection을
+  // collapse시킨다는 구조적 한계(`focusFloatingButtonIfPresent` 헤더 주석) 때문에, 살아있는
+  // selection 대신 안정적으로 유지되는 `origin` 엘리먼트 참조에 기댄다. `origin`이 없거나(폴백)
+  // DOM에서 분리되면(예외적) 마지막으로 알려진 위치를 그대로 유지한다 — (0,0) 기준으로 튀지
+  // 않는다.
   const [anchoredPos, setAnchoredPos] = useState<{ top: number; left: number } | null>(null);
-  const anchorDocPointRef = useRef<{ top: number; bottom: number; left: number; right: number } | null>(null);
+  const anchorRectRef = useRef<DOMRect | null>(null);
+  const originAtMountRef = useRef<{ top: number; left: number } | null>(null);
 
   const repositionNearAnchor = useCallback(() => {
-    const anchor = anchorDocPointRef.current;
+    const anchor = anchorRectRef.current;
     if (!anchor || !panelRef.current) return;
-    const viewportRect = {
-      top: anchor.top - window.scrollY,
-      bottom: anchor.bottom - window.scrollY,
-      left: anchor.left - window.scrollX,
-      right: anchor.right - window.scrollX,
-    };
+    let effectiveRect: { top: number; bottom: number; left: number; right: number } = anchor;
+    const originBase = originAtMountRef.current;
+    if (origin && origin.isConnected && originBase) {
+      const now = origin.getBoundingClientRect();
+      const dx = now.left - originBase.left;
+      const dy = now.top - originBase.top;
+      effectiveRect = {
+        top: anchor.top + dy,
+        bottom: anchor.bottom + dy,
+        left: anchor.left + dx,
+        right: anchor.right + dx,
+      };
+    }
     const size = panelRef.current.getBoundingClientRect();
     const viewport = { width: window.innerWidth, height: window.innerHeight };
-    setAnchoredPos(computeClampedPosition(viewportRect, { width: size.width, height: size.height }, viewport));
-  }, []);
+    setAnchoredPos(computeClampedPosition(effectiveRect, { width: size.width, height: size.height }, viewport));
+  }, [origin]);
 
   const [status, setStatus] = useState<Status>('checkingAuth');
   const [text, setText] = useState(initialText);
@@ -189,20 +207,23 @@ export function MediationPanel({
     panelRef.current?.focus();
   }, []);
 
-  // 🔴 (2026-08-12, T81→T82) 마운트/anchorRect 변경 직후(레이아웃 커밋 후) 뷰포트 좌표를 문서
-  // 좌표로 변환해 저장하고 즉시 1회 배치한다 — `selection.ts`의 버튼 위치 계산과 같은 이유로
-  // useLayoutEffect를 쓴다(측정은 DOM에 붙은 뒤에만 가능하다). `anchorRect`가 없으면 아무 것도
-  // 하지 않고 기본 우상단 고정 위치(`panelStyle`)를 그대로 쓴다.
+  // 🔴 (2026-08-12, T81→T83) 마운트/anchorRect 변경 직후(레이아웃 커밋 후) 기준점을 저장하고
+  // 즉시 1회 배치한다 — `selection.ts`의 버튼 위치 계산과 같은 이유로 useLayoutEffect를 쓴다
+  // (측정은 DOM에 붙은 뒤에만 가능하다). `anchorRect`가 없으면 아무 것도 하지 않고 기본
+  // 우상단 고정 위치(`panelStyle`)를 그대로 쓴다.
   useLayoutEffect(() => {
     if (!anchorRect) return;
-    anchorDocPointRef.current = {
-      top: anchorRect.top + window.scrollY,
-      bottom: anchorRect.bottom + window.scrollY,
-      left: anchorRect.left + window.scrollX,
-      right: anchorRect.right + window.scrollX,
-    };
+    anchorRectRef.current = anchorRect;
+    // 🔴 (T83 버그 수정) `getBoundingClientRect()`는 호출마다 실제 레이아웃 재계산 비용이 드는
+    // 동기 API다 — `.top`/`.left`를 따로 두 번 부르지 않고 한 번만 불러 구조분해한다.
+    if (origin && origin.isConnected) {
+      const rect = origin.getBoundingClientRect();
+      originAtMountRef.current = { top: rect.top, left: rect.left };
+    } else {
+      originAtMountRef.current = null;
+    }
     repositionNearAnchor();
-  }, [anchorRect, repositionNearAnchor]);
+  }, [anchorRect, origin, repositionNearAnchor]);
 
   // 🔴 (2026-08-12, T82) 패널이 열린 뒤 페이지(또는 중첩 스크롤 컨테이너)가 스크롤되면 위 문서
   // 좌표를 기준으로 다시 배치한다 — `selection.ts`의 버튼 스크롤 재배치(`repositionFloatingButton`,
