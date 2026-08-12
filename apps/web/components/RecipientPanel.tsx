@@ -110,8 +110,10 @@ export function RecipientPanel({
           메시지를 실행하면 여기에서 상대방이 받을 내용을 확인할 수 있습니다.
         </p>
       )}
+      {/* T86 인접(사용자 지적 — 실행 시 애니메이션 없음) — 결과가 새로 나타날 때마다 om-in으로
+          등장한다(SenderPanel.module.css `.resultBlock`과 같은 이유·같은 값). */}
       {hasResult && (
-        <>
+        <div className={styles.resultBlock}>
           <div className={styles.fieldGroup}>
             <label htmlFor="final-text">최종 발송문</label>
             <textarea
@@ -190,7 +192,7 @@ export function RecipientPanel({
               전송 중…
             </p>
           )}
-        </>
+        </div>
       )}
     </section>
   );

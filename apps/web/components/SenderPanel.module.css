@@ -127,10 +127,32 @@
   color: var(--color-danger-text);
 }
 
+/* v8.3(T86 인접, 사용자 지적 — "실행 시 애니메이션이 없다") — 목업은 결과가 나타날 때마다
+   om-in으로 등장한다(카드별 스태거). 이 블록 전체를 하나의 진입 단위로 애니메이션한다 —
+   `<main>`의 om-in(페이지 로드 1회성)과 달리 이건 상태 변화(실행 완료)마다 매번 다시 탄다. */
 .resultBlock {
   margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid var(--border-thin);
+  display: grid;
+  gap: 14px;
+  animation: om-in 0.28s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resultBlock {
+    animation: none;
+  }
+}
+
+/* v8.3(T86 인접, 사용자 결정 — 결과 카드 구조는 목업으로 진행) — 목업의 "상대가 읽을 문장" 카드
+   시각을 재현한다. `UrgencyPanel`/`ComparisonView`는 이미 이 카드 안에 있으므로(이 wrapper가
+   부모) `MediationWorkspace.module.css`의 `.column`(발신자 패널 전체 카드)과 같은 흰 배경을
+   쓰면 안 보인다 — 중첩 카드이므로 `--color-surface-alt`(옅은 회색)로 부모와 구분한다. */
+.resultCard {
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
   display: grid;
   gap: 14px;
 }

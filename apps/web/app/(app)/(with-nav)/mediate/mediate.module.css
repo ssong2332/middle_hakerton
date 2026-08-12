@@ -7,8 +7,6 @@
   padding: clamp(24px, 5vw, 40px) clamp(16px, 4vw, 28px) 88px;
 }
 
-.title {
-  font: 700 26px var(--font-sans);
-  letter-spacing: -0.03em;
-  margin-bottom: 26px;
-}
+/* v8.3(T86 인접) — 제목(h1)은 이제 `MediationWorkspace.tsx`가 부제·개인화 배지와 함께 한
+   타이틀 행으로 렌더한다(개인화 배지가 서버에서 조회한 실제 값을 필요로 해 그 컴포넌트로
+   옮겼다) — 스타일은 `MediationWorkspace.module.css`의 `.title`을 참조. */

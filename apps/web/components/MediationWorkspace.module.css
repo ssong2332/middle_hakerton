@@ -7,6 +7,48 @@
    `styles.frame` 참조는 그대로 둔다 — 정의되지 않은 CSS Module 클래스는 `undefined`가 되어
    className이 비는 것과 같다(안전, 별도 .tsx 수정 불필요). */
 
+/* v8.3(T86 인접) — 목업 타이틀 행. `mediate.module.css`가 예전에 갖고 있던 `.title`을
+   대체한다(제목이 개인화 배지와 함께 이 컴포넌트로 옮겨왔다, `mediate/page.tsx` 헤더 주석 참조). */
+.titleRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 20px;
+  flex-wrap: wrap;
+  margin-bottom: 26px;
+}
+
+.title {
+  font: 700 26px var(--font-sans);
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-muted-60);
+}
+
+.personalizationBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 1px solid var(--border-thin-alt);
+  font: 600 12px var(--font-sans);
+  color: var(--text-muted-75);
+}
+
+.personalizationDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-success);
+}
+
 .twoPanel {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));

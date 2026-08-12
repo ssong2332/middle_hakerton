@@ -1,6 +1,8 @@
+/* v8.3(T86 인접) — 이제 `SenderPanel.module.css`의 `.resultCard`(surface-alt, 회색) 안에
+   중첩된다 — 같은 톤이면 안 보이므로 흰색으로 뒤집어 안쪽 강조 박스처럼 보이게 한다. */
 .panel {
   border-radius: var(--radius-md);
-  background: var(--color-surface-alt);
+  background: var(--color-surface);
   padding: 11px 12px;
 }
 

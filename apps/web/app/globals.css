@@ -36,6 +36,9 @@
   --color-danger-bg: #fdedf0;
   --color-danger-text: #c40029;
   --color-accent-tint: #fff1e8;
+  /* v8.3(T86 인접) — 목업 Design Tokens 표 "그린 = 상태(완료·안전·확정)". 개인화 배지의 상태
+     점(dot)에 처음 실사용이 생겨 토큰으로 올린다(그 전까지는 각 화면이 리터럴 hex를 썼다). */
+  --color-success: #009b64;
 
   /* 라운드 (v8.0 신설 — 목업이 기존보다 훨씬 둥근 스케일을 쓴다) */
   --radius-md: 14px;
