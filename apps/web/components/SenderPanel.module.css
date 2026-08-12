@@ -73,10 +73,51 @@
   color: var(--text-muted-60);
 }
 
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  display: inline-block;
+  margin-right: 8px;
+  animation: om-spin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
 .loadingText {
   margin-top: 10px;
   font: 400 11px var(--font-mono);
   color: var(--text-muted-75);
+}
+
+/* v8.0 후속 — 목업의 om-bar 불확정 진행바. */
+.progressTrack {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.progressFill {
+  width: 32%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  animation: om-bar 1.3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    animation: none;
+    width: 100%;
+  }
 }
 
 .errorText {

@@ -31,6 +31,23 @@
   color: var(--text-muted-60);
 }
 
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  display: inline-block;
+  margin-right: 8px;
+  animation: om-spin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
 .emptyHint {
   font: 400 13px var(--font-sans);
   color: var(--text-muted-60);

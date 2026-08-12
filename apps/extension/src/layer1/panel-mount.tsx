@@ -51,6 +51,17 @@ export function openMediationPanel(
   // 깨뜨리는 경로는 없고, 이미 문서화된 한계를 한 지점으로 통합할 뿐이다.
   removeFloatingButton();
 
+  // 🔴 (2026-08-12, 사용자 실사용 재현) 패널이 열려도 host 페이지의 네이티브 텍스트 선택
+  // (`window.getSelection()`)이 지워지지 않고 하이라이트째로 남아 있었다 — 패널 안 아무 요소를
+  // 클릭해도(모드 라디오, select 등) 그 mouseup이 `document`까지 버블돼(Shadow DOM 안이라도
+  // composed 이벤트는 버블된다) `handleMouseUp`이 여전히 그 selection을 유효한 payload로 읽고
+  // **버튼을 다시 그렸다** — 패널이 열려 있는데 버튼도 함께 뜬 것처럼 보인 원인이다. 위 T82
+  // 주석은 "패널 안 클릭이 selection을 collapse시킨다"고 가정했지만 실측 결과 거짓이었다(Duty
+  // to Refute) — 패널 컨텐츠는 host 페이지 DOM 밖(Shadow DOM)에 있어 브라우저가 그 클릭을
+  // "다른 곳 클릭"으로 취급해 자동으로 collapse해 주지 않는다. payload는 이미 캡처했으므로
+  // (`payload.text` 인자로 받음) 선택 자체를 지워도 데이터 손실이 없다 — 명시적으로 지운다.
+  window.getSelection()?.removeAllRanges();
+
   const host = document.createElement('div');
   host.id = HOST_ID;
   document.body.appendChild(host);
