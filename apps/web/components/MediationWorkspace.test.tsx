@@ -9,7 +9,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { URGENCY_LABELS } from '@cross-border/core';
 import { TICKET_DRAFT_SESSION_KEY, TICKET_RESTORE_SESSION_KEY } from '../lib/ticket-draft';
 
-// T25 — `MediationWorkspace`가 "Convert to Task Ticket" 클릭 시 `/ticket`으로 이동한다
+// T25 — `MediationWorkspace`가 "작업 티켓으로 전환" 클릭 시 `/ticket`으로 이동한다
 // (`apps/web/lib/ticket-draft.ts` 참조, next/navigation의 실제 라우터 컨텍스트가 jsdom 테스트에
 // 없으므로 이 리포의 다른 라우팅 테스트(`LogoutButton.test.tsx` 등)와 같은 패턴으로 목한다).
 const mockPush = vi.fn();
@@ -1441,7 +1441,7 @@ describe('MediationWorkspace', () => {
 
   // T25/AC-058① — `ticketOption.offered:true`면 RecipientPanel에 링크가 나타나고, 클릭하면
   // 승인 대상 원문(스냅샷)을 세션에 저장한 뒤 `/ticket`으로 이동한다(`apps/web/lib/ticket-draft.ts`).
-  it('T25 — Convert to Task Ticket 클릭 시 원문을 세션에 저장하고 /ticket으로 이동한다', async () => {
+  it('T25 — 작업 티켓으로 전환 클릭 시 원문을 세션에 저장하고 /ticket으로 이동한다', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(
@@ -1458,7 +1458,7 @@ describe('MediationWorkspace', () => {
 
     const recipientPanel = screen.getByLabelText('수신자 패널');
     const ticketLink = within(recipientPanel).getByRole('button', {
-      name: /Convert to Task Ticket/,
+      name: /작업 티켓으로 전환/,
     });
     fireEvent.click(ticketLink);
 
@@ -1469,7 +1469,7 @@ describe('MediationWorkspace', () => {
   });
 
   // T25/AC-058② — 감정 신호가 낮아 `ticketOption.offered:false`이면 링크 자체가 없다.
-  it('T25 — ticketOption.offered가 false면 Convert to Task Ticket 링크가 없다', async () => {
+  it('T25 — ticketOption.offered가 false면 작업 티켓으로 전환 링크가 없다', async () => {
     const fetchMock = vi.fn().mockResolvedValue(mediateSuccessResponse());
     vi.stubGlobal('fetch', fetchMock);
 
@@ -1482,7 +1482,7 @@ describe('MediationWorkspace', () => {
 
     const recipientPanel = screen.getByLabelText('수신자 패널');
     expect(
-      within(recipientPanel).queryByRole('button', { name: /Convert to Task Ticket/ }),
+      within(recipientPanel).queryByRole('button', { name: /작업 티켓으로 전환/ }),
     ).toBeNull();
   });
 
@@ -1490,7 +1490,7 @@ describe('MediationWorkspace', () => {
   // `MediationWorkspace`가 통째로 재마운트되므로(별개 라우트), `recipient` state도 초기화된다.
   // 원문(text)뿐 아니라 받는 사람 값도 세션 초안으로 함께 들고 다녀야, 돌아왔을 때 다시 입력하지
   // 않아도 된다.
-  it('MAJ-3 — Convert to Task Ticket 후 재마운트(라우트 이동 시뮬레이션)해도 받는 사람 값이 복원된다', async () => {
+  it('MAJ-3 — 작업 티켓으로 전환 후 재마운트(라우트 이동 시뮬레이션)해도 받는 사람 값이 복원된다', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(
@@ -1507,7 +1507,7 @@ describe('MediationWorkspace', () => {
 
     const recipientPanel = screen.getByLabelText('수신자 패널');
     fireEvent.click(
-      within(recipientPanel).getByRole('button', { name: /Convert to Task Ticket/ }),
+      within(recipientPanel).getByRole('button', { name: /작업 티켓으로 전환/ }),
     );
 
     // `/ticket`으로 이동하면서 이 컴포넌트가 언마운트된다(별개 라우트) — 재마운트로 시뮬레이션한다.
@@ -1536,7 +1536,7 @@ describe('MediationWorkspace', () => {
   });
 
   // Major-1(QA GO, follow-up → 수정) — 회귀 테스트: 중재 실행(스냅샷 "A") 후 사용자가 작성창을
-  // 더 편집("A + more", 이 시점부터 `isStale`)하고 나서 "Convert to Task Ticket"을 누르면,
+  // 더 편집("A + more", 이 시점부터 `isStale`)하고 나서 "작업 티켓으로 전환"을 누르면,
   // `/api/ticket`에는 여전히 스냅샷("A")이 전달돼야 하지만(ticketOption이 그 텍스트로 판정됐으므로,
   // 이 동작 자체는 바꾸지 않는다), "Back to message"로 돌아왔을 때 작성창은 편집분("A + more")을
   // 보존해야 한다 — 스냅샷으로 조용히 되돌려지면 안 된다.
@@ -1563,7 +1563,7 @@ describe('MediationWorkspace', () => {
 
     const recipientPanel = screen.getByLabelText('수신자 패널');
     fireEvent.click(
-      within(recipientPanel).getByRole('button', { name: /Convert to Task Ticket/ }),
+      within(recipientPanel).getByRole('button', { name: /작업 티켓으로 전환/ }),
     );
 
     // API에 보낼 원문(TICKET_DRAFT_SESSION_KEY)은 여전히 스냅샷이어야 한다 — 바뀌면 안 된다.
@@ -1605,7 +1605,7 @@ describe('MediationWorkspace', () => {
 
     const recipientPanel = screen.getByLabelText('수신자 패널');
     fireEvent.click(
-      within(recipientPanel).getByRole('button', { name: /Convert to Task Ticket/ }),
+      within(recipientPanel).getByRole('button', { name: /작업 티켓으로 전환/ }),
     );
 
     expect(window.sessionStorage.getItem(TICKET_DRAFT_SESSION_KEY)).not.toBeNull();
@@ -1621,7 +1621,7 @@ describe('MediationWorkspace', () => {
     unmountMediate2();
     fetchMock.mockClear();
 
-    // 게이트(AC-058, "Convert to Task Ticket" 클릭)를 거치지 않고 다시 `/ticket`에 진입한다
+    // 게이트(AC-058, "작업 티켓으로 전환" 클릭)를 거치지 않고 다시 `/ticket`에 진입한다
     // (브라우저 Back/Forward, 북마크, 직접 URL 등을 시뮬레이션).
     render(<TicketWorkspace />);
 
@@ -1633,7 +1633,7 @@ describe('MediationWorkspace', () => {
   });
 });
 
-// T40/AC-005 — "Set response deadline" 진입 버튼은 CRITICAL 메시지에서는 렌더되지 않고
+// T40/AC-005 — "마감 기한 협상" 진입 버튼은 CRITICAL 메시지에서는 렌더되지 않고
 // (비활성이 아니라 미렌더, ticketOffered와 같은 원칙), NORMAL/LOW에서는 렌더된다. 문서가
 // 요구하는 대조 확인(둘 다 실행 출력으로 확인) 그대로 두 케이스를 각각 검증한다.
 describe('MediationWorkspace — T40 응답 기한 협상 진입 (AC-005)', () => {
@@ -1641,7 +1641,7 @@ describe('MediationWorkspace — T40 응답 기한 협상 진입 (AC-005)', () =
     vi.restoreAllMocks();
   });
 
-  it('① CRITICAL 판정 메시지에서는 "Set response deadline" 진입 수단이 렌더되지 않는다', async () => {
+  it('① CRITICAL 판정 메시지에서는 "마감 기한 협상" 진입 수단이 렌더되지 않는다', async () => {
     const fetchMock = vi.fn().mockResolvedValue(mediateSuccessResponse({ urgency: 'CRITICAL' }));
     vi.stubGlobal('fetch', fetchMock);
     render(<MediationWorkspace />);
@@ -1652,10 +1652,10 @@ describe('MediationWorkspace — T40 응답 기한 협상 진입 (AC-005)', () =
     });
 
     const recipientPanel = screen.getByLabelText('수신자 패널');
-    expect(within(recipientPanel).queryByRole('button', { name: 'Set response deadline' })).toBeNull();
+    expect(within(recipientPanel).queryByRole('button', { name: '마감 기한 협상' })).toBeNull();
   });
 
-  it('② NORMAL/LOW 판정 메시지에서는 "Set response deadline" 진입 수단이 렌더된다(항상 미노출이 아님을 대조 확인)', async () => {
+  it('② NORMAL/LOW 판정 메시지에서는 "마감 기한 협상" 진입 수단이 렌더된다(항상 미노출이 아님을 대조 확인)', async () => {
     const fetchMock = vi.fn().mockResolvedValue(mediateSuccessResponse({ urgency: 'NORMAL' }));
     vi.stubGlobal('fetch', fetchMock);
     render(<MediationWorkspace />);
@@ -1667,7 +1667,7 @@ describe('MediationWorkspace — T40 응답 기한 협상 진입 (AC-005)', () =
 
     const recipientPanel = screen.getByLabelText('수신자 패널');
     expect(
-      within(recipientPanel).getByRole('button', { name: 'Set response deadline' }),
+      within(recipientPanel).getByRole('button', { name: '마감 기한 협상' }),
     ).toBeTruthy();
   });
 
@@ -1680,7 +1680,7 @@ describe('MediationWorkspace — T40 응답 기한 협상 진입 (AC-005)', () =
       expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Set response deadline' }));
+    fireEvent.click(screen.getByRole('button', { name: '마감 기한 협상' }));
 
     expect(screen.getByRole('dialog', { name: '응답 기한 협상' })).toBeTruthy();
   });
@@ -1703,7 +1703,7 @@ describe('MediationWorkspace — T40 응답 기한 협상 진입 (AC-005)', () =
     await waitFor(() => {
       expect(screen.getAllByText('Please confirm by tomorrow.').length).toBeGreaterThan(0);
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Set response deadline' }));
+    fireEvent.click(screen.getByRole('button', { name: '마감 기한 협상' }));
 
     fireEvent.change(screen.getByLabelText('희망 응답 기한'), { target: { value: futureLocal } });
     fireEvent.change(screen.getByLabelText('수신자 타임존(IANA, 예: Asia/Tokyo)'), {

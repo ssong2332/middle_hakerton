@@ -276,7 +276,7 @@ describe('RecipientPanel', () => {
 
   // T25/AC-058② — 감정 신호가 낮아 옵션이 제시되지 않으면(ticketOffered=false) "Convert to Task
   // Ticket" 링크는 비활성/회색이 아니라 DOM에서 완전히 사라져야 한다(Absent-not-disabled controls).
-  it('T25/AC-058② — ticketOffered가 false면 Convert to Task Ticket 링크가 렌더되지 않는다', () => {
+  it('T25/AC-058② — ticketOffered가 false면 작업 티켓으로 전환 링크가 렌더되지 않는다', () => {
     render(
       <RecipientPanel
         hasResult={true}
@@ -290,7 +290,7 @@ describe('RecipientPanel', () => {
       />,
     );
 
-    expect(screen.queryByRole('button', { name: /Convert to Task Ticket/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /작업 티켓으로 전환/ })).toBeNull();
   });
 
   // T25/AC-058① — 감정 신호가 있어 옵션이 제시되면(ticketOffered=true) 링크가 나타나고, 클릭하면
@@ -311,13 +311,13 @@ describe('RecipientPanel', () => {
       />,
     );
 
-    const link = screen.getByRole('button', { name: /Convert to Task Ticket/ });
+    const link = screen.getByRole('button', { name: /작업 티켓으로 전환/ });
     expect(onConvertToTicket).not.toHaveBeenCalled();
     fireEvent.click(link);
     expect(onConvertToTicket).toHaveBeenCalledTimes(1);
   });
 
-  // T40/AC-005 — "Set response deadline"은 ticketOffered와 같은 부재-비활성 패턴.
+  // T40/AC-005 — "마감 기한 협상"은 ticketOffered와 같은 부재-비활성 패턴.
   it('T40 — deadlineNegotiationAvailable이 false면(기본값) 진입 버튼이 렌더되지 않는다', () => {
     render(
       <RecipientPanel
@@ -331,7 +331,7 @@ describe('RecipientPanel', () => {
       />,
     );
 
-    expect(screen.queryByRole('button', { name: 'Set response deadline' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '마감 기한 협상' })).toBeNull();
   });
 
   it('T40 — deadlineNegotiationAvailable이 true면 진입 버튼이 렌더되고 클릭 시 콜백을 호출한다', () => {
@@ -350,7 +350,7 @@ describe('RecipientPanel', () => {
       />,
     );
 
-    const button = screen.getByRole('button', { name: 'Set response deadline' });
+    const button = screen.getByRole('button', { name: '마감 기한 협상' });
     expect(onOpen).not.toHaveBeenCalled();
     fireEvent.click(button);
     expect(onOpen).toHaveBeenCalledTimes(1);

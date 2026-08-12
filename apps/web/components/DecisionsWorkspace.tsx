@@ -82,7 +82,7 @@ export function DecisionsWorkspace() {
         disabled={!canGenerate}
       >
         {status === 'loading' && <span aria-hidden="true" className={styles.spinner} />}
-        {status === 'error' ? '다시 시도' : 'Generate summary'}
+        {status === 'error' ? '다시 시도' : '요약 만들기'}
       </button>
 
       {status === 'empty' && (
